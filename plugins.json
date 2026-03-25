@@ -1,0 +1,14 @@
+[
+  {
+    "id": "hello",
+    "name": "Hello Box",
+    "url": "https://raw.githubusercontent.com/YOUR-USERNAME/blank-board-plugins/main/plugins/hello/plugin.js",
+    "author": "Your Name"
+  },
+  {
+    "id": "notes",
+    "name": "Sticky Notes",
+    "url": "https://raw.githubusercontent.com/someone/awesome-plugin/main/plugin.js",
+    "author": "Community"
+  }
+]
