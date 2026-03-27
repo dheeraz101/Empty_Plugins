@@ -2,7 +2,7 @@
 
 > A community-driven plugin registry for **Empty**. Drop in a JSON file, share your plugins, extend your board.
 
-[!Website](https://emptyweb.netlify.app/)
+[![Website](https://img.shields.io/badge/website-live-brightgreen?style=for-the-badge&logo=google-chrome)](https://emptyweb.netlify.app/)
 [![Docs](https://img.shields.io/badge/docs-Mintlify-blue)](https://empty-ad9a3406.mintlify.app/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](#license)
 
@@ -23,7 +23,7 @@
 
 ### 1. Install a Plugin
 
-Open **Empty*** and navigate to **Settings → Plugins**, then paste the registry URL: https://raw.githubusercontent.com/dheeraz101/Empty_Plugins/main/plugins.json
+Open **Empty** and navigate to **Settings → Plugins**, then paste the registry URL: https://raw.githubusercontent.com/dheeraz101/Empty_Plugins/main/plugins.json
 
 Browse the catalog and install with one click.
 
@@ -42,6 +42,7 @@ Want to share your plugin? Open a Pull Request!
 
 1. **Fork** this repo
 2. **Edit** `plugins.json` — add your entry:
+
    ```json
    {
      "id": "your-plugin-id",
