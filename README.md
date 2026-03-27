@@ -1,6 +1,16 @@
 # 🧩 Empty Plugins
 
-A community plugin registry for **Empty**. Browse, install, and share plugins to extend your board.
+> A community-driven plugin registry for **Empty**. Drop in a JSON file, share your plugins, extend your board.
+
+[!Website](https://emptyweb.netlify.app/)
+[![Docs](https://img.shields.io/badge/docs-Mintlify-blue)](https://empty-ad9a3406.mintlify.app/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](#license)
+
+---
+
+## About
+
+**Empty Plugins** is a centralized registry that makes it easy to discover, install, and share plugins for **Empty***. Instead of hunting across repos and threads, point your app at one URL and get access to the entire community plugin catalog.
 
 ## 📦 Available Plugins
 
@@ -9,22 +19,33 @@ A community plugin registry for **Empty**. Browse, install, and share plugins to
 | `hello` | Hello Box | Your Name |
 | `notes` | Sticky Notes | Community |
 
-## 🚀 How to Use
+## 🚀 Getting Started
 
-1. Open **Empty** and go to **Settings → Plugins**
-2. Paste the registry URL: https://raw.githubusercontent.com/dheeraz101/Empty_Plugins/main/plugins.json
-3. Browse and install any plugin from the list
+### 1. Install a Plugin
 
-## ➕ Adding Your Plugin
+Open **Empty*** and navigate to **Settings → Plugins**, then paste the registry URL: https://raw.githubusercontent.com/dheeraz101/Empty_Plugins/main/plugins.json
 
-Want to share your plugin with the community? Open a Pull Request!
+Browse the catalog and install with one click.
+
+### 2. Build Your Own
+
+Check out the **[Documentation](https://empty-ad9a3406.mintlify.app/)** for a full guide on:
+
+- Plugin architecture & lifecycle hooks
+- Available APIs and UI components
+- Best practices and common patterns
+- Debugging and testing your plugin locally
+
+## ➕ Submit Your Plugin
+
+Want to share your plugin? Open a Pull Request!
 
 1. **Fork** this repo
-2. **Edit** `plugins.json` — add your plugin entry:
-```json
-{
-  "id": "your-plugin-id",
-  "name": "Your Plugin Name",
-  "url": "https://raw.githubusercontent.com/your-username/your-repo/main/plugin.js",
-  "author": "Your Name"
-}
+2. **Edit** `plugins.json` — add your entry:
+   ```json
+   {
+     "id": "your-plugin-id",
+     "name": "Your Plugin Name",
+     "url": "https://raw.githubusercontent.com/your-username/your-repo/main/plugin.js",
+     "author": "Your Name"
+   }
