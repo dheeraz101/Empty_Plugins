@@ -10,5 +10,17 @@
     "name": "Layout",
     "url": "https://raw.githubusercontent.com/dheeraz101/Layouts/refs/heads/main/layout.js",
     "author": "Dheeraz"
+  },
+  {
+  "id": "clock-widget",
+  "name": "Clock Widget",
+  "url": "https://raw.githubusercontent.com/dheeraz101/Clock/refs/heads/main/clock-widget.js",
+  "author": "Dheeraz"
+  },
+  {
+  "id": "notes-widget",
+  "name": "Notes Widget",
+  "url": "https://raw.githubusercontent.com/dheeraz101/Notes/refs/heads/main/notes-widget.js",
+  "author": "Dheeraz"
   }
 ]
