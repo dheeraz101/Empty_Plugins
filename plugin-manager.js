@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.2.0',
+  version: '3.3.0',
   compat: '>=3.3.0'
 };
 
@@ -41,11 +41,6 @@ export function setup(api) {
       align-items:center;
       padding:14px 18px;
       border-bottom:1px solid rgba(255,255,255,0.08);
-    }
-
-    .pm-left {
-      display:flex;
-      flex-direction:column;
     }
 
     .pm-right {
@@ -89,24 +84,6 @@ export function setup(api) {
       padding:16px;
     }
 
-    .pm-panel::-webkit-scrollbar {
-      width:8px;
-    }
-
-    .pm-panel::-webkit-scrollbar-thumb {
-      background:#444;
-      border-radius:10px;
-    }
-
-    .pm-panel::-webkit-scrollbar-thumb:hover {
-      background:#666;
-    }
-
-    .pm-panel {
-      scrollbar-width: thin;
-      scrollbar-color: #444 transparent;
-    }
-
     .pm-card {
       background:#2a2a2e;
       padding:14px;
@@ -134,14 +111,13 @@ export function setup(api) {
 
   root.innerHTML = `
     <div class="pm-header">
-      <div class="pm-left">
+      <div>
         <b>⚙️ Plugin Manager</b>
         <div id="pm-stats" style="font-size:12px;color:#888"></div>
       </div>
 
       <div class="pm-right">
         <div id="pm-actions"></div>
-        <a href="https://empty-ad9a3406.mintlify.app/" target="_blank" style="color:#7c6fff">Docs</a>
         <button id="pm-close" class="pm-btn">✕</button>
       </div>
     </div>
@@ -161,29 +137,42 @@ export function setup(api) {
   api.makeDraggable(root);
   api.makeResizable(root);
 
-  // ───────── UI SLOT SYSTEM (CORE FIX) ─────────
+  // ───────── SLOT SYSTEM (CONTROLLED) ─────────
   const slots = {
     'header-actions': root.querySelector('#pm-actions')
   };
 
-  api.registerUI = (slot, el, id) => {
-    if (!slots[slot]) {
-      console.warn(`Invalid slot: ${slot}`);
-      return;
-    }
+  const slotRegistry = new Map(); // pluginId → elements[]
+
+  api.registerUI = (slot, el, id, pluginId = 'unknown') => {
+    if (!slots[slot]) return;
 
     // prevent duplicates
     if (id && slots[slot].querySelector(`[data-ui-id="${id}"]`)) return;
 
     if (id) el.dataset.uiId = id;
+    el.dataset.owner = pluginId;
 
     slots[slot].appendChild(el);
+
+    // track ownership
+    if (!slotRegistry.has(pluginId)) {
+      slotRegistry.set(pluginId, []);
+    }
+    slotRegistry.get(pluginId).push(el);
   };
+
+  function cleanupPluginUI(pluginId) {
+    const items = slotRegistry.get(pluginId);
+    if (!items) return;
+
+    items.forEach(el => el.remove());
+    slotRegistry.delete(pluginId);
+  }
 
   // ───────── STATE ─────────
   let communityCache = [];
 
-  // ───────── INSTALLED ─────────
   function renderInstalled() {
     const el = root.querySelector('#installed');
     const plugins = api.registry.getAll();
@@ -211,16 +200,13 @@ export function setup(api) {
       `${plugins.length} plugins`;
   }
 
-  // ───────── COMMUNITY ─────────
   async function loadCommunity() {
     if (communityCache.length) return communityCache;
-
     try {
       communityCache = await fetch(COMMUNITY_URL).then(r => r.json());
     } catch {
       communityCache = [];
     }
-
     return communityCache;
   }
 
@@ -229,28 +215,24 @@ export function setup(api) {
     const list = await loadCommunity();
     const installed = new Set(api.registry.getAll().map(p => p.id));
 
-    el.innerHTML = list.map(p => {
-      const isInstalled = installed.has(p.id);
+    el.innerHTML = list.map(p => `
+      <div class="pm-card">
+        <div>${p.icon || '📦'}</div>
+        <b>${p.name}</b>
+        <div style="font-size:12px;color:#888">${p.author || 'Unknown'}</div>
+        <div style="font-size:13px">${p.description || ''}</div>
 
-      return `
-        <div class="pm-card">
-          <div style="font-size:18px">${p.icon || '📦'}</div>
-          <b>${p.name}</b>
-          <div style="font-size:12px;color:#888">${p.author || 'Unknown'}</div>
-          <div style="font-size:13px;margin-top:6px">${p.description || ''}</div>
-
-          ${
-            isInstalled
-              ? `<button class="pm-btn secondary" disabled>Installed</button>`
-              : `<button class="pm-btn primary"
-                  data-install="${p.id}"
-                  data-url="${p.url}">
-                  Install
-                </button>`
-          }
-        </div>
-      `;
-    }).join('');
+        ${
+          installed.has(p.id)
+            ? `<button class="pm-btn secondary" disabled>Installed</button>`
+            : `<button class="pm-btn primary"
+                data-install="${p.id}"
+                data-url="${p.url}">
+                Install
+              </button>`
+        }
+      </div>
+    `).join('');
   }
 
   // ───────── EVENTS ─────────
@@ -268,6 +250,7 @@ export function setup(api) {
     }
 
     if (btn.dataset.act === 'delete') {
+      cleanupPluginUI(id); // 🔥 FORCE UI CLEANUP
       await api.deletePlugin(id);
       api.storage.remove(`plugin:${id}`);
       api.bus.emit('plugin:deleted', { id });
@@ -282,6 +265,11 @@ export function setup(api) {
       renderCommunity();
     }
   };
+
+  // ───────── AUTO REFRESH ─────────
+  api.bus.on('plugin:installed', renderInstalled);
+  api.bus.on('plugin:deleted', renderInstalled);
+  api.bus.on('plugin:toggled', renderInstalled);
 
   // ───────── TABS ─────────
   root.querySelectorAll('.pm-tab').forEach(tab => {
@@ -298,7 +286,7 @@ export function setup(api) {
     };
   });
 
-  // ───────── OPEN / CLOSE ─────────
+  // ───────── OPEN ─────────
   api.boardEl.addEventListener('contextmenu', (e) => {
     if (e.target.closest('.pm-root')) return;
     e.preventDefault();
@@ -311,7 +299,12 @@ export function setup(api) {
     root.style.display = 'none';
   };
 
-  console.log('🔥 Plugin Manager v3.2 (Controlled Core)');
+  // 🔥 FIX EMPTY LOAD BUG
+  requestAnimationFrame(() => {
+    renderInstalled();
+  });
+
+  console.log('🔥 Plugin Manager v3.3 (Controlled System)');
 }
 
 export function teardown() {}
