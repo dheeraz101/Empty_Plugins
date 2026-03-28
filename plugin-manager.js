@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.4.1',
+  version: '3.4.2',
   compat: '>=3.3.0'
 };
 
@@ -23,7 +23,8 @@ export function setup(api) {
       max-width: 95vw;
       max-height: 90vh;
       display: none;
-      z-index: 10000;
+      pointer-events: auto
+      z-index: 10001;
       background: #161618;
       border-radius: 16px;
       color: #ececec;
