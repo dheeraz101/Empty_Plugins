@@ -23,7 +23,7 @@ export function setup(api) {
       max-width: 95vw;
       max-height: 90vh;
       pointer-events: auto;
-      z-index: 999999;
+      z-index: 2147483647;
       background: #161618;
       border-radius: 16px;
       color: #ececec;
