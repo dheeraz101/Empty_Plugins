@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.4.3',
+  version: '3.4.4',
   compat: '>=3.3.0'
 };
 
@@ -45,6 +45,16 @@ export function setup(api) {
       border-bottom:1px solid rgba(255,255,255,0.08);
       background: rgba(255,255,255,0.02);
     }
+
+    #pm-close {
+      background: transparent;
+      color: #aaa;
+      font-size: 18px;
+      border: none;
+      cursor: pointer;
+    }
+
+    #pm-close:hover { color: #fff; }
 
     .pm-right { display:flex; align-items:center; gap:12px; }
     #pm-actions { display:flex; gap:8px; }
@@ -114,6 +124,10 @@ export function setup(api) {
     .danger { background:#e5484d22; color:#ff6b6b; }
     .secondary { background:rgba(255,255,255,0.08); color:#ddd; }
 
+    .bb-modal-overlay {
+      z-index: 2147483648 !important;
+    }
+
   `;
   document.head.appendChild(style);
 
@@ -136,6 +150,7 @@ export function setup(api) {
 
       <div class="pm-right">
         <div id="pm-actions"></div>
+        <button id="pm-close">✕</button>
       </div>
     </div>
 
@@ -153,6 +168,18 @@ export function setup(api) {
   api.boardEl.appendChild(root);
   api.makeDraggable(root);
   api.makeResizable(root);
+
+   // ───────── FIX: CLOSE BUTTON ─────────
+  root.querySelector('#pm-close').onclick = () => {
+    root.style.display = 'none';
+  };
+
+  // ───────── FIX: ESC KEY CLOSE ─────────
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && root.style.display === 'flex') {
+      root.style.display = 'none';
+    }
+  });
 
   const slots = { 'header-actions': root.querySelector('#pm-actions') };
 
@@ -189,6 +216,9 @@ export function setup(api) {
 
     const modal = api.showModal({ title: 'Install Plugin', content: wrap });
 
+    const overlay = document.querySelector('div[style*="z-index: 100001"]');
+    if (overlay) overlay.style.zIndex = 2147483648;
+
     wrap.querySelector('#pm-install').onclick = async () => {
       const url = wrap.querySelector('#pm-url').value.trim();
       const id = wrap.querySelector('#pm-id').value.trim();
@@ -211,7 +241,7 @@ export function setup(api) {
   installBtn.textContent = 'Install via URL';
   installBtn.onclick = openInstallModal;
 
-  slots['header-actions'].appendChild(installBtn);
+  root.querySelector('#pm-actions').appendChild(installBtn);
 
   // ───────── RENDER ─────────
   function renderInstalled() {
@@ -330,7 +360,7 @@ export function setup(api) {
     renderInstalled();
   });
 
-  console.log('🔥 Plugin Manager v3.4.3 (UI + Core Fixed)');
+  console.log('🔥 Plugin Manager v3.4.4 (UI + Core Fixed)');
 }
 
 export function teardown() {}
