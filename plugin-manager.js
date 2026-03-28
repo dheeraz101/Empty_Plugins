@@ -92,6 +92,12 @@ export function setup(api) {
       padding-bottom:40px; /* FIX: bottom breathing space */
     }
 
+    .pm-panel::after {
+      content: "";
+      display: block;
+      height: 30px; /* controls bottom spacing */
+    }
+
     /* 🔥 SCROLLBAR FIX */
     .pm-panel::-webkit-scrollbar {
       width: 8px;
