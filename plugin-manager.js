@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.4.4',
+  version: '3.4.5',
   compat: '>=3.3.0'
 };
 
@@ -85,7 +85,30 @@ export function setup(api) {
     }
 
     .pm-body { flex:1; overflow:hidden; background: #1c1c1f; }
-    .pm-panel { height:100%; overflow:auto; padding:20px; }
+    .pm-panel {
+      height:100%;
+      overflow:auto;
+      padding:20px;
+      padding-bottom:40px; /* FIX: bottom breathing space */
+    }
+
+    /* 🔥 SCROLLBAR FIX */
+    .pm-panel::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .pm-panel::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .pm-panel::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.15);
+      border-radius: 10px;
+    }
+
+    .pm-panel::-webkit-scrollbar-thumb:hover {
+      background: rgba(255,255,255,0.25);
+    }
 
     .pm-card {
       background: rgba(255,255,255,0.04);
@@ -208,17 +231,47 @@ export function setup(api) {
   // ───────── INSTALL MODAL ─────────
   function openInstallModal() {
     const wrap = document.createElement('div');
+
     wrap.innerHTML = `
-      <input placeholder="Plugin URL" id="pm-url"/>
-      <input placeholder="Plugin ID" id="pm-id"/>
-      <button id="pm-install">Install</button>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <b style="font-size:14px;">Install Plugin</b>
+        <button id="pm-modal-close" style="
+          background:none;
+          border:none;
+          font-size:18px;
+          cursor:pointer;
+          color:#888;
+        ">✕</button>
+      </div>
+
+      <input placeholder="Plugin URL" id="pm-url" style="width:100%; margin-bottom:8px; padding:6px;" />
+      <input placeholder="Plugin ID" id="pm-id" style="width:100%; margin-bottom:10px; padding:6px;" />
+
+      <button id="pm-install" style="
+        width:100%;
+        padding:8px;
+        background:#7c6fff;
+        color:#fff;
+        border:none;
+        border-radius:6px;
+        cursor:pointer;
+      ">
+        Install
+      </button>
     `;
 
-    const modal = api.showModal({ title: 'Install Plugin', content: wrap });
+    const modal = api.showModal({ content: wrap });
 
+    // 🔥 FIX: bring modal above everything
     const overlay = document.querySelector('div[style*="z-index: 100001"]');
     if (overlay) overlay.style.zIndex = 2147483648;
 
+    // ❌ CLOSE BUTTON FIX
+    wrap.querySelector('#pm-modal-close').onclick = () => {
+      modal.close();
+    };
+
+    // INSTALL LOGIC
     wrap.querySelector('#pm-install').onclick = async () => {
       const url = wrap.querySelector('#pm-url').value.trim();
       const id = wrap.querySelector('#pm-id').value.trim();
@@ -250,8 +303,33 @@ export function setup(api) {
 
     el.innerHTML = plugins.map(p => `
       <div class="pm-card">
-        <b>${p.name || p.id}</b>
-        <div style="font-size:11px;color:#666">${p.id}</div>
+        <div style="display:flex; gap:12px; align-items:flex-start;">
+          
+          <div style="
+            font-size:22px;
+            background:rgba(255,255,255,0.05);
+            padding:8px;
+            border-radius:8px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+          ">
+            ${p.icon || '📦'}
+          </div>
+
+          <div style="flex:1">
+            <b style="font-size:15px">${p.name || p.id}</b>
+            
+            <div style="font-size:11px;color:#7c6fff;margin-top:2px">
+              ${p.author ? 'by ' + p.author : ''}
+            </div>
+
+            <div style="font-size:11px;color:#666;margin-top:2px">
+              ${p.id}
+            </div>
+          </div>
+
+        </div>
 
         <div style="margin-top:12px">
           ${
@@ -287,14 +365,43 @@ export function setup(api) {
 
     el.innerHTML = communityCache.map(p => `
       <div class="pm-card">
-        <b>${p.name}</b>
-        <div>${p.description || ''}</div>
+        <div style="display:flex; gap:12px;">
+          
+          <div style="
+            font-size:24px;
+            background:rgba(255,255,255,0.05);
+            padding:10px;
+            border-radius:10px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+          ">
+            ${p.icon || '📦'}
+          </div>
 
-        ${
-          installed.has(p.id)
-            ? `<button class="pm-btn secondary" disabled>Installed</button>`
-            : `<button class="pm-btn primary" data-install="${p.id}" data-url="${p.url}">Install</button>`
-        }
+          <div style="flex:1">
+            <b style="font-size:15px">${p.name}</b>
+
+            <div style="font-size:11px;color:#7c6fff;margin-top:2px">
+              by ${p.author || 'Unknown'}
+            </div>
+
+            <div style="font-size:13px;color:#aaa;margin-top:6px;line-height:1.4">
+              ${p.description || ''}
+            </div>
+          </div>
+
+        </div>
+
+        <div style="margin-top:12px">
+          ${
+            installed.has(p.id)
+              ? `<button class="pm-btn secondary" disabled style="width:100%;opacity:0.5">Installed</button>`
+              : `<button class="pm-btn primary" style="width:100%" data-install="${p.id}" data-url="${p.url}">
+                  Install Plugin
+                </button>`
+          }
+        </div>
       </div>
     `).join('');
   }
@@ -360,7 +467,7 @@ export function setup(api) {
     renderInstalled();
   });
 
-  console.log('🔥 Plugin Manager v3.4.4 (UI + Core Fixed)');
+  console.log('🔥 Plugin Manager v3.4.5 (UI + Core Fixed)');
 }
 
 export function teardown() {}
