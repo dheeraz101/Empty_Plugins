@@ -125,25 +125,23 @@ export function setup(api) {
   // ─────────────────────────────
 
   // Add button into Plugin Manager header instead of broken tab hook
-  setTimeout(() => {
-    const btn = document.createElement('button');
-    btn.textContent = '🎨 Themes';
-    btn.style.cssText = `
-      margin-left:10px;
-      padding:6px 10px;
-      border-radius:8px;
-      background:#7c6fff;
-      color:white;
-      border:none;
-      cursor:pointer;
-    `;
+  function injectThemeButton() {
+    if (document.getElementById('theme-btn')) return;
 
+    const header = document.querySelector('.pm-header');
+    if (!header) return;
+
+    const btn = document.createElement('button');
+    btn.id = 'theme-btn';
+    btn.textContent = '🎨 Themes';
+
+    btn.className = 'pm-btn primary';
     btn.onclick = openThemePanel;
 
-    // inject into manager if found
-    const header = document.querySelector('.pm-root div');
-    if (header) header.appendChild(btn);
-  }, 1500);
+    header.appendChild(btn);
+  }
+
+  api.bus.on('plugin:loaded', injectThemeButton);
 
   // ─────────────────────────────
   // 🚀 INIT
