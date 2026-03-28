@@ -3,24 +3,32 @@
     "id": "welcome",
     "name": "Welcome",
     "url": "https://raw.githubusercontent.com/dheeraz101/Empty/refs/heads/main/plugins/hello/plugin.js",
-    "author": "Empty"
+    "author": "Empty",
+    "description": "A friendly welcome widget to get you started with Blank Board.",
+    "icon": "👋"
   },
   {
     "id": "layout",
     "name": "Layout",
     "url": "https://raw.githubusercontent.com/dheeraz101/Layouts/refs/heads/main/layout.js",
-    "author": "Dheeraz"
+    "author": "Dheeraz",
+    "description": "Advanced layout tools and grid helpers for your board.",
+    "icon": "📐"
   },
   {
-  "id": "clock-widget",
-  "name": "Clock Widget",
-  "url": "https://raw.githubusercontent.com/dheeraz101/Clock/refs/heads/main/clock-widget.js",
-  "author": "Dheeraz"
+    "id": "clock-widget",
+    "name": "Clock Widget",
+    "url": "https://raw.githubusercontent.com/dheeraz101/Clock/refs/heads/main/clock-widget.js",
+    "author": "Dheeraz",
+    "description": "Beautiful analog & digital clock widget with multiple styles.",
+    "icon": "⏰"
   },
   {
-  "id": "notes-widget",
-  "name": "Notes Widget",
-  "url": "https://raw.githubusercontent.com/dheeraz101/Notes/refs/heads/main/notes-widget.js",
-  "author": "Dheeraz"
+    "id": "notes-widget",
+    "name": "Notes Widget",
+    "url": "https://raw.githubusercontent.com/dheeraz101/Notes/refs/heads/main/notes-widget.js",
+    "author": "Dheeraz",
+    "description": "Quick sticky notes with auto-save and rich text support.",
+    "icon": "📝"
   }
 ]
