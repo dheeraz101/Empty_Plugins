@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '0.6.0',
+  version: '0.8.0',
   compat: '>=3.3.0'
 };
 
@@ -9,6 +9,7 @@ export function setup(api) {
   const SELF_ID = meta.id;
   const COMMUNITY_JSON_URL = 'https://raw.githubusercontent.com/dheeraz101/Empty_Plugins/refs/heads/main/plugins.json';
 
+  // ── Create Manager UI ──
   const manager = document.createElement('div');
   manager.className = 'plugin-box';
   manager.style.cssText = `
@@ -35,10 +36,8 @@ export function setup(api) {
         <div>
           <div style="font-size:17px; font-weight:700; display:flex; align-items:center; gap:10px;">
             Plugin Manager
-            <a href="https://empty-ad9a3406.mintlify.app/" target="_blank" 
-              style="text-decoration:none;">
-              <img src="https://img.shields.io/badge/docs-open-blue?style=flat&logo=book" 
-                  style="height:18px; border-radius:6px;">
+            <a href="https://empty-ad9a3406.mintlify.app/" target="_blank" style="text-decoration:none;">
+              <img src="https://img.shields.io/badge/docs-open-blue?style=flat&logo=book" style="height:18px; border-radius:6px;">
             </a>
           </div>
           <div style="font-size:12px; color:#777;">Manage your plugins</div>
@@ -50,13 +49,17 @@ export function setup(api) {
     </div>
 
     <!-- Tabs -->
-    <div style="display:flex; background:#1a1a1a; border-bottom:1px solid #2a2a2a;">
+    <div style="display:flex; background:#1a1a1a; border-bottom:1px solid #2a2a2a;" id="tabs-container">
       <button id="tab-installed" class="tab active">Installed Plugins</button>
       <button id="tab-community" class="tab">Community Store</button>
     </div>
 
     <!-- Installed Panel -->
     <div id="panel-installed" class="panel-content">
+      <div style="padding:12px 20px; background:#1a1a1a; border-bottom:1px solid #333;">
+        <input id="search-installed" type="text" placeholder="Search plugins..." 
+               style="width:100%; padding:10px 14px; background:#222; border:1px solid #444; border-radius:10px; color:#fff; font-size:14px;">
+      </div>
       <table style="width:100%; border-collapse:collapse; font-size:14px;">
         <thead>
           <tr style="background:#1a1a1a; border-bottom:1px solid #333;">
@@ -102,14 +105,15 @@ export function setup(api) {
   api.boardEl.appendChild(manager);
   api.makeDraggable(manager);
 
-  // Elements
+  // ── DOM Elements ──
   const closeBtn = manager.querySelector('#close-btn');
   const tabInstalled = manager.querySelector('#tab-installed');
   const tabCommunity = manager.querySelector('#tab-community');
   const panelInstalled = manager.querySelector('#panel-installed');
   const panelCommunity = manager.querySelector('#panel-community');
+  const searchInput = manager.querySelector('#search-installed');
 
-  // Close
+  // Close button
   closeBtn.addEventListener('click', () => manager.style.display = 'none');
 
   // Tab switching
@@ -128,58 +132,87 @@ export function setup(api) {
   // Tab styles
   const tabStyle = document.createElement('style');
   tabStyle.textContent = `
-    .tab {
-      flex: 1;
-      padding: 16px 0;
-      font-size: 14.5px;
-      font-weight: 600;
-      border: none;
-      background: none;
-      color: #888;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .tab.active {
-      color: #fff;
-      border-bottom: 3px solid #7c6fff;
-      background: #151515;
-    }
+    .tab { flex: 1; padding: 16px 0; font-size: 14.5px; font-weight: 600; border: none; background: none; color: #888; cursor: pointer; transition: all 0.2s; }
+    .tab.active { color: #fff; border-bottom: 3px solid #7c6fff; background: #151515; }
     .tab:hover:not(.active) { color: #ccc; }
-    .panel-content { padding: 24px; overflow: auto; max-height: calc(90vh - 140px); }
+    .panel-content { padding: 0; overflow: auto; max-height: calc(90vh - 140px); }
   `;
   document.head.appendChild(tabStyle);
 
-  // Render Installed
-  function renderInstalled() {
+  // ── Strong Self-Protection ──
+  function protectSelf() {
+    const originalDelete = api.deletePlugin;
+    api.deletePlugin = (id) => {
+      if (id === SELF_ID) {
+        api.notify("❌ Plugin Manager is a core plugin and cannot be deleted.", "error", 6000);
+        return false;
+      }
+      return originalDelete(id);
+    };
+
+    const originalToggle = api.togglePlugin;
+    api.togglePlugin = async (id) => {
+      if (id === SELF_ID) {
+        api.notify("❌ Plugin Manager cannot be disabled.", "error", 4000);
+        return false;
+      }
+      return await originalToggle(id);
+    };
+  }
+  protectSelf();
+
+  // ── Extensibility Hooks (for other plugins to customize the manager) ──
+  api.registerHook('manager:renderInstalledRow', (plugin) => null);   // return extra HTML or null
+  api.registerHook('manager:renderCommunityCard', (plugin) => null); // return extra HTML or null
+  api.registerHook('manager:addTab', (tabs) => {});                 // can push new tab buttons
+
+  // Render Installed (with search + hooks)
+  function renderInstalled(filter = '') {
     const plugins = api.registry.getAll();
     const tbody = manager.querySelector('#installed-list');
-    
-    tbody.innerHTML = plugins.map(p => {
-      const isSelf = p.id === SELF_ID;
-      return `
-        <tr style="border-bottom:1px solid #222;">
-          <td style="padding:16px 20px;">
-            <div style="font-weight:600;">${p.name || p.id}</div>
-            <div style="font-size:12.5px; color:#666;">${p.id}</div>
-          </td>
-          <td style="padding:16px 20px; text-align:center;">
-            <span style="padding:6px 18px; border-radius:9999px; font-size:13px; background:${p.enabled ? '#1a3a1a' : '#3a1a1a'}; color:${p.enabled ? '#4caf50' : '#ff6666'};">
-              ${p.enabled ? '● Enabled' : '⏸ Paused'}
-            </span>
-          </td>
-          <td style="padding:16px 20px; text-align:right;">
-            ${isSelf ? 
-              `<span style="color:#555; font-size:13px;">Protected</span>` : `
-              <button data-action="toggle" data-id="${p.id}" style="margin-right:8px; padding:8px 16px; border:1px solid #444; border-radius:8px; background:#222; color:#ddd; cursor:pointer;">
-                ${p.enabled ? 'Pause' : 'Resume'}
-              </button>
-              <button data-action="delete" data-id="${p.id}" style="padding:8px 16px; background:#3a1a1a; color:#ff6666; border:1px solid #ff4444; border-radius:8px; cursor:pointer;">
-                Delete
-              </button>`}
-          </td>
-        </tr>`;
-    }).join('');
+    let html = '';
+
+    plugins
+      .filter(p => p.name?.toLowerCase().includes(filter) || p.id.toLowerCase().includes(filter))
+      .forEach(p => {
+        const isSelf = p.id === SELF_ID;
+        let row = `
+          <tr style="border-bottom:1px solid #222;">
+            <td style="padding:16px 20px;">
+              <div style="font-weight:600;">${p.name || p.id}</div>
+              <div style="font-size:12.5px; color:#666;">${p.id}</div>
+            </td>
+            <td style="padding:16px 20px; text-align:center;">
+              <span style="padding:6px 18px; border-radius:9999px; font-size:13px; background:${p.enabled ? '#1a3a1a' : '#3a1a1a'}; color:${p.enabled ? '#4caf50' : '#ff6666'};">
+                ${p.enabled ? '● Enabled' : '⏸ Paused'}
+              </span>
+            </td>
+            <td style="padding:16px 20px; text-align:right;">
+              ${isSelf ? 
+                `<span style="color:#ffaa00; font-weight:600; font-size:13px;">🔒 Core Plugin (Protected)</span>` : `
+                <button data-action="toggle" data-id="${p.id}" style="margin-right:8px; padding:8px 16px; border:1px solid #444; border-radius:8px; background:#222; color:#ddd; cursor:pointer;">
+                  ${p.enabled ? 'Pause' : 'Resume'}
+                </button>
+                <button data-action="delete" data-id="${p.id}" style="padding:8px 16px; background:#3a1a1a; color:#ff6666; border:1px solid #ff4444; border-radius:8px; cursor:pointer;">
+                  Delete
+                </button>`}
+            </td>
+          </tr>`;
+
+        // Allow other plugins to inject extra content
+        const extras = api.useHook('manager:renderInstalledRow', p);
+        extras.forEach(extra => { if (extra) row += extra; });
+
+        html += row;
+      });
+
+    tbody.innerHTML = html || `<tr><td colspan="3" style="padding:40px; text-align:center; color:#777;">No plugins found</td></tr>`;
   }
+
+  // Search functionality
+  searchInput.addEventListener('input', (e) => {
+    renderInstalled(e.target.value.toLowerCase().trim());
+  });
 
   // Load Community Plugins
   async function loadCommunityPlugins() {
@@ -195,25 +228,34 @@ export function setup(api) {
       let html = '';
       plugins.forEach(p => {
         const alreadyInstalled = api.registry.getAll().some(i => i.id === p.id);
-        html += `
+        let card = `
           <div style="background:#1a1a1a; border:1px solid #333; border-radius:12px; padding:18px;">
             <div style="font-size:22px; margin-bottom:8px;">${p.icon || '📦'}</div>
             <div style="font-weight:600; font-size:15px;">${p.name}</div>
             <div style="font-size:12.5px; color:#777; margin:4px 0 10px;">by ${p.author || 'community'}</div>
-            <div style="font-size:13px; color:#aaa; line-height:1.5;">${p.description || 'No description'}</div>
-            
-            ${alreadyInstalled ? 
-              `<div style="margin-top:16px; color:#4caf50; font-size:14px;">✓ Already installed</div>` :
-              `<button data-id="${p.id}" data-url="${p.url}" data-name="${p.name}" 
-                style="margin-top:16px; width:100%; padding:12px; background:#7c6fff; color:white; border:none; border-radius:10px; font-weight:600; cursor:pointer;">
-                Install
-              </button>`}
-          </div>`;
+            <div style="font-size:13px; color:#aaa; line-height:1.5;">${p.description || 'No description'}</div>`;
+        
+        if (alreadyInstalled) {
+          card += `<div style="margin-top:16px; color:#4caf50; font-size:14px;">✓ Already installed</div>`;
+        } else {
+          card += `<button data-id="${p.id}" data-url="${p.url}" data-name="${p.name}" 
+                    style="margin-top:16px; width:100%; padding:12px; background:#7c6fff; color:white; border:none; border-radius:10px; font-weight:600; cursor:pointer;">
+                    Install
+                  </button>`;
+        }
+        card += `</div>`;
+
+        // Allow other plugins to customize community cards
+        const extras = api.useHook('manager:renderCommunityCard', p);
+        extras.forEach(extra => { if (extra) card += extra; });
+
+        html += card;
       });
 
       container.innerHTML = html;
       loading.style.display = 'none';
 
+      // Install handler
       container.querySelectorAll('button[data-id]').forEach(btn => {
         btn.addEventListener('click', async () => {
           const success = await api.installPlugin(btn.dataset.id, btn.dataset.url, btn.dataset.name);
@@ -221,10 +263,7 @@ export function setup(api) {
             btn.textContent = '✓ Installed';
             btn.style.background = '#4caf50';
             btn.disabled = true;
-            setTimeout(() => {
-              showTab('installed');
-              renderInstalled();
-            }, 800);
+            setTimeout(() => { showTab('installed'); renderInstalled(); }, 800);
           }
         });
       });
@@ -243,11 +282,11 @@ export function setup(api) {
 
     if (action === 'toggle') {
       await api.togglePlugin(id);
-      renderInstalled();
+      renderInstalled(searchInput.value.toLowerCase().trim());
     } else if (action === 'delete') {
       if (confirm(`Delete "${id}" permanently?`)) {
         api.deletePlugin(id);
-        renderInstalled();
+        renderInstalled(searchInput.value.toLowerCase().trim());
       }
     }
   });
@@ -267,7 +306,7 @@ export function setup(api) {
     }
   });
 
-  // Right-click to open manager
+  // Right-click to open
   api.boardEl.addEventListener('contextmenu', (e) => {
     if (e.target.closest('.plugin-box')) return;
     e.preventDefault();
@@ -278,12 +317,12 @@ export function setup(api) {
     showTab('installed');
   });
 
-  // Self protection
+  // Fallback protection
   api.bus.on('plugin:unloaded', (id) => {
     if (id === SELF_ID) manager.remove();
   });
 
-  console.log('✅ Plugin Manager v0.6.0 loaded');
+  console.log('✅ Plugin Manager v0.8.0 loaded (fully extensible & protected)');
 }
 
 export function teardown() {
