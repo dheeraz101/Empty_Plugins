@@ -1,77 +1,158 @@
 export const meta = {
   id: 'theme-plugin',
   name: 'Theme Manager',
-  version: '1.0.0',
-  description: 'Dark/Light theme switcher with custom board backgrounds',
-  author: 'Your Name',
+  version: '2.0.0',
+  description: 'Real theme system with presets + persistence',
   compat: '>=3.3.0'
 };
 
 export function setup(api) {
-  console.log('🎨 Theme Plugin loaded');
+  const STORAGE_KEY = 'activeTheme';
 
-  // Example: Listen to board lifecycle events
-  api.bus.on('board:allPluginsLoaded', () => {
-    console.log('🎨 All plugins loaded — applying saved theme');
-    applySavedTheme();
-  });
+  console.log('🎨 Theme Manager v2 loaded');
 
-  // Hook into Plugin Manager to add a custom tab/button
-  api.registerHook('manager:addTab', (tabs) => {
-    tabs.push({
-      id: 'theme-tab',
-      label: '🎨 Themes',
-      content: createThemePanel()
-    });
-  });
-
-  // Example: Add custom action button to every installed plugin card
-  api.registerHook('manager:renderInstalledCard', (plugin) => {
-    if (plugin.id === SELF_ID || plugin.id === 'theme-plugin') return null;
-    return `
-      <button onclick="applyRandomTheme()" 
-              style="margin-top:8px; width:100%; padding:8px; background:#333; color:#fff; border:none; border-radius:8px; cursor:pointer;">
-        🎨 Random Theme
-      </button>`;
-  });
-
-  // Simple theme functions
-  function applySavedTheme() {
-    const saved = api.storage.getForPlugin('theme-plugin', 'currentTheme') || 'dark';
-    document.documentElement.style.setProperty('--board-bg', saved === 'dark' ? '#0f0f0f' : '#f8f9fa');
-  }
-
-  window.applyRandomTheme = () => {
-    const themes = ['#0f0f0f', '#1a1a2e', '#16213e', '#0f3460', '#f8f9fa'];
-    const randomBg = themes[Math.floor(Math.random() * themes.length)];
-    
-    document.getElementById('board').style.background = randomBg;
-    api.storage.setForPlugin('theme-plugin', 'currentTheme', randomBg);
-    
-    api.notify(`Theme changed to ${randomBg}`, 'success', 2000);
+  // ─────────────────────────────
+  // 🎨 THEMES
+  // ─────────────────────────────
+  const THEMES = {
+    dark: {
+      '--bg': '#0f0f0f',
+      '--panel': '#1c1c1f',
+      '--text': '#f5f5f7'
+    },
+    light: {
+      '--bg': '#f5f5f7',
+      '--panel': '#ffffff',
+      '--text': '#111'
+    },
+    blue: {
+      '--bg': '#0f172a',
+      '--panel': '#1e293b',
+      '--text': '#e2e8f0'
+    },
+    amoled: {
+      '--bg': '#000000',
+      '--panel': '#0a0a0a',
+      '--text': '#ffffff'
+    }
   };
 
-  function createThemePanel() {
-    const div = document.createElement('div');
-    div.style.padding = '20px';
-    div.innerHTML = `
-      <h3 style="margin-bottom:16px; color:#fff;">Theme Settings</h3>
-      <button onclick="applyRandomTheme()" 
-              style="padding:12px 24px; background:#7c6fff; color:white; border:none; border-radius:10px; cursor:pointer; margin-right:12px;">
-        Apply Random Background
-      </button>
-      <button onclick="alert('More theme options coming soon!')" 
-              style="padding:12px 24px; background:#333; color:#fff; border:none; border-radius:10px; cursor:pointer;">
-        More Themes
-      </button>
-    `;
-    return div;
+  // ─────────────────────────────
+  // 🎯 APPLY THEME
+  // ─────────────────────────────
+  function applyTheme(name) {
+    const theme = THEMES[name];
+    if (!theme) return;
+
+    Object.entries(theme).forEach(([key, val]) => {
+      document.documentElement.style.setProperty(key, val);
+    });
+
+    document.body.style.background = theme['--bg'];
+
+    api.storage.setForPlugin(meta.id, STORAGE_KEY, name);
+    api.notify(`Theme: ${name}`, 'success', 2000);
   }
 
-  // Cleanup
+  function loadTheme() {
+    const saved = api.storage.getForPlugin(meta.id, STORAGE_KEY) || 'dark';
+    applyTheme(saved);
+  }
+
+  // ─────────────────────────────
+  // 🪟 FLOATING THEME PANEL (REAL UI)
+  // ─────────────────────────────
+  function openThemePanel() {
+    let panel = document.getElementById('theme-panel');
+
+    if (panel) {
+      panel.style.display = 'block';
+      return;
+    }
+
+    panel = document.createElement('div');
+    panel.id = 'theme-panel';
+
+    panel.style.cssText = `
+      position:absolute;
+      top:120px;
+      left:300px;
+      width:320px;
+      background:rgba(30,30,34,0.85);
+      backdrop-filter:blur(20px);
+      border-radius:16px;
+      padding:20px;
+      z-index:99999;
+      color:white;
+      box-shadow:0 20px 60px rgba(0,0,0,0.6);
+    `;
+
+    panel.innerHTML = `
+      <div style="font-weight:600; margin-bottom:12px;">🎨 Themes</div>
+      <div id="theme-list"></div>
+      <button id="close-theme" style="margin-top:14px;">Close</button>
+    `;
+
+    document.body.appendChild(panel);
+
+    // render themes
+    const list = panel.querySelector('#theme-list');
+
+    list.innerHTML = Object.keys(THEMES).map(name => `
+      <div style="margin-bottom:10px;">
+        <button data-theme="${name}" style="width:100%; padding:10px;">
+          ${name}
+        </button>
+      </div>
+    `).join('');
+
+    list.onclick = (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+
+      applyTheme(btn.dataset.theme);
+    };
+
+    panel.querySelector('#close-theme').onclick = () => {
+      panel.style.display = 'none';
+    };
+
+    api.makeDraggable(panel);
+  }
+
+  // ─────────────────────────────
+  // 🧠 INTEGRATION (WORKING WAY)
+  // ─────────────────────────────
+
+  // Add button into Plugin Manager header instead of broken tab hook
+  setTimeout(() => {
+    const btn = document.createElement('button');
+    btn.textContent = '🎨 Themes';
+    btn.style.cssText = `
+      margin-left:10px;
+      padding:6px 10px;
+      border-radius:8px;
+      background:#7c6fff;
+      color:white;
+      border:none;
+      cursor:pointer;
+    `;
+
+    btn.onclick = openThemePanel;
+
+    // inject into manager if found
+    const header = document.querySelector('.pm-root div');
+    if (header) header.appendChild(btn);
+  }, 1500);
+
+  // ─────────────────────────────
+  // 🚀 INIT
+  // ─────────────────────────────
+  api.bus.on('board:allPluginsLoaded', loadTheme);
+
   return {
-    teardown: () => {
-      console.log('🎨 Theme Plugin unloaded');
+    teardown() {
+      console.log('🎨 Theme Manager unloaded');
     }
   };
 }
