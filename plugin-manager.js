@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.4.5',
+  version: '3.4.6',
   compat: '>=3.3.0'
 };
 
@@ -35,6 +35,7 @@ export function setup(api) {
       flex-direction:column;
       box-shadow: 0 20px 50px rgba(0,0,0,0.5);
       backdrop-filter: blur(10px);
+      overflow: hidden;
     }
 
     .pm-header {
@@ -473,7 +474,7 @@ export function setup(api) {
     renderInstalled();
   });
 
-  console.log('🔥 Plugin Manager v3.4.5 (UI + Core Fixed)');
+  console.log('🔥 Plugin Manager v3.4.6 (Community card ui bug)');
 }
 
 export function teardown() {}
