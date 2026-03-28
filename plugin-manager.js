@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.0.0',
+  version: '3.2.0',
   compat: '>=3.3.0'
 };
 
@@ -18,6 +18,10 @@ export function setup(api) {
       left: 240px;
       width: 850px;
       height: 75vh;
+      min-width: 500px;
+      min-height: 400px;
+      max-width: 95vw;
+      max-height: 90vh;
       display: none;
       z-index: 10000;
 
@@ -37,6 +41,22 @@ export function setup(api) {
       align-items:center;
       padding:14px 18px;
       border-bottom:1px solid rgba(255,255,255,0.08);
+    }
+
+    .pm-left {
+      display:flex;
+      flex-direction:column;
+    }
+
+    .pm-right {
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+
+    #pm-actions {
+      display:flex;
+      gap:6px;
     }
 
     .pm-tabs {
@@ -69,6 +89,24 @@ export function setup(api) {
       padding:16px;
     }
 
+    .pm-panel::-webkit-scrollbar {
+      width:8px;
+    }
+
+    .pm-panel::-webkit-scrollbar-thumb {
+      background:#444;
+      border-radius:10px;
+    }
+
+    .pm-panel::-webkit-scrollbar-thumb:hover {
+      background:#666;
+    }
+
+    .pm-panel {
+      scrollbar-width: thin;
+      scrollbar-color: #444 transparent;
+    }
+
     .pm-card {
       background:#2a2a2e;
       padding:14px;
@@ -96,12 +134,14 @@ export function setup(api) {
 
   root.innerHTML = `
     <div class="pm-header">
-      <div>
+      <div class="pm-left">
         <b>⚙️ Plugin Manager</b>
         <div id="pm-stats" style="font-size:12px;color:#888"></div>
       </div>
-      <div>
-        <a href="https://empty-ad9a3406.mintlify.app/" target="_blank" style="color:#7c6fff;margin-right:10px">Docs</a>
+
+      <div class="pm-right">
+        <div id="pm-actions"></div>
+        <a href="https://empty-ad9a3406.mintlify.app/" target="_blank" style="color:#7c6fff">Docs</a>
         <button id="pm-close" class="pm-btn">✕</button>
       </div>
     </div>
@@ -120,6 +160,25 @@ export function setup(api) {
   api.boardEl.appendChild(root);
   api.makeDraggable(root);
   api.makeResizable(root);
+
+  // ───────── UI SLOT SYSTEM (CORE FIX) ─────────
+  const slots = {
+    'header-actions': root.querySelector('#pm-actions')
+  };
+
+  api.registerUI = (slot, el, id) => {
+    if (!slots[slot]) {
+      console.warn(`Invalid slot: ${slot}`);
+      return;
+    }
+
+    // prevent duplicates
+    if (id && slots[slot].querySelector(`[data-ui-id="${id}"]`)) return;
+
+    if (id) el.dataset.uiId = id;
+
+    slots[slot].appendChild(el);
+  };
 
   // ───────── STATE ─────────
   let communityCache = [];
@@ -168,21 +227,30 @@ export function setup(api) {
   async function renderCommunity() {
     const el = root.querySelector('#community');
     const list = await loadCommunity();
+    const installed = new Set(api.registry.getAll().map(p => p.id));
 
-    el.innerHTML = list.map(p => `
-      <div class="pm-card">
-        <div style="font-size:18px">${p.icon || '📦'}</div>
-        <b>${p.name}</b>
-        <div style="font-size:12px;color:#888">${p.author || 'Unknown'}</div>
-        <div style="font-size:13px;margin-top:6px">${p.description || ''}</div>
+    el.innerHTML = list.map(p => {
+      const isInstalled = installed.has(p.id);
 
-        <button class="pm-btn primary"
-          data-install="${p.id}"
-          data-url="${p.url}">
-          Install
-        </button>
-      </div>
-    `).join('');
+      return `
+        <div class="pm-card">
+          <div style="font-size:18px">${p.icon || '📦'}</div>
+          <b>${p.name}</b>
+          <div style="font-size:12px;color:#888">${p.author || 'Unknown'}</div>
+          <div style="font-size:13px;margin-top:6px">${p.description || ''}</div>
+
+          ${
+            isInstalled
+              ? `<button class="pm-btn secondary" disabled>Installed</button>`
+              : `<button class="pm-btn primary"
+                  data-install="${p.id}"
+                  data-url="${p.url}">
+                  Install
+                </button>`
+          }
+        </div>
+      `;
+    }).join('');
   }
 
   // ───────── EVENTS ─────────
@@ -192,27 +260,30 @@ export function setup(api) {
 
     const id = btn.dataset.id;
 
-    // toggle
     if (btn.dataset.act === 'toggle') {
       await api.togglePlugin(id);
+      api.bus.emit('plugin:toggled', { id });
       renderInstalled();
+      renderCommunity();
     }
 
-    // delete (no confirm)
     if (btn.dataset.act === 'delete') {
       await api.deletePlugin(id);
       api.storage.remove(`plugin:${id}`);
+      api.bus.emit('plugin:deleted', { id });
       renderInstalled();
+      renderCommunity();
     }
 
-    // install (no confirm)
     if (btn.dataset.install) {
       await api.installPlugin(btn.dataset.install, btn.dataset.url, btn.dataset.install);
+      api.bus.emit('plugin:installed', { id: btn.dataset.install });
       renderInstalled();
+      renderCommunity();
     }
   };
 
-  // tabs
+  // ───────── TABS ─────────
   root.querySelectorAll('.pm-tab').forEach(tab => {
     tab.onclick = () => {
       root.querySelectorAll('.pm-tab').forEach(t => t.classList.remove('active'));
@@ -227,7 +298,7 @@ export function setup(api) {
     };
   });
 
-  // open
+  // ───────── OPEN / CLOSE ─────────
   api.boardEl.addEventListener('contextmenu', (e) => {
     if (e.target.closest('.pm-root')) return;
     e.preventDefault();
@@ -236,12 +307,11 @@ export function setup(api) {
     renderInstalled();
   });
 
-  // close
   root.querySelector('#pm-close').onclick = () => {
     root.style.display = 'none';
   };
 
-  console.log('🔥 Minimal Plugin Manager Loaded');
+  console.log('🔥 Plugin Manager v3.2 (Controlled Core)');
 }
 
 export function teardown() {}

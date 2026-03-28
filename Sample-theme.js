@@ -1,19 +1,14 @@
 export const meta = {
   id: 'theme-plugin',
   name: 'Theme Manager',
-  version: '2.0.0',
-  description: 'Real theme system with presets + persistence',
+  version: '3.0.0',
+  description: 'Modern theme system with real board support',
   compat: '>=3.3.0'
 };
 
 export function setup(api) {
   const STORAGE_KEY = 'activeTheme';
 
-  console.log('🎨 Theme Manager v2 loaded');
-
-  // ─────────────────────────────
-  // 🎨 THEMES
-  // ─────────────────────────────
   const THEMES = {
     dark: {
       '--bg': '#0f0f0f',
@@ -37,21 +32,25 @@ export function setup(api) {
     }
   };
 
-  // ─────────────────────────────
-  // 🎯 APPLY THEME
-  // ─────────────────────────────
+  // ───────── APPLY THEME (FIXED) ─────────
   function applyTheme(name) {
     const theme = THEMES[name];
     if (!theme) return;
 
-    Object.entries(theme).forEach(([key, val]) => {
-      document.documentElement.style.setProperty(key, val);
+    // global vars
+    Object.entries(theme).forEach(([k, v]) => {
+      document.documentElement.style.setProperty(k, v);
     });
+
+    // 🔥 FORCE APPLY TO BOARD (FIX)
+    if (api.boardEl) {
+      api.boardEl.style.background = theme['--bg'];
+      api.boardEl.style.color = theme['--text'];
+    }
 
     document.body.style.background = theme['--bg'];
 
     api.storage.setForPlugin(meta.id, STORAGE_KEY, name);
-    api.notify(`Theme: ${name}`, 'success', 2000);
   }
 
   function loadTheme() {
@@ -59,10 +58,8 @@ export function setup(api) {
     applyTheme(saved);
   }
 
-  // ─────────────────────────────
-  // 🪟 FLOATING THEME PANEL (REAL UI)
-  // ─────────────────────────────
-  function openThemePanel() {
+  // ───────── PANEL UI (IMPROVED) ─────────
+  function openPanel() {
     let panel = document.getElementById('theme-panel');
 
     if (panel) {
@@ -74,39 +71,43 @@ export function setup(api) {
     panel.id = 'theme-panel';
 
     panel.style.cssText = `
-      position:absolute;
+      position:fixed;
       top:120px;
       left:300px;
-      width:320px;
-      background:rgba(30,30,34,0.85);
-      backdrop-filter:blur(20px);
-      border-radius:16px;
-      padding:20px;
+      width:260px;
+      background:#1c1c1f;
+      border-radius:14px;
+      padding:14px;
       z-index:99999;
       color:white;
-      box-shadow:0 20px 60px rgba(0,0,0,0.6);
+      box-shadow:0 10px 40px rgba(0,0,0,0.6);
+      font-family:system-ui;
     `;
 
     panel.innerHTML = `
-      <div style="font-weight:600; margin-bottom:12px;">🎨 Themes</div>
-      <div id="theme-list"></div>
-      <button id="close-theme" style="margin-top:14px;">Close</button>
+      <div style="font-weight:600;margin-bottom:10px">🎨 Themes</div>
+      <div id="theme-grid" style="display:grid;gap:8px"></div>
+      <button id="close-theme" style="margin-top:10px;width:100%">Close</button>
     `;
 
     document.body.appendChild(panel);
 
-    // render themes
-    const list = panel.querySelector('#theme-list');
+    const grid = panel.querySelector('#theme-grid');
 
-    list.innerHTML = Object.keys(THEMES).map(name => `
-      <div style="margin-bottom:10px;">
-        <button data-theme="${name}" style="width:100%; padding:10px;">
-          ${name}
-        </button>
-      </div>
+    grid.innerHTML = Object.keys(THEMES).map(name => `
+      <button data-theme="${name}" style="
+        padding:8px;
+        border:none;
+        border-radius:8px;
+        background:#2a2a2e;
+        color:white;
+        cursor:pointer;
+      ">
+        ${name}
+      </button>
     `).join('');
 
-    list.onclick = (e) => {
+    grid.onclick = (e) => {
       const btn = e.target.closest('button');
       if (!btn) return;
 
@@ -120,37 +121,29 @@ export function setup(api) {
     api.makeDraggable(panel);
   }
 
-  // ─────────────────────────────
-  // 🧠 INTEGRATION (WORKING WAY)
-  // ─────────────────────────────
-
-  // Add button into Plugin Manager header instead of broken tab hook
-  function injectThemeButton() {
-    if (document.getElementById('theme-btn')) return;
-
-    const header = document.querySelector('.pm-header');
-    if (!header) return;
-
+  // ───────── SAFE INJECTION (NEW SYSTEM) ─────────
+  function injectButton() {
     const btn = document.createElement('button');
-    btn.id = 'theme-btn';
-    btn.textContent = '🎨 Themes';
-
+    btn.textContent = '🎨';
     btn.className = 'pm-btn primary';
-    btn.onclick = openThemePanel;
+    btn.onclick = openPanel;
 
-    header.appendChild(btn);
+    // 🔥 USE SLOT SYSTEM (NO DOM BREAKING)
+    if (api.registerUI) {
+      api.registerUI('header-actions', btn, 'theme-btn');
+    }
   }
 
-  api.bus.on('plugin:loaded', injectThemeButton);
+  api.bus.on('plugin:installed', ({ id }) => {
+    if (id === meta.id) injectButton();
+  });
 
-  // ─────────────────────────────
-  // 🚀 INIT
-  // ─────────────────────────────
-  api.bus.on('board:allPluginsLoaded', loadTheme);
+  api.bus.on('board:allPluginsLoaded', () => {
+    loadTheme();
+    injectButton();
+  });
 
   return {
-    teardown() {
-      console.log('🎨 Theme Manager unloaded');
-    }
+    teardown() {}
   };
 }
