@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.3.0',
+  version: '3.4.0',
   compat: '>=3.3.0'
 };
 
@@ -18,19 +18,17 @@ export function setup(api) {
       left: 240px;
       width: 850px;
       height: 75vh;
-      min-width: 500px;
-      min-height: 400px;
+      min-width: 520px;
+      min-height: 420px;
       max-width: 95vw;
       max-height: 90vh;
       display: none;
       z-index: 10000;
-
       background: #1c1c1f;
       border-radius: 16px;
       color: #fff;
       font-family: system-ui;
       border: 1px solid rgba(255,255,255,0.08);
-
       display:flex;
       flex-direction:column;
     }
@@ -108,6 +106,7 @@ export function setup(api) {
   // ───────── ROOT ─────────
   const root = document.createElement('div');
   root.className = 'pm-root';
+  root.style.display = 'none';
 
   root.innerHTML = `
     <div class="pm-header">
@@ -137,17 +136,18 @@ export function setup(api) {
   api.makeDraggable(root);
   api.makeResizable(root);
 
-  // ───────── SLOT SYSTEM (CONTROLLED) ─────────
+  // ───────── SLOT SYSTEM (FIXED) ─────────
   const slots = {
     'header-actions': root.querySelector('#pm-actions')
   };
 
-  const slotRegistry = new Map(); // pluginId → elements[]
+  const slotRegistry = new Map();
 
-  api.registerUI = (slot, el, id, pluginId = 'unknown') => {
+  api.registerUI = (slot, el, id) => {
+    const pluginId = api._currentPlugin || 'unknown';
+
     if (!slots[slot]) return;
 
-    // prevent duplicates
     if (id && slots[slot].querySelector(`[data-ui-id="${id}"]`)) return;
 
     if (id) el.dataset.uiId = id;
@@ -155,7 +155,6 @@ export function setup(api) {
 
     slots[slot].appendChild(el);
 
-    // track ownership
     if (!slotRegistry.has(pluginId)) {
       slotRegistry.set(pluginId, []);
     }
@@ -174,6 +173,8 @@ export function setup(api) {
   let communityCache = [];
 
   function renderInstalled() {
+    if (!api.registry || !api.registry.getAll) return;
+
     const el = root.querySelector('#installed');
     const plugins = api.registry.getAll();
 
@@ -202,15 +203,19 @@ export function setup(api) {
 
   async function loadCommunity() {
     if (communityCache.length) return communityCache;
+
     try {
       communityCache = await fetch(COMMUNITY_URL).then(r => r.json());
     } catch {
       communityCache = [];
     }
+
     return communityCache;
   }
 
   async function renderCommunity() {
+    if (!api.registry) return;
+
     const el = root.querySelector('#community');
     const list = await loadCommunity();
     const installed = new Set(api.registry.getAll().map(p => p.id));
@@ -244,29 +249,45 @@ export function setup(api) {
 
     if (btn.dataset.act === 'toggle') {
       await api.togglePlugin(id);
+
+      const plugin = api.registry.getAll().find(p => p.id === id);
+
+      if (!plugin?.enabled) {
+        cleanupPluginUI(id); // 🔥 FIX pause bug
+      }
+
       api.bus.emit('plugin:toggled', { id });
       renderInstalled();
       renderCommunity();
     }
 
     if (btn.dataset.act === 'delete') {
-      cleanupPluginUI(id); // 🔥 FORCE UI CLEANUP
+      cleanupPluginUI(id); // 🔥 FIX ghost UI
+
       await api.deletePlugin(id);
       api.storage.remove(`plugin:${id}`);
+
       api.bus.emit('plugin:deleted', { id });
+
       renderInstalled();
       renderCommunity();
     }
 
     if (btn.dataset.install) {
       await api.installPlugin(btn.dataset.install, btn.dataset.url, btn.dataset.install);
+
       api.bus.emit('plugin:installed', { id: btn.dataset.install });
+
       renderInstalled();
       renderCommunity();
     }
   };
 
-  // ───────── AUTO REFRESH ─────────
+  // ───────── LIFECYCLE FIX ─────────
+  api.bus.on('board:allPluginsLoaded', () => {
+    renderInstalled();
+  });
+
   api.bus.on('plugin:installed', renderInstalled);
   api.bus.on('plugin:deleted', renderInstalled);
   api.bus.on('plugin:toggled', renderInstalled);
@@ -299,12 +320,7 @@ export function setup(api) {
     root.style.display = 'none';
   };
 
-  // 🔥 FIX EMPTY LOAD BUG
-  requestAnimationFrame(() => {
-    renderInstalled();
-  });
-
-  console.log('🔥 Plugin Manager v3.3 (Controlled System)');
+  console.log('🔥 Plugin Manager v3.4 (Stable Core)');
 }
 
 export function teardown() {}
