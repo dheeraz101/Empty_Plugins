@@ -1,22 +1,25 @@
 export const meta = {
   id: 'theme-plugin',
   name: 'Theme Manager',
-  version: '3.1.0',
+  version: '3.1.1',
   compat: '>=3.3.0'
 };
 
+// State variables held outside setup so teardown can access them
+let themeBtn = null;
+let panel = null;
+let currentApi = null;
+
+const THEMES = {
+  dark: { '--bg': '#0f0f0f', '--text': '#f5f5f7' },
+  light: { '--bg': '#f5f5f7', '--text': '#111' },
+  blue: { '--bg': '#0f172a', '--text': '#e2e8f0' },
+  amoled: { '--bg': '#000000', '--text': '#ffffff' }
+};
+
 export function setup(api) {
+  currentApi = api;
   const STORAGE_KEY = 'activeTheme';
-
-  let themeBtn = null;
-  let panel = null;
-
-  const THEMES = {
-    dark: { '--bg': '#0f0f0f', '--text': '#f5f5f7' },
-    light: { '--bg': '#f5f5f7', '--text': '#111' },
-    blue: { '--bg': '#0f172a', '--text': '#e2e8f0' },
-    amoled: { '--bg': '#000000', '--text': '#ffffff' }
-  };
 
   function applyTheme(name) {
     const theme = THEMES[name];
@@ -32,18 +35,7 @@ export function setup(api) {
     }
 
     document.body.style.background = theme['--bg'];
-
     api.storage.setForPlugin(meta.id, STORAGE_KEY, name);
-  }
-
-  function resetTheme() {
-    document.documentElement.removeAttribute('style');
-    document.body.style.background = '';
-
-    if (api.boardEl) {
-      api.boardEl.style.background = '';
-      api.boardEl.style.color = '';
-    }
   }
 
   function loadTheme() {
@@ -58,7 +50,6 @@ export function setup(api) {
     }
 
     panel = document.createElement('div');
-
     panel.style.cssText = `
       position:fixed;
       top:120px;
@@ -69,20 +60,22 @@ export function setup(api) {
       padding:14px;
       z-index:99999;
       color:white;
+      border: 1px solid rgba(255,255,255,0.1);
     `;
 
     panel.innerHTML = `
-      <div style="font-weight:600;margin-bottom:10px">🎨 Themes</div>
-      <div id="theme-grid"></div>
-      <button id="close-theme">Close</button>
+      <div style="font-weight:600;margin-bottom:10px;display:flex;justify-content:space-between;">
+        <span>🎨 Themes</span>
+      </div>
+      <div id="theme-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;"></div>
+      <button id="close-theme" class="pm-btn secondary" style="width:100%">Close</button>
     `;
 
     document.body.appendChild(panel);
 
     const grid = panel.querySelector('#theme-grid');
-
     grid.innerHTML = Object.keys(THEMES).map(name => `
-      <button data-theme="${name}">${name}</button>
+      <button class="pm-btn secondary" data-theme="${name}">${name}</button>
     `).join('');
 
     grid.onclick = (e) => {
@@ -106,30 +99,39 @@ export function setup(api) {
     themeBtn.className = 'pm-btn primary';
     themeBtn.onclick = openPanel;
 
+    // Registering UI via the API ensures the Plugin Manager knows who owns this button
     api.registerUI?.('header-actions', themeBtn, 'theme-btn');
   }
 
-  function cleanup() {
-    if (themeBtn) {
-      themeBtn.remove();
-      themeBtn = null;
-    }
+  // Initialization
+  injectButton();
+  
+  // Listen for the board ready event to apply saved settings
+  api.bus.on('board:allPluginsLoaded', loadTheme);
+}
 
-    if (panel) {
-      panel.remove();
-      panel = null;
-    }
-
-    resetTheme();
+/**
+ * Top-level teardown function called by core.js when plugin is paused or deleted
+ */
+export function teardown() {
+  // 1. Remove the UI button
+  if (themeBtn) {
+    themeBtn.remove();
+    themeBtn = null;
   }
 
-  // INIT
-  injectButton();
-  api.bus.on('board:allPluginsLoaded', loadTheme);
+  // 2. Remove the theme selection panel
+  if (panel) {
+    panel.remove();
+    panel = null;
+  }
 
-  return {
-    teardown() {
-      cleanup();
-    }
-  };
+  // 3. Reset visual styles to default
+  document.documentElement.removeAttribute('style');
+  document.body.style.background = '';
+
+  if (currentApi && currentApi.boardEl) {
+    currentApi.boardEl.style.background = '';
+    currentApi.boardEl.style.color = '';
+  }
 }

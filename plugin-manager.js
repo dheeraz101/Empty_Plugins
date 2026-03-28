@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.4.0',
+  version: '3.4.1',
   compat: '>=3.3.0'
 };
 
@@ -248,26 +248,22 @@ export function setup(api) {
     const id = btn.dataset.id;
 
     if (btn.dataset.act === 'toggle') {
-      await api.togglePlugin(id);
+      // This core method calls the plugin's exported teardown()
+      await api.togglePlugin(id); 
+      
+      // Manually clean up any UI registered in the 'header-actions' slot
+      cleanupPluginUI(id); 
 
-      const plugin = api.registry.getAll().find(p => p.id === id);
-
-      if (!plugin?.enabled) {
-        cleanupPluginUI(id); // 🔥 FIX pause bug
-      }
-
-      api.bus.emit('plugin:toggled', { id });
       renderInstalled();
       renderCommunity();
     }
 
     if (btn.dataset.act === 'delete') {
-      cleanupPluginUI(id); // 🔥 FIX ghost UI
-
-      await api.deletePlugin(id);
+      // This removes the plugin from registry and calls teardown()
+      await api.deletePlugin(id); 
+      
+      cleanupPluginUI(id);
       api.storage.remove(`plugin:${id}`);
-
-      api.bus.emit('plugin:deleted', { id });
 
       renderInstalled();
       renderCommunity();
@@ -320,7 +316,7 @@ export function setup(api) {
     root.style.display = 'none';
   };
 
-  console.log('🔥 Plugin Manager v3.4 (Stable Core)');
+  console.log('🔥 Plugin Manager v3.4.1 (Stable Core)');
 }
 
 export function teardown() {}
