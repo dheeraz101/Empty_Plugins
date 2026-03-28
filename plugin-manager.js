@@ -1,322 +1,225 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.4.1',
+  version: '3.5.0',
   compat: '>=3.3.0'
 };
 
 export function setup(api) {
   const SELF_ID = meta.id;
   const COMMUNITY_URL = 'https://raw.githubusercontent.com/dheeraz101/Empty_Plugins/refs/heads/main/plugins.json';
+  const DOCS_URL = 'https://empty-ad9a3406.mintlify.app/';
+  
+  // Track UI elements registered by other plugins for cleanup
+  const slotRegistry = new Map();
 
-  // ───────── STYLE ─────────
-  const style = document.createElement('style');
-  style.textContent = `
+  // ───────── STYLES ─────────
+  api.injectCSS?.(SELF_ID, `
     .pm-root {
       position: fixed;
       top: 80px;
       left: 240px;
-      width: 850px;
-      height: 75vh;
-      min-width: 520px;
-      min-height: 420px;
-      max-width: 95vw;
-      max-height: 90vh;
-      display: none;
-      z-index: 10000;
+      width: 600px;
+      height: 650px;
       background: #1c1c1f;
       border-radius: 16px;
       color: #fff;
-      font-family: system-ui;
-      border: 1px solid rgba(255,255,255,0.08);
-      display:flex;
-      flex-direction:column;
+      font-family: system-ui, -apple-system, sans-serif;
+      border: 1px solid rgba(255,255,255,0.1);
+      display: none;
+      flex-direction: column;
+      z-index: 10000;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+      overflow: hidden;
     }
+    .pm-header { padding: 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.05); background: #232326; }
+    .pm-tabs { display: flex; background: #111114; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .pm-tab { flex: 1; padding: 14px; border: none; background: none; color: #888; cursor: pointer; font-weight: 600; border-bottom: 2px solid transparent; transition: 0.2s; }
+    .pm-tab.active { color: #7c6fff; border-bottom-color: #7c6fff; background: rgba(124, 111, 255, 0.05); }
+    .pm-body { flex: 1; overflow-y: auto; padding: 16px; background: #1c1c1f; }
+    .pm-card { background: #262629; padding: 16px; border-radius: 12px; margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.05); transition: transform 0.1s; }
+    .pm-card:hover { border-color: rgba(124, 111, 255, 0.3); }
+    .pm-footer { padding: 12px; background: #111114; border-top: 1px solid rgba(255,255,255,0.05); text-align: center; }
+    .pm-btn { padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+    .pm-btn:hover { filter: brightness(1.2); transform: translateY(-1px); }
+    .pm-btn.primary { background: #7c6fff; color: white; }
+    .pm-btn.danger { background: rgba(255, 102, 102, 0.1); color: #ff6666; border: 1px solid rgba(255, 102, 102, 0.2); }
+    .pm-btn.secondary { background: #333336; color: #ddd; }
+    .pm-badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 800; text-transform: uppercase; }
+    .docs-link { color: #7c6fff; text-decoration: none; font-size: 12px; font-weight: 500; }
+    .docs-link:hover { text-decoration: underline; }
+  `);
 
-    .pm-header {
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      padding:14px 18px;
-      border-bottom:1px solid rgba(255,255,255,0.08);
-    }
-
-    .pm-right {
-      display:flex;
-      align-items:center;
-      gap:8px;
-    }
-
-    #pm-actions {
-      display:flex;
-      gap:6px;
-    }
-
-    .pm-tabs {
-      display:flex;
-      border-bottom:1px solid rgba(255,255,255,0.05);
-    }
-
-    .pm-tab {
-      flex:1;
-      padding:12px;
-      background:none;
-      border:none;
-      color:#888;
-      cursor:pointer;
-    }
-
-    .pm-tab.active {
-      color:#fff;
-      border-bottom:2px solid #7c6fff;
-    }
-
-    .pm-body {
-      flex:1;
-      overflow:hidden;
-    }
-
-    .pm-panel {
-      height:100%;
-      overflow:auto;
-      padding:16px;
-    }
-
-    .pm-card {
-      background:#2a2a2e;
-      padding:14px;
-      border-radius:12px;
-      margin-bottom:12px;
-    }
-
-    .pm-btn {
-      margin-top:8px;
-      padding:6px 10px;
-      border:none;
-      border-radius:8px;
-      cursor:pointer;
-    }
-
-    .primary { background:#7c6fff; color:#fff; }
-    .danger { background:#3a1a1a; color:#ff6666; }
-    .secondary { background:#333; color:#ddd; }
-  `;
-  document.head.appendChild(style);
-
-  // ───────── ROOT ─────────
+  // ───────── UI STRUCTURE ─────────
   const root = document.createElement('div');
   root.className = 'pm-root';
-  root.style.display = 'none';
-
   root.innerHTML = `
     <div class="pm-header">
       <div>
-        <b>⚙️ Plugin Manager</b>
-        <div id="pm-stats" style="font-size:12px;color:#888"></div>
+        <div style="font-weight:700; font-size: 18px; letter-spacing: -0.5px;">Plugin Manager</div>
+        <div id="pm-stats" style="font-size:11px; color: #666; margin-top: 2px;">Checking plugins...</div>
       </div>
-
-      <div class="pm-right">
-        <div id="pm-actions"></div>
-        <button id="pm-close" class="pm-btn">✕</button>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <div id="pm-slot-header" style="display:flex; gap:6px;"></div>
+        <button id="pm-close" class="pm-btn secondary" style="padding: 6px 10px;">✕</button>
       </div>
     </div>
-
     <div class="pm-tabs">
       <button class="pm-tab active" data-tab="installed">Installed</button>
       <button class="pm-tab" data-tab="community">Community</button>
     </div>
-
     <div class="pm-body">
-      <div id="installed" class="pm-panel"></div>
-      <div id="community" class="pm-panel" style="display:none"></div>
+      <div id="pm-list-installed"></div>
+      <div id="pm-list-community" style="display:none"></div>
+    </div>
+    <div class="pm-footer">
+      <a href="${DOCS_URL}" target="_blank" class="docs-link">📖 Developer Documentation & API Guide</a>
     </div>
   `;
 
-  api.boardEl.appendChild(root);
+  document.body.appendChild(root);
   api.makeDraggable(root);
-  api.makeResizable(root);
 
-  // ───────── SLOT SYSTEM (FIXED) ─────────
-  const slots = {
-    'header-actions': root.querySelector('#pm-actions')
+  // ───────── SLOT SYSTEM ─────────
+  api.registerUI = (slotName, element, uiId) => {
+    const target = (slotName === 'header-actions') ? root.querySelector('#pm-slot-header') : null;
+    if (!target) return;
+    if (uiId && target.querySelector(`[data-ui-id="${uiId}"]`)) return;
+    
+    const ownerId = api.getPluginId?.() || 'unknown';
+    element.dataset.uiId = uiId || 'anon';
+    element.dataset.owner = ownerId;
+    target.appendChild(element);
+
+    if (!slotRegistry.has(ownerId)) slotRegistry.set(ownerId, []);
+    slotRegistry.get(ownerId).push(element);
   };
 
-  const slotRegistry = new Map();
-
-  api.registerUI = (slot, el, id) => {
-    const pluginId = api._currentPlugin || 'unknown';
-
-    if (!slots[slot]) return;
-
-    if (id && slots[slot].querySelector(`[data-ui-id="${id}"]`)) return;
-
-    if (id) el.dataset.uiId = id;
-    el.dataset.owner = pluginId;
-
-    slots[slot].appendChild(el);
-
-    if (!slotRegistry.has(pluginId)) {
-      slotRegistry.set(pluginId, []);
-    }
-    slotRegistry.get(pluginId).push(el);
-  };
-
-  function cleanupPluginUI(pluginId) {
+  const cleanupPluginUI = (pluginId) => {
     const items = slotRegistry.get(pluginId);
-    if (!items) return;
-
-    items.forEach(el => el.remove());
-    slotRegistry.delete(pluginId);
-  }
-
-  // ───────── STATE ─────────
-  let communityCache = [];
-
-  function renderInstalled() {
-    if (!api.registry || !api.registry.getAll) return;
-
-    const el = root.querySelector('#installed');
-    const plugins = api.registry.getAll();
-
-    el.innerHTML = plugins.map(p => `
-      <div class="pm-card">
-        <b>${p.name || p.id}</b>
-        <div style="font-size:12px;color:#888">${p.id}</div>
-        <div style="color:${p.enabled ? '#4caf50' : '#ff6666'}">
-          ${p.enabled ? 'Active' : 'Paused'}
-        </div>
-
-        ${p.id !== SELF_ID ? `
-          <button class="pm-btn secondary" data-act="toggle" data-id="${p.id}">
-            ${p.enabled ? 'Pause' : 'Resume'}
-          </button>
-          <button class="pm-btn danger" data-act="delete" data-id="${p.id}">
-            Delete
-          </button>
-        ` : `<div style="color:#ffaa00">Protected</div>`}
-      </div>
-    `).join('');
-
-    root.querySelector('#pm-stats').textContent =
-      `${plugins.length} plugins`;
-  }
-
-  async function loadCommunity() {
-    if (communityCache.length) return communityCache;
-
-    try {
-      communityCache = await fetch(COMMUNITY_URL).then(r => r.json());
-    } catch {
-      communityCache = [];
-    }
-
-    return communityCache;
-  }
-
-  async function renderCommunity() {
-    if (!api.registry) return;
-
-    const el = root.querySelector('#community');
-    const list = await loadCommunity();
-    const installed = new Set(api.registry.getAll().map(p => p.id));
-
-    el.innerHTML = list.map(p => `
-      <div class="pm-card">
-        <div>${p.icon || '📦'}</div>
-        <b>${p.name}</b>
-        <div style="font-size:12px;color:#888">${p.author || 'Unknown'}</div>
-        <div style="font-size:13px">${p.description || ''}</div>
-
-        ${
-          installed.has(p.id)
-            ? `<button class="pm-btn secondary" disabled>Installed</button>`
-            : `<button class="pm-btn primary"
-                data-install="${p.id}"
-                data-url="${p.url}">
-                Install
-              </button>`
-        }
-      </div>
-    `).join('');
-  }
-
-  // ───────── EVENTS ─────────
-  root.onclick = async (e) => {
-    const btn = e.target.closest('button');
-    if (!btn) return;
-
-    const id = btn.dataset.id;
-
-    if (btn.dataset.act === 'toggle') {
-      // This core method calls the plugin's exported teardown()
-      await api.togglePlugin(id); 
-      
-      // Manually clean up any UI registered in the 'header-actions' slot
-      cleanupPluginUI(id); 
-
-      renderInstalled();
-      renderCommunity();
-    }
-
-    if (btn.dataset.act === 'delete') {
-      // This removes the plugin from registry and calls teardown()
-      await api.deletePlugin(id); 
-      
-      cleanupPluginUI(id);
-      api.storage.remove(`plugin:${id}`);
-
-      renderInstalled();
-      renderCommunity();
-    }
-
-    if (btn.dataset.install) {
-      await api.installPlugin(btn.dataset.install, btn.dataset.url, btn.dataset.install);
-
-      api.bus.emit('plugin:installed', { id: btn.dataset.install });
-
-      renderInstalled();
-      renderCommunity();
+    if (items) {
+      items.forEach(el => el.remove());
+      slotRegistry.delete(pluginId);
     }
   };
 
-  // ───────── LIFECYCLE FIX ─────────
-  api.bus.on('board:allPluginsLoaded', () => {
-    renderInstalled();
-  });
+  // ───────── RENDERERS ─────────
+  const renderInstalled = () => {
+    const container = root.querySelector('#pm-list-installed');
+    const plugins = api.registry.getAll();
+    
+    container.innerHTML = plugins.map(p => `
+      <div class="pm-card">
+        <div style="display:flex; justify-content:space-between; align-items:start;">
+          <div>
+            <div style="font-weight:700; font-size: 15px;">${p.name || p.id}</div>
+            <div style="font-size:11px; color:#666; font-family: monospace;">ID: ${p.id}</div>
+          </div>
+          <span class="pm-badge" style="background:${p.enabled ? 'rgba(76, 175, 80, 0.1)' : 'rgba(255, 102, 102, 0.1)'}; color:${p.enabled ? '#4caf50' : '#ff6666'}">
+            ${p.enabled ? 'Enabled' : 'Paused'}
+          </span>
+        </div>
+        <div style="margin-top:14px; display:flex; gap:8px;">
+          ${p.id !== SELF_ID ? `
+            <button class="pm-btn ${p.enabled ? 'secondary' : 'primary'}" data-act="toggle" data-id="${p.id}">
+              ${p.enabled ? 'Pause' : 'Resume'}
+            </button>
+            <button class="pm-btn danger" data-act="delete" data-id="${p.id}">Delete</button>
+          ` : `<span style="font-size:11px; color:#7c6fff; font-weight:600;">System Plugin</span>`}
+        </div>
+      </div>
+    `).join('');
+    
+    root.querySelector('#pm-stats').textContent = `${plugins.length} plugins discovered`;
+  };
 
-  api.bus.on('plugin:installed', renderInstalled);
-  api.bus.on('plugin:deleted', renderInstalled);
-  api.bus.on('plugin:toggled', renderInstalled);
+  const renderCommunity = async () => {
+    const container = root.querySelector('#pm-list-community');
+    container.innerHTML = `<div style="text-align:center; padding:40px; color:#666;">Loading from GitHub...</div>`;
+    
+    try {
+      const res = await fetch(COMMUNITY_URL);
+      const data = await res.json();
+      const installed = api.registry.getAll().map(p => p.id);
 
-  // ───────── TABS ─────────
-  root.querySelectorAll('.pm-tab').forEach(tab => {
-    tab.onclick = () => {
+      container.innerHTML = data.plugins.map(p => {
+        const isInstalled = installed.includes(p.id);
+        return `
+          <div class="pm-card">
+            <div style="font-weight:700; font-size: 15px;">${p.name}</div>
+            <div style="font-size:12px; color:#aaa; margin: 4px 0 12px 0;">${p.description || 'No description provided.'}</div>
+            <button class="pm-btn primary" 
+              data-act="install" 
+              data-url="${p.url}" 
+              data-id="${p.id}" 
+              ${isInstalled ? 'disabled' : ''}>
+              ${isInstalled ? '✓ Installed' : 'Install Plugin'}
+            </button>
+          </div>
+        `;
+      }).join('');
+    } catch (err) {
+      container.innerHTML = `<div style="color:#ff6666; text-align:center; padding:20px;">Failed to load community store.</div>`;
+    }
+  };
+
+  // ───────── INTERACTION ─────────
+  root.addEventListener('click', async (e) => {
+    const btn = e.target.closest('button');
+    const tab = e.target.closest('.pm-tab');
+    
+    if (btn?.id === 'pm-close') { root.style.display = 'none'; return; }
+
+    if (tab) {
       root.querySelectorAll('.pm-tab').forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
+      const isComm = tab.dataset.tab === 'community';
+      root.querySelector('#pm-list-installed').style.display = isComm ? 'none' : 'block';
+      root.querySelector('#pm-list-community').style.display = isComm ? 'block' : 'none';
+      if (isComm) renderCommunity();
+      return;
+    }
 
-      root.querySelector('#installed').style.display = 'none';
-      root.querySelector('#community').style.display = 'none';
+    if (!btn?.dataset.act) return;
+    const { act, id, url } = btn.dataset;
 
-      root.querySelector('#' + tab.dataset.tab).style.display = 'block';
+    if (act === 'toggle') {
+      await api.togglePlugin(id);
+      cleanupPluginUI(id); 
+      renderInstalled();
+    }
 
-      if (tab.dataset.tab === 'community') renderCommunity();
-    };
+    if (act === 'delete') {
+      if (confirm(`Are you sure you want to remove ${id}?`)) {
+        await api.deletePlugin(id);
+        cleanupPluginUI(id);
+        api.storage.remove(`plugin:${id}`);
+        renderInstalled();
+      }
+    }
+
+    if (act === 'install') {
+      btn.textContent = 'Installing...';
+      btn.disabled = true;
+      await api.installPlugin(id, url);
+      renderCommunity();
+    }
   });
 
-  // ───────── OPEN ─────────
-  api.boardEl.addEventListener('contextmenu', (e) => {
-    if (e.target.closest('.pm-root')) return;
-    e.preventDefault();
+  // ───────── SYSTEM EVENTS ─────────
+  api.bus.on('plugin:loaded', renderInstalled);
+  api.bus.on('plugin:unloaded', renderInstalled);
 
-    root.style.display = 'flex';
-    renderInstalled();
-  });
-
-  root.querySelector('#pm-close').onclick = () => {
-    root.style.display = 'none';
+  // Global toggle for right-click or button access
+  window.togglePluginManager = () => {
+    const isHidden = root.style.display === 'none' || !root.style.display;
+    root.style.display = isHidden ? 'flex' : 'none';
+    if (isHidden) renderInstalled();
   };
 
-  console.log('🔥 Plugin Manager v3.4.1 (Stable Core)');
+  renderInstalled();
 }
 
-export function teardown() {}
+export function teardown() {
+  document.querySelector('.pm-root')?.remove();
+}
