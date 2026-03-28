@@ -1,10 +1,10 @@
 [
   {
-    "id": "welcome",
-    "name": "Welcome",
-    "url": "https://raw.githubusercontent.com/dheeraz101/Empty/refs/heads/main/plugins/hello/plugin.js",
+    "id": "About",
+    "name": "About",
+    "url": "https://raw.githubusercontent.com/dheeraz101/Empty_Plugins/refs/heads/main/About.js",
     "author": "Empty",
-    "description": "A friendly welcome widget to get you started with Blank Board.",
+    "description": "A friendly about widget to get you started with Blank Board.",
     "icon": "👋"
   },
   {
@@ -30,5 +30,13 @@
     "author": "Dheeraz",
     "description": "Quick sticky notes with auto-save and rich text support.",
     "icon": "📝"
+  },
+  {
+    "id": "sample-theme",
+    "name": "Sample Theme",
+    "url": "https://raw.githubusercontent.com/dheeraz101/Empty_Plugins/refs/heads/main/Sample-theme.js",
+    "author": "Dheeraz",
+    "description": "A sample theme plugin to demonstrate how to create and apply custom themes in Blank Board.",
+    "icon": "🎨"
   }
 ]
