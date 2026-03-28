@@ -22,9 +22,8 @@ export function setup(api) {
       min-height: 420px;
       max-width: 95vw;
       max-height: 90vh;
-      display: none;
-      pointer-events: auto
-      z-index: 10001;
+      pointer-events: auto;
+      z-index: 999999;
       background: #161618;
       border-radius: 16px;
       color: #ececec;
