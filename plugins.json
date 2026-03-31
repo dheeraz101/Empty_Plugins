@@ -9,7 +9,7 @@
   },
   {
     "id": "layout",
-    "name": "Layout",
+    "name": "Layout(Beta)",
     "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/layout.js",
     "author": "Dheeraz",
     "description": "Advanced layout tools and grid helpers for your board.",
