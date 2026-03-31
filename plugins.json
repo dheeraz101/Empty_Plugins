@@ -38,5 +38,21 @@
     "author": "Dheeraz",
     "description": "A sample theme plugin to demonstrate how to create and apply custom themes in Blank Board.",
     "icon": "🎨"
+  },
+  {
+    "id": "music-player",
+    "name": "Music Player",
+    "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/music-player.js",
+    "author": "Dheeraz",
+    "description": "A music player plugin with playlist support.",
+    "icon": "🎵"
+  },
+  {
+    "id": "plugin-builder",
+    "name": "Plugin Builder",
+    "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/plugin-builder.js",
+    "author": "Dheeraz",
+    "description": "A plugin builder to help you create your own plugins for Blank Board.",
+    "icon": "🔨"
   }
 ]
