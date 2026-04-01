@@ -54,6 +54,14 @@
     "author": "Dheeraz",
     "description": "A plugin builder to help you create your own plugins for Blank Board.",
     "icon": "🔨"
+  },
+  {
+  "id": "plugin-manager-pro",
+  "name": "Plugin Manager Pro",
+  "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/plugin-manager-pro.js",
+  "author": "Dheeraz",
+  "description": "Advanced plugin manager with grid/list views, search, active/paused categories, and polished community store.",
+  "icon": "⚡"
   }, 
   {"id":"pomodoro-timer","name":"Pomodoro Timer","url":"https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/pomodoro-timer.js","author":"Dheeraz","description":"Focus timer with 25-min work sessions and 5-min breaks. Tracks completed sessions.","icon":"🍅"},
   {"id":"calculator","name":"Calculator","url":"https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/calculator.js","author":"Dheeraz","description":"A sleek calculator with basic arithmetic operations and expression display.","icon":"🔢"},
