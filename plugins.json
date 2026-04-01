@@ -58,7 +58,7 @@
   {
   "id": "plugin-manager-pro",
   "name": "Plugin Manager Pro",
-  "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/plugin-manager-pro.js",
+  "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/plugin-manager-enhancer.js",
   "author": "Dheeraz",
   "description": "Advanced plugin manager with grid/list views, search, active/paused categories, and polished community store.",
   "icon": "⚡"
