@@ -91,39 +91,95 @@ export function setup(api) {
     margin-bottom: 8px;
   }
 
-  /* Plugin Cards */
+  .pm-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
   .plugin-item {
-    background: rgba(255, 255, 255, 0.5);
-    border: 0.5px solid rgba(0,0,0,0.1);
-    border-radius: 16px;
-    padding: 20px;
+    background: rgba(255, 255, 255, 0.4);
+    border: 1px solid rgba(0, 0, 0, 0.04);
+    border-radius: 20px;
+    padding: 16px 20px;
     display: flex;
     align-items: center;
-    gap: 18px;
-    transition: transform 0.2s ease;
+    gap: 16px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .plugin-item:hover {
-    transform: translateY(-2px);
-    background: rgba(255, 255, 255, 0.8);
+    background: rgba(255, 255, 255, 0.7);
+    border-color: rgba(0, 0, 0, 0.08);
+    transform: translateY(-1px);
+  }
+
+  .plugin-item:active {
+    transform: scale(0.98);
   }
 
   .plugin-icon-box {
-    width: 48px;
-    height: 48px;
-    background: linear-gradient(135deg, #007aff, #00c7ff);
-    border-radius: 12px;
+    width: 52px;
+    height: 52px;
+    background: linear-gradient(145deg, #f0f0f3, #ffffff);
+    border-radius: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: white;
-    font-weight: bold;
-    font-size: 20px;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.05), 0 4px 10px rgba(0,0,0,0.03);
+    font-size: 24px;
   }
 
   .plugin-info { flex: 1; }
-  .plugin-name { font-weight: 600; font-size: 16px; color: #1d1d1f; }
-  .plugin-meta { font-size: 13px; color: #86868b; margin-top: 2px; }
+  .plugin-name { font-weight: 700; font-size: 15px; color: #1d1d1f; }
+  .plugin-meta { font-size: 13px; color: #6b6b71; margin-top: 6px; }
+
+  .plugin-badge {
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .badge-enabled { background: rgba(52, 199, 89, 0.15); color: #248a3d; }
+  .badge-update { background: rgba(0, 122, 255, 0.15); color: #007aff; }
+
+  .plugin-action-group {
+    display: flex;
+    gap: 8px;
+    margin-left: auto;
+    align-items: center;
+  }
+
+  .pm-switch {
+    position: relative;
+    width: 42px;
+    height: 24px;
+    background: #e9e9ea;
+    border-radius: 12px;
+    cursor: pointer;
+    border: none;
+    transition: background 0.3s;
+  }
+
+  .pm-switch.active { background: #34c759; }
+
+  .pm-switch::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    background: white;
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    transition: transform 0.3s;
+  }
+
+  .pm-switch.active::after { transform: translateX(18px); }
 
   .pm-card {
     background: rgba(255, 255, 255, 0.5);
@@ -427,11 +483,11 @@ export function setup(api) {
 
     for (const p of plugins) {
       const isSelf = p.id === SELF_ID;
-      let versionInfo = '';
-      let updateBtn = '';
       let installedVer = p.version || null;
       let remoteVer = null;
       let remoteMeta = null;
+      let updateBtn = '';
+      let updateStatus = '';
 
       if (p.url && (shouldCheck || !installedVer)) {
         remoteMeta = await fetchRemoteMeta(p.url);
@@ -447,58 +503,34 @@ export function setup(api) {
         const cmp = compareVersions(remoteVer, installedVer);
         if (cmp > 0) {
           availableUpdates++;
-          versionInfo = `<span class="pm-version update-available">v${installedVer} → v${remoteVer}</span>`;
           updateBtn = `<button class="pm-btn pm-update-btn" data-update="${p.id}">Update</button>`;
-        } else {
-          versionInfo = `<span class="pm-version">v${installedVer}</span>`;
+          updateStatus = '<span class="plugin-badge badge-update">Update Available</span>';
         }
-      } else if (installedVer) {
-        versionInfo = `<span class="pm-version">v${installedVer}</span>`;
-      } else {
-        versionInfo = `<span class="pm-version">Version unknown</span>`;
       }
 
+      const statusBadge = isSelf
+        ? '<span class="plugin-badge badge-enabled">System</span>'
+        : p.enabled
+          ? '<span class="plugin-badge badge-enabled">Active</span>'
+          : '';
+
+      const versionText = installedVer ? `v${installedVer}` : 'Version unknown';
+
       html += `
-        <div class="pm-card">
-          <div style="display:flex; gap:12px; align-items:flex-start;">
-            <div style="
-              font-size:22px;
-              background:rgba(255,255,255,0.05);
-              padding:8px;
-              border-radius:8px;
-              display:flex;
-              align-items:center;
-              justify-content:center;
-            ">
-              ${p.icon || '📦'}
+        <div class="plugin-item">
+          <div class="plugin-icon-box">${p.name?.[0] || p.icon || '🧩'}</div>
+          <div class="plugin-info">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <span class="plugin-name">${p.name || p.id}</span>
+              ${statusBadge}
+              ${updateStatus}
             </div>
-
-            <div style="flex:1">
-              <b style="font-size:15px">${p.name || p.id}</b>
-              ${versionInfo}
-              <div style="font-size:11px;color:#7c6fff;margin-top:2px">
-                ${p.author ? 'by ' + p.author : ''}
-              </div>
-              <div style="font-size:11px;color:#666;margin-top:2px">
-                ${p.id}
-              </div>
-            </div>
+            <div class="plugin-meta">${versionText} • ${p.id}</div>
           </div>
-
-          <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-            ${
-              isSelf
-                ? `<span style="color:#ffaa00;font-size:12px">System Protected</span>`
-                : `
-                <button class="pm-btn secondary" data-act="toggle" data-id="${p.id}">
-                  ${p.enabled ? 'Pause' : 'Resume'}
-                </button>
-                <button class="pm-btn danger" data-act="delete" data-id="${p.id}">
-                  Delete
-                </button>
-                ${updateBtn}
-              `
-            }
+          <div class="plugin-action-group">
+            ${isSelf ? '' : `<button class="pm-btn pm-btn-secondary" data-act="toggle" data-id="${p.id}">${p.enabled ? 'Disable' : 'Enable'}</button>`}
+            ${isSelf ? '' : `<button class="pm-btn pm-btn-secondary" data-act="delete" data-id="${p.id}" style="color:#ff3b30;">Delete</button>`}
+            ${updateBtn}
           </div>
         </div>
       `;
