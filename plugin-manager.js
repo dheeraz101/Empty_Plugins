@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.4.6',
+  version: '3.5.3',
   compat: '>=3.3.0'
 };
 
@@ -9,10 +9,14 @@ export function setup(api) {
   const SELF_ID = meta.id;
   const COMMUNITY_URL = 'https://raw.githubusercontent.com/dheeraz101/Empty_Plugins/refs/heads/main/plugins.json';
 
-  // ───────── STYLE (UNCHANGED UI) ─────────
+  let lastCheckedTime = 0;
+  const CACHE_TIMEOUT = 10 * 60 * 1000; // 10 minutes
+
+  let updateCount = 0; // number of plugins with available updates
+
+  // ───────── STYLE ─────────
   const style = document.createElement('style');
   style.textContent = `
-
     /* YOUR ORIGINAL UI — untouched */
     .pm-root {
       position: fixed;
@@ -158,6 +162,62 @@ export function setup(api) {
       z-index: 2147483648 !important;
     }
 
+    .pm-version {
+      font-size: 11px;
+      color: #888;
+      margin-left: 6px;
+    }
+
+    .update-available {
+      color: #ffaa00 !important;
+      font-weight: 600;
+    }
+
+    .pm-update-btn {
+      background: #ffaa00;
+      color: #000;
+      font-size: 12px;
+      padding: 6px 12px;
+      margin-left: 8px;
+    }
+
+    .pm-update-btn:hover { background: #ffc107; }
+
+    .last-checked {
+      font-size: 11px;
+      color: #666;
+      margin-top: 6px;
+      text-align: center;
+    }
+
+    .update-badge {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .update-badge .badge {
+      background: #ff3b30;
+      color: white;
+      font-size: 10px;
+      font-weight: 700;
+      min-width: 16px;
+      height: 16px;
+      border-radius: 9999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 5px;
+      position: absolute;
+      top: -6px;
+      right: -8px;
+      box-shadow: 0 0 0 2px #161618;
+    }
+
+    .check-updates {
+      position: relative;
+    }
   `;
   document.head.appendChild(style);
 
@@ -199,20 +259,7 @@ export function setup(api) {
   api.makeDraggable(root);
   api.makeResizable(root);
 
-   // ───────── FIX: CLOSE BUTTON ─────────
-  root.querySelector('#pm-close').onclick = () => {
-    root.style.display = 'none';
-  };
-
-  // ───────── FIX: ESC KEY CLOSE ─────────
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && root.style.display === 'flex') {
-      root.style.display = 'none';
-    }
-  });
-
   const slots = { 'header-actions': root.querySelector('#pm-actions') };
-
   const slotRegistry = new Map();
 
   api.registerUI = (slot, el, id) => {
@@ -233,6 +280,84 @@ export function setup(api) {
     if (!items) return;
     items.forEach(el => el.remove());
     slotRegistry.delete(pluginId);
+  }
+
+  // ───────── FIX: CLOSE BUTTON ─────────
+  root.querySelector('#pm-close').onclick = () => {
+    root.style.display = 'none';
+  };
+
+  // ───────── FIX: ESC KEY CLOSE ─────────
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && root.style.display === 'flex') {
+      root.style.display = 'none';
+    }
+  });
+
+  // ───────── HEADER BUTTONS + BADGE ─────────
+  const actions = root.querySelector('#pm-actions');
+
+  const checkUpdatesBtn = document.createElement('button');
+  checkUpdatesBtn.className = 'pm-btn secondary check-updates';
+  checkUpdatesBtn.innerHTML = `
+    🔄 Check Updates
+    <span class="update-badge" id="update-badge" style="display:none;">
+      <span class="badge" id="badge-count">0</span>
+    </span>
+  `;
+  checkUpdatesBtn.onclick = () => renderInstalled(true);
+  actions.appendChild(checkUpdatesBtn);
+
+  const installBtn = document.createElement('button');
+  installBtn.className = 'pm-btn primary';
+  installBtn.textContent = 'Install via URL';
+  installBtn.onclick = openInstallModal;
+  actions.appendChild(installBtn);
+
+  // ───────── HELPERS ─────────
+  function timeAgo(timestamp) {
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+    if (seconds < 30) return "just now";
+    if (seconds < 60) return "a few seconds ago";
+    if (seconds < 3600) return Math.floor(seconds / 60) + " min ago";
+    if (seconds < 86400) return Math.floor(seconds / 3600) + " hr ago";
+    return Math.floor(seconds / 86400) + " days ago";
+  }
+
+  async function fetchRemoteMeta(url) {
+    try {
+      const res = await fetch(url + (url.includes('?') ? '&' : '?') + 't=' + Date.now());
+      const code = await res.text();
+      const metaMatch = code.match(/export const meta\s*=\s*(\{[\s\S]*?\});/);
+      if (!metaMatch) return null;
+      return new Function(`return ${metaMatch[1]}`)();
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function compareVersions(a = '0.0.0', b = '0.0.0') {
+    const pa = a.split('.').map(n => parseInt(n) || 0);
+    const pb = b.split('.').map(n => parseInt(n) || 0);
+    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+      if ((pa[i] || 0) > (pb[i] || 0)) return 1;
+      if ((pa[i] || 0) < (pb[i] || 0)) return -1;
+    }
+    return 0;
+  }
+
+  function updateBadge(count) {
+    updateCount = count;
+    const badgeContainer = document.getElementById('update-badge');
+    const badgeCount = document.getElementById('badge-count');
+    if (!badgeContainer || !badgeCount) return;
+
+    if (count > 0) {
+      badgeCount.textContent = count;
+      badgeContainer.style.display = 'inline-flex';
+    } else {
+      badgeContainer.style.display = 'none';
+    }
   }
 
   // ───────── INSTALL MODAL ─────────
@@ -268,17 +393,13 @@ export function setup(api) {
     `;
 
     const modal = api.showModal({ content: wrap });
-
-    // 🔥 FIX: bring modal above everything
     const overlay = document.querySelector('div[style*="z-index: 100001"]');
     if (overlay) overlay.style.zIndex = 2147483648;
 
-    // ❌ CLOSE BUTTON FIX
     wrap.querySelector('#pm-modal-close').onclick = () => {
       modal.close();
     };
 
-    // INSTALL LOGIC
     wrap.querySelector('#pm-install').onclick = async () => {
       const url = wrap.querySelector('#pm-url').value.trim();
       const id = wrap.querySelector('#pm-id').value.trim();
@@ -296,73 +417,113 @@ export function setup(api) {
     };
   }
 
-  const installBtn = document.createElement('button');
-  installBtn.className = 'pm-btn primary';
-  installBtn.textContent = 'Install via URL';
-  installBtn.onclick = openInstallModal;
+  // ───────── RENDER INSTALLED (with badge support) ─────────
+  async function renderInstalled(forceCheck = false) {
+    const now = Date.now();
+    const shouldCheck = forceCheck || (now - lastCheckedTime > CACHE_TIMEOUT);
 
-  root.querySelector('#pm-actions').appendChild(installBtn);
+    if (shouldCheck) {
+      lastCheckedTime = now;
+    }
 
-  // ───────── RENDER ─────────
-  function renderInstalled() {
     const el = root.querySelector('#installed');
     const plugins = api.registry.getAll();
 
-    el.innerHTML = plugins.map(p => `
-      <div class="pm-card">
-        <div style="display:flex; gap:12px; align-items:flex-start;">
-          
-          <div style="
-            font-size:22px;
-            background:rgba(255,255,255,0.05);
-            padding:8px;
-            border-radius:8px;
-            display:flex;
-            align-items:center;
-            justify-content:center;
-          ">
-            ${p.icon || '📦'}
-          </div>
+    let html = '';
+    let availableUpdates = 0;
 
-          <div style="flex:1">
-            <b style="font-size:15px">${p.name || p.id}</b>
-            
-            <div style="font-size:11px;color:#7c6fff;margin-top:2px">
-              ${p.author ? 'by ' + p.author : ''}
-            </div>
+    for (const p of plugins) {
+      const isSelf = p.id === SELF_ID;
+      let versionInfo = '';
+      let updateBtn = '';
 
-            <div style="font-size:11px;color:#666;margin-top:2px">
-              ${p.id}
-            </div>
-          </div>
+      if (p.url) {
+        let remoteVer = null;
+        const installedVer = p.version || '0.0.0';
 
-        </div>
+        if (shouldCheck) {
+          const remoteMeta = await fetchRemoteMeta(p.url);
+          remoteVer = remoteMeta?.version || null;
+        }
 
-        <div style="margin-top:12px">
-          ${
-            p.id !== SELF_ID
-              ? `
-              <button class="pm-btn secondary" data-act="toggle" data-id="${p.id}">
-                ${p.enabled ? 'Pause' : 'Resume'}
-              </button>
-              <button class="pm-btn danger" data-act="delete" data-id="${p.id}">
-                Delete
-              </button>`
-              : `<span style="color:#ffaa00;font-size:12px">System Protected</span>`
+        if (remoteVer) {
+          const cmp = compareVersions(remoteVer, installedVer);
+          if (cmp > 0) {
+            availableUpdates++;
+            versionInfo = `<span class="pm-version update-available">v${installedVer} → v${remoteVer}</span>`;
+            updateBtn = `<button class="pm-btn pm-update-btn" data-update="${p.id}">Update</button>`;
+          } else {
+            versionInfo = `<span class="pm-version">v${installedVer}</span>`;
           }
+        } else {
+          versionInfo = `<span class="pm-version">v${installedVer}</span>`;
+        }
+      } else if (p.version) {
+        versionInfo = `<span class="pm-version">v${p.version}</span>`;
+      }
+
+      html += `
+        <div class="pm-card">
+          <div style="display:flex; gap:12px; align-items:flex-start;">
+            <div style="
+              font-size:22px;
+              background:rgba(255,255,255,0.05);
+              padding:8px;
+              border-radius:8px;
+              display:flex;
+              align-items:center;
+              justify-content:center;
+            ">
+              ${p.icon || '📦'}
+            </div>
+
+            <div style="flex:1">
+              <b style="font-size:15px">${p.name || p.id}</b>
+              ${versionInfo}
+              <div style="font-size:11px;color:#7c6fff;margin-top:2px">
+                ${p.author ? 'by ' + p.author : ''}
+              </div>
+              <div style="font-size:11px;color:#666;margin-top:2px">
+                ${p.id}
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+            ${
+              isSelf
+                ? `<span style="color:#ffaa00;font-size:12px">System Protected</span>`
+                : `
+                <button class="pm-btn secondary" data-act="toggle" data-id="${p.id}">
+                  ${p.enabled ? 'Pause' : 'Resume'}
+                </button>
+                <button class="pm-btn danger" data-act="delete" data-id="${p.id}">
+                  Delete
+                </button>
+                ${updateBtn}
+              `
+            }
+          </div>
         </div>
-      </div>
-    `).join('');
+      `;
+    }
+
+    const lastCheckedHTML = lastCheckedTime
+      ? `<div class="last-checked">Last checked: ${timeAgo(lastCheckedTime)}</div>`
+      : '';
+
+    el.innerHTML = html + lastCheckedHTML;
+    updateBadge(availableUpdates);
   }
 
+  // ───────── RENDER COMMUNITY (unchanged) ─────────
   let communityCache = [];
-
   async function renderCommunity() {
     const el = root.querySelector('#community');
 
     if (!communityCache.length) {
       try {
-        communityCache = await fetch(COMMUNITY_URL).then(r => r.json());
+        communityCache = await fetch(COMMUNITY_URL + '?t=' + Date.now()).then(r => r.json());
       } catch {
         communityCache = [];
       }
@@ -373,7 +534,7 @@ export function setup(api) {
     el.innerHTML = communityCache.map(p => `
       <div class="pm-card">
         <div style="display:flex; gap:12px;">
-          
+
           <div style="
             font-size:24px;
             background:rgba(255,255,255,0.05);
@@ -404,15 +565,14 @@ export function setup(api) {
           ${
             installed.has(p.id)
               ? `<button class="pm-btn secondary" disabled style="width:100%;opacity:0.5">Installed</button>`
-              : `<button class="pm-btn primary" style="width:100%" data-install="${p.id}" data-url="${p.url}">
-                  Install Plugin
-                </button>`
+              : `<button class="pm-btn primary" style="width:100%" data-install="${p.id}" data-url="${p.url}">Install Plugin</button>`
           }
         </div>
       </div>
     `).join('');
   }
 
+  // ───────── CLICK HANDLER ─────────
   root.onclick = async (e) => {
     const btn = e.target.closest('button');
     if (!btn) return;
@@ -449,6 +609,17 @@ export function setup(api) {
       }
     }
 
+    if (btn.dataset.update) {
+      const updateId = btn.dataset.update;
+      try {
+        api.notify(`Updating ${updateId}...`, 'info');
+        await api.reloadPlugin(updateId);
+        api.notify(`${updateId} updated successfully!`, 'success');
+      } catch {
+        api.notify('Update failed', 'error');
+      }
+    }
+
     renderInstalled();
     renderCommunity();
   };
@@ -463,6 +634,7 @@ export function setup(api) {
 
       root.querySelector('#' + tab.dataset.tab).style.display = 'block';
 
+      if (tab.dataset.tab === 'installed') renderInstalled();
       if (tab.dataset.tab === 'community') renderCommunity();
     };
   });
@@ -474,7 +646,7 @@ export function setup(api) {
     renderInstalled();
   });
 
-  console.log('🔥 Plugin Manager v3.4.6 (Community card ui bug)');
+  console.log('🔥 Plugin Manager v3.5.3 – Update badge + auto-check loaded');
 }
 
 export function teardown() {}
