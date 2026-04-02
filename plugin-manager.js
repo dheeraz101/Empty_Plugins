@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.5.6',
+  version: '3.5.7',
   compat: '>=3.3.0'
 };
 
@@ -24,211 +24,166 @@ export function setup(api) {
   // ───────── STYLE ─────────
   style = document.createElement('style');
   style.textContent = `
-    /* YOUR ORIGINAL UI — untouched */
+  .pm-root {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 820px;
+    height: 600px;
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(40px) saturate(200%);
+    -webkit-backdrop-filter: blur(40px) saturate(200%);
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 40px 100px rgba(0,0,0,0.2);
+    display: flex;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+    color: #1d1d1f;
+    z-index: 10000;
+  }
+
+  /* Left Sidebar Navigation */
+  .pm-sidebar {
+    width: 220px;
+    background: rgba(255, 255, 255, 0.3);
+    border-right: 1px solid rgba(0,0,0,0.05);
+    padding: 32px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .pm-tab {
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #424245;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .pm-tab.active {
+    background: rgba(0,0,0,0.05);
+    color: #1d1d1f;
+    font-weight: 600;
+  }
+
+  /* Content Area */
+  .pm-content {
+    flex: 1;
+    padding: 40px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .pm-view-title {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    margin-bottom: 8px;
+  }
+
+  /* Plugin Cards */
+  .plugin-item {
+    background: rgba(255, 255, 255, 0.5);
+    border: 0.5px solid rgba(0,0,0,0.1);
+    border-radius: 16px;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    transition: transform 0.2s ease;
+  }
+
+  .plugin-item:hover {
+    transform: translateY(-2px);
+    background: rgba(255, 255, 255, 0.8);
+  }
+
+  .plugin-icon-box {
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, #007aff, #00c7ff);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 20px;
+  }
+
+  .plugin-info { flex: 1; }
+  .plugin-name { font-weight: 600; font-size: 16px; color: #1d1d1f; }
+  .plugin-meta { font-size: 13px; color: #86868b; margin-top: 2px; }
+
+  .pm-card {
+    background: rgba(255, 255, 255, 0.5);
+    border: 0.5px solid rgba(0,0,0,0.1);
+    border-radius: 16px;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    transition: transform 0.2s ease;
+  }
+
+  .pm-card:hover {
+    transform: translateY(-2px);
+    background: rgba(255, 255, 255, 0.8);
+  }
+
+  /* Buttons */
+  .pm-btn {
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .pm-btn-primary,
+  .primary {
+    background: #0071e3;
+    color: white;
+  }
+
+  .pm-btn-primary:hover,
+  .primary:hover {
+    background: #0077ed;
+  }
+  
+  .pm-btn-secondary,
+  .secondary {
+    background: rgba(0,0,0,0.05);
+    color: #1d1d1f;
+  }
+
+  /* Dark Mode Overrides */
+  @media (prefers-color-scheme: dark) {
     .pm-root {
-      position: fixed;
-      top: 80px;
-      left: 240px;
-      width: 850px;
-      height: 75vh;
-      min-width: 520px;
-      min-height: 420px;
-      max-width: 95vw;
-      max-height: 90vh;
-      pointer-events: auto;
-      z-index: 2147483647;
-      background: #161618;
-      border-radius: 16px;
-      color: #ececec;
-      font-family: 'Inter', system-ui, -apple-system, sans-serif;
-      border: 1px solid rgba(255,255,255,0.1);
-      display:flex;
-      flex-direction:column;
-      box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-      backdrop-filter: blur(10px);
-      overflow: hidden;
+      background: rgba(30, 30, 32, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #f5f5f7;
     }
-
-    .pm-header {
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      padding:16px 20px;
-      border-bottom:1px solid rgba(255,255,255,0.08);
-      background: rgba(255,255,255,0.02);
-    }
-
-    #pm-close {
-      background: transparent;
-      color: #aaa;
-      font-size: 18px;
-      border: none;
-      cursor: pointer;
-    }
-
-    #pm-close:hover { color: #fff; }
-
-    .pm-right { display:flex; align-items:center; gap:12px; }
-    #pm-actions { display:flex; gap:8px; }
-
-    .pm-tabs {
-      display:flex;
-      padding: 0 10px;
-      background: rgba(0,0,0,0.2);
-      border-bottom:1px solid rgba(255,255,255,0.05);
-    }
-
-    .pm-tab {
-      padding:14px 20px;
-      background:none;
-      border:none;
-      color:#888;
-      cursor:pointer;
-      font-weight: 500;
-      transition: all 0.2s;
-      border-bottom: 2px solid transparent;
-    }
-
-    .pm-tab:hover { color: #bbb; }
-
-    .pm-tab.active {
-      color:#7c6fff;
-      border-bottom:2px solid #7c6fff;
-    }
-
-    .pm-body { flex:1; overflow:hidden; background: #1c1c1f; }
-    .pm-panel {
-      height:100%;
-      overflow:auto;
-      padding:20px;
-      padding-bottom:40px; /* FIX: bottom breathing space */
-    }
-
-    .pm-panel::after {
-      content: "";
-      display: block;
-      height: 30px; /* controls bottom spacing */
-    }
-
-    /* 🔥 SCROLLBAR FIX */
-    .pm-panel::-webkit-scrollbar {
-      width: 8px;
-    }
-
-    .pm-panel::-webkit-scrollbar-track {
-      background: transparent;
-    }
-
-    .pm-panel::-webkit-scrollbar-thumb {
-      background: rgba(255,255,255,0.15);
-      border-radius: 10px;
-    }
-
-    .pm-panel::-webkit-scrollbar-thumb:hover {
-      background: rgba(255,255,255,0.25);
-    }
-
-    .pm-card {
-      background: rgba(255,255,255,0.04);
-      padding:16px;
-      border-radius:12px;
-      margin-bottom:12px;
-      border: 1px solid rgba(255,255,255,0.05);
-      transition: transform 0.1s;
-    }
-
-    .pm-card:hover { background: rgba(255,255,255,0.06); }
-
-    .pm-btn {
-      padding:8px 14px;
-      border:none;
-      border-radius:8px;
-      cursor:pointer;
-      font-weight: 600;
-      font-size: 13px;
-    }
-
-    .docs-link {
-      color: #7c6fff;
-      text-decoration: none;
-      font-size: 12px;
-      padding: 6px 10px;
-      border-radius: 6px;
-      background: rgba(124, 111, 255, 0.1);
-      border: 1px solid rgba(124, 111, 255, 0.2);
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-
-    .primary { background:#7c6fff; color:#fff; }
-    .danger { background:#e5484d22; color:#ff6b6b; }
-    .secondary { background:rgba(255,255,255,0.08); color:#ddd; }
-
-    .bb-modal-overlay {
-      z-index: 2147483648 !important;
-    }
-
-    .pm-version {
-      font-size: 11px;
-      color: #888;
-      margin-left: 6px;
-    }
-
-    .update-available {
-      color: #ffaa00 !important;
-      font-weight: 600;
-    }
-
-    .pm-update-btn {
-      background: #ffaa00;
-      color: #000;
-      font-size: 12px;
-      padding: 6px 12px;
-      margin-left: 8px;
-    }
-
-    .pm-update-btn:hover { background: #ffc107; }
-
-    .last-checked {
-      font-size: 11px;
-      color: #666;
-      margin-top: 6px;
-      text-align: center;
-    }
-
-    .update-badge {
-      position: absolute;
-      top: 50%;
-      right: 12px;
-      transform: translateY(-50%);
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 18px;
-      height: 18px;
-    }
-
-    .update-badge .badge {
-      background: #ff3b30;
-      color: white;
-      font-size: 10px;
-      font-weight: 700;
-      min-width: 18px;
-      height: 18px;
-      border-radius: 9999px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0 4px;
-      box-shadow: 0 0 0 2px #161618;
-    }
-
-    .check-updates {
-      position: relative;
-      padding-right: 40px;
-    }
-  `;
+    .pm-sidebar { background: rgba(0,0,0,0.2); border-right: 1px solid rgba(255,255,255,0.05); }
+    .pm-tab { color: #a1a1a6; }
+    .pm-tab.active { background: rgba(255,255,255,0.1); color: #fff; }
+    .plugin-item { background: rgba(255, 255, 255, 0.05); border-color: rgba(255,255,255,0.1); }
+    .plugin-name { color: #f5f5f7; }
+    .pm-btn-secondary { background: rgba(255,255,255,0.1); color: #f5f5f7; }
+  }
+`;
   document.head.appendChild(style);
 
   // ───────── ROOT ─────────
@@ -237,33 +192,37 @@ export function setup(api) {
   root.style.display = 'none';
 
   root.innerHTML = `
-    <div class="pm-header">
-      <div>
-        <div style="display:flex; align-items:center; gap:10px;">
-            <b style="font-size:16px;">⚙️ Plugin Manager</b>
-            <a href="https://empty-ad9a3406.mintlify.app/" target="_blank" class="docs-link">
-               <span>Docs</span> ↗
-            </a>
-        </div>
-        <div id="pm-stats" style="font-size:11px; color:#666; margin-top:2px;"></div>
-      </div>
+  <div class="pm-sidebar">
+    <div style="padding: 0 14px 20px 14px;">
+      <div style="font-size: 12px; font-weight: 700; color: #86868b; text-transform: uppercase; letter-spacing: 1px;">Library</div>
+    </div>
+    <div class="pm-tab active" data-tab="installed">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+      Installed
+    </div>
+    <div class="pm-tab" data-tab="community">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+      Community
+    </div>
+    <div style="margin-top: auto; padding: 14px;">
+       <button id="close-pm" class="pm-btn pm-btn-secondary" style="width: 100%">Close</button>
+    </div>
+  </div>
 
-      <div class="pm-right">
-        <div id="pm-actions"></div>
-        <button id="pm-close">✕</button>
-      </div>
+  <div class="pm-content">
+    <div id="installed">
+      <h1 class="pm-view-title">Installed Plugins</h1>
+      <p style="color: #86868b; margin-bottom: 24px;">Manage and configure your active workspace tools.</p>
+      <div class="pm-list"></div>
     </div>
 
-    <div class="pm-tabs">
-      <button class="pm-tab active" data-tab="installed">Installed</button>
-      <button class="pm-tab" data-tab="community">Community</button>
+    <div id="community" style="display:none;">
+      <h1 class="pm-view-title">Discovery</h1>
+      <p style="color: #86868b; margin-bottom: 24px;">Explore new extensions built by the community.</p>
+      <div class="pm-list"></div>
     </div>
-
-    <div class="pm-body">
-      <div id="installed" class="pm-panel"></div>
-      <div id="community" class="pm-panel" style="display:none"></div>
-    </div>
-  `;
+  </div>
+`;
 
   api.boardEl.appendChild(root);
   api.makeDraggable(root);
@@ -293,7 +252,7 @@ export function setup(api) {
   }
 
   // ───────── FIX: CLOSE BUTTON ─────────
-  root.querySelector('#pm-close').onclick = () => {
+  root.querySelector('#close-pm').onclick = () => {
     root.style.display = 'none';
   };
 
@@ -459,7 +418,7 @@ export function setup(api) {
       lastCheckedTime = now;
     }
 
-    const el = root.querySelector('#installed');
+    const el = root.querySelector('#installed .pm-list');
     const plugins = api.registry.getAll();
 
     let html = '';
@@ -555,7 +514,7 @@ export function setup(api) {
   // ───────── RENDER COMMUNITY (unchanged) ─────────
   let communityCache = [];
   async function renderCommunity() {
-    const el = root.querySelector('#community');
+    const el = root.querySelector('#community .pm-list');
 
     if (!communityCache.length) {
       try {
