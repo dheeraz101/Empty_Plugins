@@ -1,12 +1,19 @@
 export const meta = {
   id: 'about',
   name: 'About Blank Board',
-  version: '0.3.5',
+  version: '0.3.6',
   compat: '>=1.0.0'
 };
 
+let box = null;
+
 export function setup(api) {
-  const box = document.createElement('div');
+  if (box) {
+    box.remove();
+    box = null;
+  }
+
+  box = document.createElement('div');
   box.className = 'plugin-box';
   box.style.cssText = `
     position: absolute;
@@ -135,8 +142,18 @@ export function setup(api) {
   closeButton.addEventListener('click', () => {
     box.style.opacity = '0';
     box.style.transform = 'translate(-50%, -48%) scale(0.95)';
-    setTimeout(() => box.remove(), 200);
+    setTimeout(() => {
+      if (box) {
+        box.remove();
+        box = null;
+      }
+    }, 200);
   });
 }
 
-export function teardown() {}
+export function teardown() {
+  if (box) {
+    box.remove();
+    box = null;
+  }
+}
