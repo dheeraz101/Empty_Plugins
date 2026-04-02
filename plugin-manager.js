@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.6.1',
+  version: '3.6.2',
   compat: '>=3.3.0'
 };
 
@@ -342,6 +342,15 @@ export function setup(api) {
     return c?.icon || null;
   }
 
+  async function ensureCommunityCache() {
+    if (communityCache && communityCache.length) return;
+    try {
+      communityCache = await fetch(COMMUNITY_URL + '?t=' + Date.now()).then(r => r.json());
+    } catch {
+      communityCache = [];
+    }
+  }
+
   async function fetchRemoteMeta(url) {
     try {
       const res = await fetch(url + (url.includes('?') ? '&' : '?') + 't=' + Date.now());
@@ -429,6 +438,8 @@ export function setup(api) {
 
   // ───────── RENDER INSTALLED (with badge support) ─────────
   async function renderInstalled(forceCheck = false) {
+    await ensureCommunityCache();
+
     const now = Date.now();
     const shouldCheck = forceCheck || (now - lastCheckedTime > CACHE_TIMEOUT);
 
@@ -484,8 +495,19 @@ export function setup(api) {
       const iconBg = colors[p.id.length % colors.length];
       const iconContent = p.icon || remoteMeta?.icon || getCommunityIcon(p.id) || '📦';
       const iconHtml = (typeof iconContent === 'string' && (iconContent.startsWith('http://') || iconContent.startsWith('https://')))
-        ? `<img src="${iconContent}" alt="" style="width:100%;height:100%;border-radius:10px;object-fit:cover;" />`
+        ? `<img src="${iconContent}" alt="${p.name || p.id}" style="width:100%;height:100%;border-radius:10px;object-fit:cover;" />`
         : iconContent;
+
+      // persist icon to registry so installed list keeps community icon
+      if (!p.icon && iconContent && iconContent !== '📦') {
+        const reg = api.registry.getAll();
+        const entry = reg.find(item => item.id === p.id);
+        if (entry) {
+          entry.icon = iconContent;
+          api.registry.save([...reg]);
+          p.icon = iconContent;
+        }
+      }
 
       html += `
         <div class="plugin-item">
