@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.6.0',
+  version: '3.6.1',
   compat: '>=3.3.0'
 };
 
@@ -336,6 +336,12 @@ export function setup(api) {
     return Math.floor(seconds / 86400) + " days ago";
   }
 
+  function getCommunityIcon(id) {
+    if (!communityCache || !communityCache.length) return null;
+    const c = communityCache.find(p => p.id === id);
+    return c?.icon || null;
+  }
+
   async function fetchRemoteMeta(url) {
     try {
       const res = await fetch(url + (url.includes('?') ? '&' : '?') + 't=' + Date.now());
@@ -476,11 +482,14 @@ export function setup(api) {
       const versionText = installedVer ? `v${installedVer}` : 'Version unknown';
       const colors = ['#007AFF', '#5856D6', '#AF52DE', '#FF2D55', '#FF9500'];
       const iconBg = colors[p.id.length % colors.length];
-      const iconContent = p.icon || remoteMeta?.icon || '📦';
+      const iconContent = p.icon || remoteMeta?.icon || getCommunityIcon(p.id) || '📦';
+      const iconHtml = (typeof iconContent === 'string' && (iconContent.startsWith('http://') || iconContent.startsWith('https://')))
+        ? `<img src="${iconContent}" alt="" style="width:100%;height:100%;border-radius:10px;object-fit:cover;" />`
+        : iconContent;
 
       html += `
         <div class="plugin-item">
-          <div class="plugin-icon-box" style="background: ${iconBg};">${iconContent}</div>
+          <div class="plugin-icon-box" style="background: ${iconBg};">${iconHtml}</div>
           <div class="plugin-info">
             <span class="plugin-name">${p.name || p.id}</span>
             <div class="plugin-meta">${versionText} • <span style="opacity: 0.7">${p.id}</span></div>
@@ -496,7 +505,7 @@ export function setup(api) {
     }
 
     const lastCheckedHTML = lastCheckedTime
-      ? `<div class="last-checked">Last checked: ${timeAgo(lastCheckedTime)}</div>`
+      ? `<div class="last-checked">Last update checked ${timeAgo(lastCheckedTime)}</div>`
       : '';
 
     el.innerHTML = html + lastCheckedHTML;
@@ -541,7 +550,7 @@ export function setup(api) {
           ${
             isInstalled
               ? `<button class="pm-btn pm-btn-secondary" disabled style="width:100%;opacity:0.5">Installed</button>`
-              : `<button class="pm-btn pm-btn-primary" style="width:100%" data-install="${p.id}" data-url="${p.url}">Install Plugin</button>`
+              : `<button class="pm-btn pm-btn-primary" style="width:100%" data-install="${p.id}" data-url="${p.url}" data-icon="${p.icon || ''}">Install Plugin</button>`
           }
         </div>
       </div>
@@ -582,7 +591,8 @@ export function setup(api) {
         url: btn.dataset.url,
         name: btn.dataset.install,
         enabled: true,
-        source: 'registry'
+        source: 'registry',
+        icon: btn.dataset.icon || undefined
       };
 
       const registry = api.registry.getAll();
