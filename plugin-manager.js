@@ -339,10 +339,21 @@ export function setup(api) {
     try {
       const res = await fetch(url + (url.includes('?') ? '&' : '?') + 't=' + Date.now());
       const code = await res.text();
-      const metaMatch = code.match(/export const meta\s*=\s*(\{[\s\S]*?\})(?:;|$)/);
+      const metaMatch = code.match(/export const meta\s*=\s*(\{[\s\S]*?\})/);
       if (!metaMatch) return null;
-      return new Function(`return ${metaMatch[1]}`)();
+
+      let metaStr = metaMatch[1]
+        .replace(/\/\/.*$/gm, '')
+        .replace(/,\s*}/g, '}')
+        .replace(/,\s*\]/g, ']');
+
+      try {
+        return JSON.parse(metaStr);
+      } catch {
+        return new Function(`return (${metaStr})`)();
+      }
     } catch (e) {
+      console.warn('Meta fetch failed:', e);
       return null;
     }
   }
