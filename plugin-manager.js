@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.5.9',
+  version: '3.6.0',
   compat: '>=3.3.0'
 };
 
@@ -426,7 +426,7 @@ export function setup(api) {
 
       html += `
         <div class="plugin-item">
-          <div class="plugin-icon-box" style="background: ${iconBg};">${p.name?.[0] || p.icon || '🧩'}</div>
+          <div class="plugin-icon-box" style="background: ${iconBg};">${p.icon || '📦'}</div>
           <div class="plugin-info">
             <span class="plugin-name">${p.name || p.id}</span>
             <div class="plugin-meta">${versionText} • <span style="opacity: 0.7">${p.id}</span></div>
@@ -471,47 +471,28 @@ export function setup(api) {
 
     el.innerHTML = communityCache.map(p => {
       const displayVersion = p.version || installedVersions[p.id];
+      const colors = ['#007AFF', '#5856D6', '#AF52DE', '#FF2D55', '#FF9500'];
+      const iconBg = colors[p.id.length % colors.length];
+      const isInstalled = installed.has(p.id);
+
       return `
-      <div class="pm-card">
-        <div style="display:flex; gap:12px;">
-
-          <div style="
-            font-size:24px;
-            background:rgba(255,255,255,0.05);
-            padding:10px;
-            border-radius:10px;
-            display:flex;
-            align-items:center;
-            justify-content:center;
-          ">
-            ${p.icon || '📦'}
-          </div>
-
-          <div style="flex:1">
-            <b style="font-size:15px">${p.name}</b>
-
-            ${displayVersion ? `<div style="font-size:11px;color:#888;margin-top:2px">v${displayVersion}</div>` : ''}
-
-            <div style="font-size:11px;color:#7c6fff;margin-top:2px">
-              by ${p.author || 'Unknown'}
-            </div>
-
-            <div style="font-size:13px;color:#aaa;margin-top:6px;line-height:1.4">
-              ${p.description || ''}
-            </div>
-          </div>
-
+      <div class="plugin-item">
+        <div class="plugin-icon-box" style="background: ${iconBg};">${p.icon || '📦'}</div>
+        <div class="plugin-info">
+          <span class="plugin-name">${p.name}</span>
+          <div class="plugin-meta">${displayVersion ? `v${displayVersion} • ` : ''}${p.author || 'Unknown'}</div>
+          <div class="plugin-meta" style="margin-top: 10px; color: #8e8e93;">${p.description || ''}</div>
         </div>
-
-        <div style="margin-top:12px">
+        <div class="pm-action-group" style="min-width: 110px;">
           ${
-            installed.has(p.id)
+            isInstalled
               ? `<button class="pm-btn pm-btn-secondary" disabled style="width:100%;opacity:0.5">Installed</button>`
               : `<button class="pm-btn pm-btn-primary" style="width:100%" data-install="${p.id}" data-url="${p.url}">Install Plugin</button>`
           }
         </div>
       </div>
-    `}).join('');
+    `;
+    }).join('');
   }
 
   // ───────── CLICK HANDLER ─────────
