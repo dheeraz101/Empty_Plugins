@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.6.0',
+  version: '3.6.1',
   compat: '>=3.3.0'
 };
 
@@ -31,7 +31,7 @@ export function setup(api) {
     transform: translate(-50%, -50%);
     width: 820px;
     height: 600px;
-    background: rgba(255, 255, 255, 0.85);
+    background: rgba(255, 255, 255, 0.75);
     backdrop-filter: blur(40px) saturate(210%);
     -webkit-backdrop-filter: blur(40px) saturate(210%);
     border-radius: 28px;
@@ -51,7 +51,6 @@ export function setup(api) {
     padding: 32px 12px;
     display: flex;
     flex-direction: column;
-    gap: 6px;
   }
 
   .pm-tab {
@@ -64,7 +63,7 @@ export function setup(api) {
     display: flex;
     align-items: center;
     gap: 10px;
-    transition: background 0.2s;
+    transition: all 0.2s;
   }
 
   .pm-tab.active { background: rgba(0, 0, 0, 0.06); color: #000; font-weight: 600; }
@@ -74,6 +73,7 @@ export function setup(api) {
 
   .pm-view-title { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 4px; }
   .pm-view-subtitle { font-size: 15px; color: #86868b; margin-bottom: 32px; font-weight: 400; }
+  .pm-list { display: flex; flex-direction: column; gap: 12px; }
 
   .plugin-item {
     background: rgba(255, 255, 255, 0.4);
@@ -112,6 +112,17 @@ export function setup(api) {
   .plugin-name { font-weight: 600; font-size: 16px; color: #1d1d1f; display: block; overflow: hidden; text-overflow: ellipsis; }
   .plugin-meta { font-size: 13px; color: #86868b; margin-top: 2px; }
 
+  .plugin-badge {
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .badge-enabled { background: rgba(52, 199, 89, 0.15); color: #248a3d; }
+  .badge-update { background: rgba(0, 122, 255, 0.15); color: #007aff; }
+
   .pm-action-group { display: flex; gap: 8px; align-items: center; }
 
   .pm-btn {
@@ -122,27 +133,79 @@ export function setup(api) {
     border: none;
     cursor: pointer;
     transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
   }
   .pm-btn-primary { background: #0071e3; color: white; }
+  .pm-btn-primary:hover { background: #0077ed; }
   .pm-btn-secondary { background: rgba(0,0,0,0.05); color: #1d1d1f; }
   .pm-btn-secondary:hover { background: rgba(0,0,0,0.1); }
 
-  .last-checked {
+  #close-pm:hover { background: #ff3b30 !important; color: white !important; }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  .spinning svg { animation: spin 0.8s cubic-bezier(0.4, 0, 0.2, 1); }
+
+  .sidebar-footer-text {
     font-size: 11px;
-    color: #a1a1a6;
-    margin-top: 12px;
-    font-weight: 500;
+    color: #86868b;
+    line-height: 1.4;
+    padding: 0 14px;
+    margin-bottom: 12px;
+    font-weight: 400;
   }
 
+  .docs-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: #0071e3;
+    text-decoration: none;
+    font-weight: 500;
+    border-radius: 10px;
+    transition: background 0.2s;
+  }
+  .docs-link:hover { background: rgba(0, 113, 227, 0.05); }
+
+  .pm-modal-overlay {
+    position: fixed; top:0; left:0; right:0; bottom:0;
+    background: rgba(0,0,0,0.2);
+    backdrop-filter: blur(10px);
+    z-index: 20000;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .pm-modal-content {
+    background: rgba(255,255,255,0.9);
+    width: 380px; padding: 24px; border-radius: 24px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+    border: 1px solid rgba(0,0,0,0.05);
+  }
+  .pm-input {
+    width: 100%; padding: 12px; border-radius: 12px;
+    border: 1px solid rgba(0,0,0,0.1); background: rgba(255,255,255,0.5);
+    margin-bottom: 12px; font-size: 14px; outline: none;
+    box-sizing: border-box; transition: border 0.2s;
+  }
+  .pm-input:focus { border-color: #0071e3; }
+
   @media (prefers-color-scheme: dark) {
-    .pm-root { background: rgba(28, 28, 30, 0.85); border-color: rgba(255,255,255,0.1); color: #f5f5f7; }
+    .pm-root { background: rgba(28, 28, 30, 0.75); border-color: rgba(255,255,255,0.1); color: #f5f5f7; }
     .pm-sidebar { background: rgba(255, 255, 255, 0.02); }
     .pm-tab { color: #a1a1a6; }
     .pm-tab.active { background: rgba(255, 255, 255, 0.1); color: #fff; }
     .plugin-item { background: rgba(255, 255, 255, 0.05); border-color: rgba(255,255,255,0.1); }
-    .plugin-item:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255,255,255,0.2); }
+    .plugin-item:hover { background: rgba(255, 255, 255, 0.08); }
     .plugin-name { color: #f5f5f7; }
     .pm-btn-secondary { background: rgba(255,255,255,0.1); color: #f5f5f7; }
+    .pm-modal-content { background: rgba(44, 44, 46, 0.95); color: white; border-color: rgba(255,255,255,0.1); }
+    .pm-input { background: rgba(0,0,0,0.2); border-color: rgba(255,255,255,0.1); color: white; }
     .last-checked { color: #6e6e73; }
   }
 `;
@@ -167,8 +230,15 @@ export function setup(api) {
       Community
     </div>
     <div id="pm-actions" style="padding: 14px; display: flex; flex-direction: column; gap: 10px;"></div>
-    <div style="margin-top: auto; padding: 14px;">
-       <button id="close-pm" class="pm-btn pm-btn-secondary" style="width: 100%">Close</button>
+    <a href="${DOCS_URL}" target="_blank" class="docs-link">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+      Developer Portal
+    </a>
+    <div style="margin-top: auto; padding-top: 20px;">
+       <p class="sidebar-footer-text">Curate your workspace with precision. All plugins are sandboxed for security.</p>
+       <div style="padding: 0 12px 14px 12px;">
+         <button id="close-pm" class="pm-btn pm-btn-secondary" style="width: 100%">Close</button>
+       </div>
     </div>
   </div>
 
@@ -178,7 +248,6 @@ export function setup(api) {
       <p class="pm-view-subtitle">Manage and configure your active workspace tools.</p>
       <div class="pm-list"></div>
     </div>
-
     <div id="community" style="display:none;">
       <h1 class="pm-view-title">Discovery</h1>
       <p class="pm-view-subtitle">Explore new extensions built by the community.</p>
@@ -233,12 +302,14 @@ export function setup(api) {
   const checkUpdatesBtn = document.createElement('button');
   checkUpdatesBtn.className = 'pm-btn pm-btn-secondary check-updates';
   checkUpdatesBtn.innerHTML = `
-    🔄 Check Updates
-    <span class="update-badge" id="update-badge" style="display:none;">
-      <span class="badge" id="badge-count">0</span>
-    </span>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+    Check Updates
   `;
-  checkUpdatesBtn.onclick = () => renderInstalled(true);
+  checkUpdatesBtn.onclick = async () => {
+    checkUpdatesBtn.classList.add('spinning');
+    await renderInstalled(true);
+    setTimeout(() => checkUpdatesBtn.classList.remove('spinning'), 800);
+  };
   actions.appendChild(checkUpdatesBtn);
 
   const installBtn = document.createElement('button');
@@ -304,70 +375,40 @@ export function setup(api) {
 
   // ───────── INSTALL MODAL ─────────
   function openInstallModal() {
-    const wrap = document.createElement('div');
+    const overlay = document.createElement('div');
+    overlay.className = 'pm-modal-overlay';
 
-    wrap.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-        <b style="font-size:14px;">Install Plugin</b>
-        <button id="pm-modal-close" style="
-          background:none;
-          border:none;
-          font-size:18px;
-          cursor:pointer;
-          color:#888;
-        ">✕</button>
+    overlay.innerHTML = `
+      <div class="pm-modal-content">
+        <h3 style="margin-top:0; font-size:18px; font-weight:600; margin-bottom:16px;">Install Extension</h3>
+        <input type="text" id="pm-url" class="pm-input" placeholder="https://source.com/plugin.js">
+        <input type="text" id="pm-id" class="pm-input" placeholder="Unique Plugin ID">
+        <div style="display:flex; gap:10px; margin-top:8px;">
+          <button id="pm-cancel" class="pm-btn pm-btn-secondary" style="flex:1">Cancel</button>
+          <button id="pm-confirm" class="pm-btn pm-btn-primary" style="flex:1">Install</button>
+        </div>
       </div>
-
-      <input placeholder="Plugin URL" id="pm-url" style="width:100%; margin-bottom:8px; padding:6px;" />
-      <input placeholder="Plugin ID" id="pm-id" style="width:100%; margin-bottom:10px; padding:6px;" />
-
-      <button id="pm-install" style="
-        width:100%;
-        padding:8px;
-        background:#7c6fff;
-        color:#fff;
-        border:none;
-        border-radius:6px;
-        cursor:pointer;
-      ">
-        Install
-      </button>
     `;
 
-    const modal = api.showModal({ content: wrap });
-    const overlay = document.querySelector('div[style*="z-index: 100001"]');
-    if (overlay) overlay.style.zIndex = 2147483648;
+    document.body.appendChild(overlay);
 
-    wrap.querySelector('#pm-modal-close').onclick = () => {
-      modal.close();
-    };
-
-    wrap.querySelector('#pm-install').onclick = async () => {
-      const url = wrap.querySelector('#pm-url').value.trim();
-      const id = wrap.querySelector('#pm-id').value.trim();
-
-      if (!url || !id) return api.notify('Missing fields', 'error');
+    overlay.querySelector('#pm-cancel').onclick = () => overlay.remove();
+    overlay.querySelector('#pm-confirm').onclick = async () => {
+      const url = overlay.querySelector('#pm-url').value.trim();
+      const id = overlay.querySelector('#pm-id').value.trim();
+      if (!url || !id) return api.notify('All fields required', 'error');
 
       try {
         const remoteMeta = await fetchRemoteMeta(url);
-        const newDef = {
-          id,
-          url,
-          name: remoteMeta?.name || id,
-          enabled: true,
-          source: 'registry',
-          version: remoteMeta?.version || undefined,
-        };
-
+        const newDef = { id, url, name: remoteMeta?.name || id, enabled: true, source: 'registry', version: remoteMeta?.version };
         const registry = api.registry.getAll();
         api.registry.save([...registry, newDef]);
-
-        cleanupPluginUI(id);
         await api.reloadPlugin(id);
-        api.notify('Installed', 'success');
-        modal.close();
+        api.notify('Installed Successfully', 'success');
+        overlay.remove();
+        renderInstalled();
       } catch {
-        api.notify('Install failed', 'error');
+        api.notify('Installation failed', 'error');
       }
     };
   }
