@@ -41,6 +41,11 @@ export function setup(api) {
         </span>
       </div>
 
+      <div style="margin-bottom:18px;">
+        <img src="https://raw.githubusercontent.com/dheeraz101/Empty_Plugins/main/main.gif" alt="Empty board demo" style="width:100%;border-radius:14px;border:1px solid #333;display:block;" />
+        <div style="margin-top:10px;font-size:12px;color:#777;">Demo: the plugin-based Empty board in action.</div>
+      </div>
+
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:13px;">
         <div>
           <strong>Author</strong><br>
