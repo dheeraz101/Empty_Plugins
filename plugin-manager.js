@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.5.5',
+  version: '3.5.6',
   compat: '>=3.3.0'
 };
 
@@ -339,21 +339,10 @@ export function setup(api) {
     try {
       const res = await fetch(url + (url.includes('?') ? '&' : '?') + 't=' + Date.now());
       const code = await res.text();
-      const metaMatch = code.match(/export const meta\s*=\s*(\{[\s\S]*?\})/);
+      const metaMatch = code.match(/export const meta\s*=\s*(\{[\s\S]*?\})(?:;|$)/);
       if (!metaMatch) return null;
-
-      let metaStr = metaMatch[1]
-        .replace(/\/\/.*$/gm, '')
-        .replace(/,\s*}/g, '}')
-        .replace(/,\s*\]/g, ']');
-
-      try {
-        return JSON.parse(metaStr);
-      } catch {
-        return new Function(`return (${metaStr})`)();
-      }
+      return new Function(`return ${metaMatch[1]}`)();
     } catch (e) {
-      console.warn('Meta fetch failed:', e);
       return null;
     }
   }
@@ -604,7 +593,7 @@ export function setup(api) {
           <div style="flex:1">
             <b style="font-size:15px">${p.name}</b>
 
-            ${displayVersion ? `<div style="font-size:11px;color:#888;margin-top:2px">v${displayVersion}</div>` : ''}
+            ${p.version ? `<div style="font-size:11px;color:#888;margin-top:2px">v${p.version}</div>` : ''}
 
             <div style="font-size:11px;color:#7c6fff;margin-top:2px">
               by ${p.author || 'Unknown'}
@@ -625,7 +614,7 @@ export function setup(api) {
           }
         </div>
       </div>
-    `).join('');
+    `}).join('');
   }
 
   // ───────── CLICK HANDLER ─────────
@@ -716,7 +705,7 @@ export function setup(api) {
   };
   api.boardEl.addEventListener('contextmenu', contextMenuHandler);
 
-  console.log('🔥 Plugin Manager v3.5.5 – Update badge + auto-check loaded');
+  console.log('🔥 Plugin Manager v3.5.6 – Update badge + auto-check loaded');
 }
 
 export function teardown() {
