@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.5.8',
+  version: '3.5.9',
   compat: '>=3.3.0'
 };
 
@@ -31,12 +31,12 @@ export function setup(api) {
     transform: translate(-50%, -50%);
     width: 820px;
     height: 600px;
-    background: rgba(255, 255, 255, 0.8);
-    backdrop-filter: blur(40px) saturate(200%);
-    -webkit-backdrop-filter: blur(40px) saturate(200%);
-    border-radius: 24px;
-    border: 1px solid rgba(255, 255, 255, 0.4);
-    box-shadow: 0 40px 100px rgba(0,0,0,0.2);
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(40px) saturate(210%);
+    -webkit-backdrop-filter: blur(40px) saturate(210%);
+    border-radius: 28px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    box-shadow: 0 30px 80px rgba(0,0,0,0.15);
     display: flex;
     overflow: hidden;
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
@@ -44,15 +44,14 @@ export function setup(api) {
     z-index: 10000;
   }
 
-  /* Left Sidebar Navigation */
   .pm-sidebar {
-    width: 220px;
-    background: rgba(255, 255, 255, 0.3);
-    border-right: 1px solid rgba(0,0,0,0.05);
+    width: 210px;
+    background: rgba(0, 0, 0, 0.03);
+    border-right: 1px solid rgba(0, 0, 0, 0.05);
     padding: 32px 12px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
   }
 
   .pm-tab {
@@ -62,142 +61,59 @@ export function setup(api) {
     font-weight: 500;
     color: #424245;
     cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
     display: flex;
     align-items: center;
     gap: 10px;
+    transition: background 0.2s;
   }
 
-  .pm-tab.active {
-    background: rgba(0,0,0,0.05);
-    color: #1d1d1f;
-    font-weight: 600;
-  }
+  .pm-tab.active { background: rgba(0, 0, 0, 0.06); color: #000; font-weight: 600; }
+  .pm-tab:hover:not(.active) { background: rgba(0, 0, 0, 0.03); }
 
-  /* Content Area */
-  .pm-content {
-    flex: 1;
-    padding: 40px;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 24px;
-  }
+  .pm-content { flex: 1; padding: 40px; overflow-y: auto; }
 
-  .pm-view-title {
-    font-size: 28px;
-    font-weight: 700;
-    letter-spacing: -0.5px;
-    margin-bottom: 8px;
-  }
-
-  .pm-list {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
+  .pm-view-title { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 4px; }
+  .pm-view-subtitle { font-size: 15px; color: #86868b; margin-bottom: 32px; font-weight: 400; }
 
   .plugin-item {
     background: rgba(255, 255, 255, 0.4);
-    border: 1px solid rgba(0, 0, 0, 0.04);
+    border: 1px solid rgba(0, 0, 0, 0.06);
     border-radius: 20px;
     padding: 16px 20px;
     display: flex;
     align-items: center;
     gap: 16px;
+    margin-bottom: 12px;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .plugin-item:hover {
-    background: rgba(255, 255, 255, 0.7);
-    border-color: rgba(0, 0, 0, 0.08);
-    transform: translateY(-1px);
-  }
-
-  .plugin-item:active {
-    transform: scale(0.98);
+    background: rgba(255, 255, 255, 0.6);
+    border-color: rgba(0, 0, 0, 0.12);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.04);
   }
 
   .plugin-icon-box {
-    width: 52px;
-    height: 52px;
-    background: linear-gradient(145deg, #f0f0f3, #ffffff);
-    border-radius: 14px;
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, #007aff, #00c7ff);
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.05), 0 4px 10px rgba(0,0,0,0.03);
-    font-size: 24px;
-  }
-
-  .plugin-info { flex: 1; }
-  .plugin-name { font-weight: 700; font-size: 15px; color: #1d1d1f; }
-  .plugin-meta { font-size: 13px; color: #6b6b71; margin-top: 6px; }
-
-  .plugin-badge {
-    padding: 2px 8px;
-    border-radius: 6px;
-    font-size: 11px;
+    color: white;
     font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    font-size: 18px;
+    flex-shrink: 0;
+    box-shadow: 0 4px 10px rgba(0, 122, 255, 0.2);
   }
 
-  .badge-enabled { background: rgba(52, 199, 89, 0.15); color: #248a3d; }
-  .badge-update { background: rgba(0, 122, 255, 0.15); color: #007aff; }
+  .plugin-info { flex: 1; min-width: 0; }
+  .plugin-name { font-weight: 600; font-size: 16px; color: #1d1d1f; display: block; overflow: hidden; text-overflow: ellipsis; }
+  .plugin-meta { font-size: 13px; color: #86868b; margin-top: 2px; }
 
-  .plugin-action-group {
-    display: flex;
-    gap: 8px;
-    margin-left: auto;
-    align-items: center;
-  }
+  .pm-action-group { display: flex; gap: 8px; align-items: center; }
 
-  .pm-switch {
-    position: relative;
-    width: 42px;
-    height: 24px;
-    background: #e9e9ea;
-    border-radius: 12px;
-    cursor: pointer;
-    border: none;
-    transition: background 0.3s;
-  }
-
-  .pm-switch.active { background: #34c759; }
-
-  .pm-switch::after {
-    content: '';
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 20px;
-    height: 20px;
-    background: white;
-    border-radius: 50%;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    transition: transform 0.3s;
-  }
-
-  .pm-switch.active::after { transform: translateX(18px); }
-
-  .pm-card {
-    background: rgba(255, 255, 255, 0.5);
-    border: 0.5px solid rgba(0,0,0,0.1);
-    border-radius: 16px;
-    padding: 20px;
-    display: flex;
-    align-items: center;
-    gap: 18px;
-    transition: transform 0.2s ease;
-  }
-
-  .pm-card:hover {
-    transform: translateY(-2px);
-    background: rgba(255, 255, 255, 0.8);
-  }
-
-  /* Buttons */
   .pm-btn {
     padding: 6px 14px;
     border-radius: 999px;
@@ -207,37 +123,27 @@ export function setup(api) {
     cursor: pointer;
     transition: all 0.2s;
   }
+  .pm-btn-primary { background: #0071e3; color: white; }
+  .pm-btn-secondary { background: rgba(0,0,0,0.05); color: #1d1d1f; }
+  .pm-btn-secondary:hover { background: rgba(0,0,0,0.1); }
 
-  .pm-btn-primary,
-  .primary {
-    background: #0071e3;
-    color: white;
+  .last-checked {
+    font-size: 11px;
+    color: #a1a1a6;
+    margin-top: 12px;
+    font-weight: 500;
   }
 
-  .pm-btn-primary:hover,
-  .primary:hover {
-    background: #0077ed;
-  }
-  
-  .pm-btn-secondary,
-  .secondary {
-    background: rgba(0,0,0,0.05);
-    color: #1d1d1f;
-  }
-
-  /* Dark Mode Overrides */
   @media (prefers-color-scheme: dark) {
-    .pm-root {
-      background: rgba(30, 30, 32, 0.7);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      color: #f5f5f7;
-    }
-    .pm-sidebar { background: rgba(0,0,0,0.2); border-right: 1px solid rgba(255,255,255,0.05); }
+    .pm-root { background: rgba(28, 28, 30, 0.85); border-color: rgba(255,255,255,0.1); color: #f5f5f7; }
+    .pm-sidebar { background: rgba(255, 255, 255, 0.02); }
     .pm-tab { color: #a1a1a6; }
-    .pm-tab.active { background: rgba(255,255,255,0.1); color: #fff; }
+    .pm-tab.active { background: rgba(255, 255, 255, 0.1); color: #fff; }
     .plugin-item { background: rgba(255, 255, 255, 0.05); border-color: rgba(255,255,255,0.1); }
+    .plugin-item:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255,255,255,0.2); }
     .plugin-name { color: #f5f5f7; }
     .pm-btn-secondary { background: rgba(255,255,255,0.1); color: #f5f5f7; }
+    .last-checked { color: #6e6e73; }
   }
 `;
   document.head.appendChild(style);
@@ -269,13 +175,13 @@ export function setup(api) {
   <div class="pm-content">
     <div id="installed">
       <h1 class="pm-view-title">Installed Plugins</h1>
-      <p style="color: #86868b; margin-bottom: 24px;">Manage and configure your active workspace tools.</p>
+      <p class="pm-view-subtitle">Manage and configure your active workspace tools.</p>
       <div class="pm-list"></div>
     </div>
 
     <div id="community" style="display:none;">
       <h1 class="pm-view-title">Discovery</h1>
-      <p style="color: #86868b; margin-bottom: 24px;">Explore new extensions built by the community.</p>
+      <p class="pm-view-subtitle">Explore new extensions built by the community.</p>
       <div class="pm-list"></div>
     </div>
   </div>
@@ -325,7 +231,7 @@ export function setup(api) {
   const actions = root.querySelector('#pm-actions');
 
   const checkUpdatesBtn = document.createElement('button');
-  checkUpdatesBtn.className = 'pm-btn secondary check-updates';
+  checkUpdatesBtn.className = 'pm-btn pm-btn-secondary check-updates';
   checkUpdatesBtn.innerHTML = `
     🔄 Check Updates
     <span class="update-badge" id="update-badge" style="display:none;">
@@ -336,7 +242,7 @@ export function setup(api) {
   actions.appendChild(checkUpdatesBtn);
 
   const installBtn = document.createElement('button');
-  installBtn.className = 'pm-btn primary';
+  installBtn.className = 'pm-btn pm-btn-primary';
   installBtn.textContent = 'Install via URL';
   installBtn.onclick = openInstallModal;
   actions.appendChild(installBtn);
@@ -487,7 +393,7 @@ export function setup(api) {
       let remoteVer = null;
       let remoteMeta = null;
       let updateBtn = '';
-      let updateStatus = '';
+      let statusBadge = '';
 
       if (p.url && (shouldCheck || !installedVer)) {
         remoteMeta = await fetchRemoteMeta(p.url);
@@ -503,33 +409,32 @@ export function setup(api) {
         const cmp = compareVersions(remoteVer, installedVer);
         if (cmp > 0) {
           availableUpdates++;
-          updateBtn = `<button class="pm-btn pm-update-btn" data-update="${p.id}">Update</button>`;
-          updateStatus = '<span class="plugin-badge badge-update">Update Available</span>';
+          updateBtn = `<button class="pm-btn pm-btn-primary" data-update="${p.id}">Update</button>`;
+          statusBadge = '<span class="plugin-badge badge-update">Update Available</span>';
         }
       }
 
-      const statusBadge = isSelf
-        ? '<span class="plugin-badge badge-enabled">System</span>'
-        : p.enabled
-          ? '<span class="plugin-badge badge-enabled">Active</span>'
-          : '';
+      if (isSelf) {
+        statusBadge = '<span class="plugin-badge badge-enabled">System</span>';
+      } else if (p.enabled) {
+        statusBadge = '<span class="plugin-badge badge-enabled">Active</span>';
+      }
 
       const versionText = installedVer ? `v${installedVer}` : 'Version unknown';
+      const colors = ['#007AFF', '#5856D6', '#AF52DE', '#FF2D55', '#FF9500'];
+      const iconBg = colors[p.id.length % colors.length];
 
       html += `
         <div class="plugin-item">
-          <div class="plugin-icon-box">${p.name?.[0] || p.icon || '🧩'}</div>
+          <div class="plugin-icon-box" style="background: ${iconBg};">${p.name?.[0] || p.icon || '🧩'}</div>
           <div class="plugin-info">
-            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-              <span class="plugin-name">${p.name || p.id}</span>
-              ${statusBadge}
-              ${updateStatus}
-            </div>
-            <div class="plugin-meta">${versionText} • ${p.id}</div>
+            <span class="plugin-name">${p.name || p.id}</span>
+            <div class="plugin-meta">${versionText} • <span style="opacity: 0.7">${p.id}</span></div>
           </div>
-          <div class="plugin-action-group">
-            ${isSelf ? '' : `<button class="pm-btn pm-btn-secondary" data-act="toggle" data-id="${p.id}">${p.enabled ? 'Disable' : 'Enable'}</button>`}
-            ${isSelf ? '' : `<button class="pm-btn pm-btn-secondary" data-act="delete" data-id="${p.id}" style="color:#ff3b30;">Delete</button>`}
+          <div class="pm-action-group">
+            <button class="pm-btn pm-btn-secondary reload-btn" data-act="reload" data-id="${p.id}">Reload</button>
+            ${isSelf ? '' : `<button class="pm-btn ${p.enabled ? 'pm-btn-secondary' : 'pm-btn-primary'} toggle-btn" data-act="toggle" data-id="${p.id}">${p.enabled ? 'Disable' : 'Enable'}</button>`}
+            ${isSelf ? '' : `<button class="pm-btn pm-btn-secondary delete-btn" data-act="delete" data-id="${p.id}" style="color:#ff3b30;">Delete</button>`}
             ${updateBtn}
           </div>
         </div>
@@ -601,8 +506,8 @@ export function setup(api) {
         <div style="margin-top:12px">
           ${
             installed.has(p.id)
-              ? `<button class="pm-btn secondary" disabled style="width:100%;opacity:0.5">Installed</button>`
-              : `<button class="pm-btn primary" style="width:100%" data-install="${p.id}" data-url="${p.url}">Install Plugin</button>`
+              ? `<button class="pm-btn pm-btn-secondary" disabled style="width:100%;opacity:0.5">Installed</button>`
+              : `<button class="pm-btn pm-btn-primary" style="width:100%" data-install="${p.id}" data-url="${p.url}">Install Plugin</button>`
           }
         </div>
       </div>
@@ -624,6 +529,16 @@ export function setup(api) {
     if (btn.dataset.act === 'delete') {
       await api.deletePlugin(id);
       cleanupPluginUI(id);
+    }
+
+    if (btn.dataset.act === 'reload') {
+      try {
+        await api.reloadPlugin(id);
+        api.notify(`Reloaded ${id}`, 'success');
+        cleanupPluginUI(id);
+      } catch {
+        api.notify('Reload failed', 'error');
+      }
     }
 
     if (btn.dataset.install) {
