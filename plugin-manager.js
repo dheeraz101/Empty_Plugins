@@ -43,6 +43,7 @@ export function setup(api) {
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
     color: #1d1d1f;
     z-index: 10000;
+    isolation: isolate;
   }
 
   .pm-sidebar {
@@ -58,6 +59,7 @@ export function setup(api) {
 
   .pm-sidebar-footer {
     margin-top: auto;
+    padding-bottom: 10px;
     padding-top: 20px;
     display: flex;
     flex-direction: column;
@@ -189,7 +191,7 @@ export function setup(api) {
     position: fixed; top:0; left:0; right:0; bottom:0;
     background: rgba(0,0,0,0.2);
     backdrop-filter: blur(10px);
-    z-index: 20000;
+    z-index: 2147483647;
     display: flex; align-items: center; justify-content: center;
   }
   .pm-modal-content {
@@ -410,6 +412,8 @@ export function setup(api) {
   function openInstallModal() {
     const overlay = document.createElement('div');
     overlay.className = 'pm-modal-overlay';
+    // Ensure the modal always stacks above the plugin manager (and any app chrome).
+    overlay.style.zIndex = '2147483647';
 
     overlay.innerHTML = `
       <div class="pm-modal-content">
@@ -423,7 +427,7 @@ export function setup(api) {
       </div>
     `;
 
-    document.body.appendChild(overlay);
+    document.documentElement.appendChild(overlay);
 
     overlay.querySelector('#pm-cancel').onclick = () => overlay.remove();
     overlay.querySelector('#pm-confirm').onclick = async () => {
