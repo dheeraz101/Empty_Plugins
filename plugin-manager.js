@@ -528,7 +528,7 @@ export function setup(api) {
     }
 
     const lastCheckedHTML = lastCheckedTime
-      ? `<div class="last-checked">Last update checked ${timeAgo(lastCheckedTime)}</div>`
+      ? `<div class="last-checked">Last update checked: ${timeAgo(lastCheckedTime)}</div>`
       : '';
 
     el.innerHTML = html + lastCheckedHTML;
