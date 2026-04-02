@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.6.2',
+  version: '3.6.0',
   compat: '>=3.3.0'
 };
 
@@ -15,7 +15,6 @@ export function setup(api) {
   apiRef = api;
   const SELF_ID = meta.id;
   const COMMUNITY_URL = 'https://raw.githubusercontent.com/dheeraz101/Empty_Plugins/refs/heads/main/plugins.json';
-  const DOCS_URL = 'https://empty-ad9a3406.mintlify.app/introduction';
 
   let lastCheckedTime = 0;
   const CACHE_TIMEOUT = 10 * 60 * 1000; // 10 minutes
@@ -161,14 +160,6 @@ export function setup(api) {
     font-weight: 400;
   }
 
-  .last-checked {
-    font-size: 11px;
-    color: #86868b;
-    margin-top: 10px;
-    text-align: right;
-    opacity: 0.8;
-  }
-
   .docs-link {
     display: flex;
     align-items: center;
@@ -201,6 +192,13 @@ export function setup(api) {
     border: 1px solid rgba(0,0,0,0.1); background: rgba(255,255,255,0.5);
     margin-bottom: 12px; font-size: 14px; outline: none;
     box-sizing: border-box; transition: border 0.2s;
+  }
+  .last-checked {
+    font-size: 11px;
+    color: #86868b;
+    margin-top: 10px;
+    text-align: right;
+    opacity: 0.8;
   }
   .pm-input:focus { border-color: #0071e3; }
 
@@ -238,25 +236,16 @@ export function setup(api) {
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
       Community
     </div>
-    <div id="pm-actions" style="display: none;"></div>
-    <div style="margin-top: auto; padding-top: 20px; display: flex; flex-direction: column; gap: 10px;">
-
-      <a href="${DOCS_URL}" target="_blank" class="docs-link">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
-        Developer Portal
-      </a>
-
-      <p class="sidebar-footer-text">
-        Curate your workspace with precision.
-      </p>
-
-      <button id="check-updates-bottom" class="pm-btn pm-btn-secondary">Check Updates</button>
-      <button id="install-url-bottom" class="pm-btn pm-btn-primary">Install via URL</button>
-
-      <div style="padding-top: 6px;">
-        <button id="close-pm" class="pm-btn pm-btn-secondary" style="width: 100%">Close</button>
-      </div>
-
+    <div id="pm-actions" style="padding: 14px; display: flex; flex-direction: column; gap: 10px;"></div>
+    <a href="${DOCS_URL}" target="_blank" class="docs-link">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+      Developer Portal
+    </a>
+    <div style="margin-top: auto; padding-top: 20px;">
+       <p class="sidebar-footer-text">Curate your workspace with precision. All plugins are sandboxed for security.</p>
+       <div style="padding: 0 12px 14px 12px;">
+         <button id="close-pm" class="pm-btn pm-btn-secondary" style="width: 100%">Close</button>
+       </div>
     </div>
   </div>
 
@@ -277,21 +266,6 @@ export function setup(api) {
   api.boardEl.appendChild(root);
   api.makeDraggable(root);
   api.makeResizable(root);
-
-  const checkUpdatesBtn = root.querySelector('#check-updates-bottom');
-  const installBtn = root.querySelector('#install-url-bottom');
-
-  if (checkUpdatesBtn) {
-    checkUpdatesBtn.onclick = async () => {
-      checkUpdatesBtn.classList.add('spinning');
-      await renderInstalled(true);
-      setTimeout(() => checkUpdatesBtn.classList.remove('spinning'), 800);
-    };
-  }
-
-  if (installBtn) {
-    installBtn.onclick = openInstallModal;
-  }
 
   const slots = { 'header-actions': root.querySelector('#pm-actions') };
   const slotRegistry = new Map();
@@ -328,6 +302,28 @@ export function setup(api) {
     }
   };
   document.addEventListener('keydown', escHandler);
+
+  // ───────── HEADER BUTTONS + BADGE ─────────
+  const actions = root.querySelector('#pm-actions');
+
+  const checkUpdatesBtn = document.createElement('button');
+  checkUpdatesBtn.className = 'pm-btn pm-btn-secondary check-updates';
+  checkUpdatesBtn.innerHTML = `
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+    Check Updates
+  `;
+  checkUpdatesBtn.onclick = async () => {
+    checkUpdatesBtn.classList.add('spinning');
+    await renderInstalled(true);
+    setTimeout(() => checkUpdatesBtn.classList.remove('spinning'), 800);
+  };
+  actions.appendChild(checkUpdatesBtn);
+
+  const installBtn = document.createElement('button');
+  installBtn.className = 'pm-btn pm-btn-primary';
+  installBtn.textContent = 'Install via URL';
+  installBtn.onclick = openInstallModal;
+  actions.appendChild(installBtn);
 
   // ───────── HELPERS ─────────
   function timeAgo(timestamp) {
@@ -499,7 +495,7 @@ export function setup(api) {
     }
 
     const lastCheckedHTML = lastCheckedTime
-      ? `<div class="last-checked">Last update checked: ${timeAgo(lastCheckedTime)}</div>`
+      ? `<div class="last-checked">Last checked: ${timeAgo(lastCheckedTime)}</div>`
       : '';
 
     el.innerHTML = html + lastCheckedHTML;
