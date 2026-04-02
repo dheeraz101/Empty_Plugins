@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.6.3',
+  version: '3.6.4',
   compat: '>=3.3.0'
 };
 
@@ -52,6 +52,16 @@ export function setup(api) {
     padding: 32px 12px;
     display: flex;
     flex-direction: column;
+    justify-content: space-between;
+    height: 100%;
+  }
+
+  .pm-sidebar-footer {
+    margin-top: auto;
+    padding-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
   }
 
   .pm-tab {
@@ -238,7 +248,7 @@ export function setup(api) {
       Community
     </div>
     <div id="pm-actions" style="padding: 14px; display: flex; flex-direction: column; gap: 10px;"></div>
-    <div style="margin-top: auto; padding-top: 20px;">
+    <div class="pm-sidebar-footer">
       <a href="${DOCS_URL}" target="_blank" class="docs-link">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
         Developer Portal
@@ -438,6 +448,7 @@ export function setup(api) {
 
   // ───────── RENDER INSTALLED (with badge support) ─────────
   async function renderInstalled(forceCheck = false) {
+    if (!root || !document.body.contains(root)) return;
     await ensureCommunityCache();
 
     const now = Date.now();
@@ -538,6 +549,7 @@ export function setup(api) {
   // ───────── RENDER COMMUNITY (unchanged) ─────────
   let communityCache = [];
   async function renderCommunity() {
+    if (!root || !document.body.contains(root)) return;
     const el = root.querySelector('#community .pm-list') || root.querySelector('#community');
     if (!el) return;
 
@@ -604,6 +616,9 @@ export function setup(api) {
         await api.reloadPlugin(id);
         api.notify(`Reloaded ${id}`, 'success');
         cleanupPluginUI(id);
+
+        // 🔥 STOP execution if self reload happened
+        if (id === SELF_ID) return;
       } catch {
         api.notify('Reload failed', 'error');
       }
@@ -648,6 +663,7 @@ export function setup(api) {
         api.notify(`${updateId} updated successfully!`, 'success');
         if (updateId === SELF_ID) {
           setTimeout(() => window.location.reload(), 200);
+          return;
         }
       } catch {
         api.notify('Update failed', 'error');
