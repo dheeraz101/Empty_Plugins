@@ -15,6 +15,7 @@ export function setup(api) {
   apiRef = api;
   const SELF_ID = meta.id;
   const COMMUNITY_URL = 'https://raw.githubusercontent.com/dheeraz101/Empty_Plugins/refs/heads/main/plugins.json';
+  const DOCS_URL = 'https://empty-ad9a3406.mintlify.app/introduction';
 
   let lastCheckedTime = 0;
   const CACHE_TIMEOUT = 10 * 60 * 1000; // 10 minutes
