@@ -191,10 +191,15 @@ export function setup(api) {
     }
 
     .update-badge {
-      position: relative;
+      position: absolute;
+      top: 50%;
+      right: 12px;
+      transform: translateY(-50%);
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
     }
 
     .update-badge .badge {
@@ -202,21 +207,19 @@ export function setup(api) {
       color: white;
       font-size: 10px;
       font-weight: 700;
-      min-width: 16px;
-      height: 16px;
+      min-width: 18px;
+      height: 18px;
       border-radius: 9999px;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 0 5px;
-      position: absolute;
-      top: -6px;
-      right: -8px;
+      padding: 0 4px;
       box-shadow: 0 0 0 2px #161618;
     }
 
     .check-updates {
       position: relative;
+      padding-right: 40px;
     }
   `;
   document.head.appendChild(style);
@@ -328,7 +331,7 @@ export function setup(api) {
     try {
       const res = await fetch(url + (url.includes('?') ? '&' : '?') + 't=' + Date.now());
       const code = await res.text();
-      const metaMatch = code.match(/export const meta\s*=\s*(\{[\s\S]*?\});/);
+      const metaMatch = code.match(/export const meta\s*=\s*(\{[\s\S]*?\})(?:;|$)/);
       if (!metaMatch) return null;
       return new Function(`return ${metaMatch[1]}`)();
     } catch (e) {
@@ -344,6 +347,15 @@ export function setup(api) {
       if ((pa[i] || 0) < (pb[i] || 0)) return -1;
     }
     return 0;
+  }
+
+  function saveRegistryPluginVersion(pluginId, version) {
+    if (!version) return;
+    const registry = api.registry.getAll();
+    const item = registry.find(entry => entry.id === pluginId);
+    if (!item) return;
+    item.version = version;
+    api.registry.save([...registry]);
   }
 
   function updateBadge(count) {
@@ -407,8 +419,21 @@ export function setup(api) {
       if (!url || !id) return api.notify('Missing fields', 'error');
 
       try {
+        const remoteMeta = await fetchRemoteMeta(url);
+        const newDef = {
+          id,
+          url,
+          name: remoteMeta?.name || id,
+          enabled: true,
+          source: 'registry',
+          version: remoteMeta?.version || undefined,
+        };
+
+        const registry = api.registry.getAll();
+        api.registry.save([...registry, newDef]);
+
         cleanupPluginUI(id);
-        await api.installPlugin(id, url, id);
+        await api.reloadPlugin(id);
         api.notify('Installed', 'success');
         modal.close();
       } catch {
@@ -436,30 +461,31 @@ export function setup(api) {
       const isSelf = p.id === SELF_ID;
       let versionInfo = '';
       let updateBtn = '';
+      let installedVer = p.version || 'unknown';
+      let remoteVer = null;
+      let remoteMeta = null;
 
-      if (p.url) {
-        let remoteVer = null;
-        const installedVer = p.version || '0.0.0';
+      if (p.url && shouldCheck) {
+        remoteMeta = await fetchRemoteMeta(p.url);
+        remoteVer = remoteMeta?.version || null;
+      }
 
-        if (shouldCheck) {
-          const remoteMeta = await fetchRemoteMeta(p.url);
-          remoteVer = remoteMeta?.version || null;
-        }
+      if (!p.version && remoteVer) {
+        saveRegistryPluginVersion(p.id, remoteVer);
+        installedVer = remoteVer;
+      }
 
-        if (remoteVer) {
-          const cmp = compareVersions(remoteVer, installedVer);
-          if (cmp > 0) {
-            availableUpdates++;
-            versionInfo = `<span class="pm-version update-available">v${installedVer} → v${remoteVer}</span>`;
-            updateBtn = `<button class="pm-btn pm-update-btn" data-update="${p.id}">Update</button>`;
-          } else {
-            versionInfo = `<span class="pm-version">v${installedVer}</span>`;
-          }
+      if (remoteVer && installedVer !== 'unknown') {
+        const cmp = compareVersions(remoteVer, installedVer);
+        if (cmp > 0) {
+          availableUpdates++;
+          versionInfo = `<span class="pm-version update-available">v${installedVer} → v${remoteVer}</span>`;
+          updateBtn = `<button class="pm-btn pm-update-btn" data-update="${p.id}">Update</button>`;
         } else {
           versionInfo = `<span class="pm-version">v${installedVer}</span>`;
         }
-      } else if (p.version) {
-        versionInfo = `<span class="pm-version">v${p.version}</span>`;
+      } else {
+        versionInfo = `<span class="pm-version">${installedVer === 'unknown' ? 'v?' : 'v' + installedVer}</span>`;
       }
 
       html += `
@@ -550,6 +576,8 @@ export function setup(api) {
           <div style="flex:1">
             <b style="font-size:15px">${p.name}</b>
 
+            ${p.version ? `<div style="font-size:11px;color:#888;margin-top:2px">v${p.version}</div>` : ''}
+
             <div style="font-size:11px;color:#7c6fff;margin-top:2px">
               by ${p.author || 'Unknown'}
             </div>
@@ -611,9 +639,19 @@ export function setup(api) {
 
     if (btn.dataset.update) {
       const updateId = btn.dataset.update;
+      const registry = api.registry.getAll();
+      const entry = registry.find(p => p.id === updateId);
+      let remoteVersion = null;
+
+      if (entry?.url) {
+        const remoteMeta = await fetchRemoteMeta(entry.url);
+        remoteVersion = remoteMeta?.version || null;
+      }
+
       try {
         api.notify(`Updating ${updateId}...`, 'info');
         await api.reloadPlugin(updateId);
+        if (remoteVersion) saveRegistryPluginVersion(updateId, remoteVersion);
         api.notify(`${updateId} updated successfully!`, 'success');
       } catch {
         api.notify('Update failed', 'error');
