@@ -1,73 +1,115 @@
 export const meta = {
   id: 'about',
   name: 'About Blank Board',
-  version: '0.3.0',
+  version: '0.3.1',
   compat: '>=1.0.0'
 };
 
 export function setup(api) {
+  const assetBase = new URL('.', import.meta.url).href;
   const box = document.createElement('div');
   box.className = 'plugin-box';
   box.style.cssText = `
-    left: 180px;
-    top: 120px;
-    width: 440px;
-    background: var(--board-surface, #111);
-    color: var(--board-text, #e8e8e8);
-    border: 1px solid var(--board-border, rgba(255,255,255,0.08));
-    border-radius: 16px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    left: 120px;
+    top: 80px;
+    width: min(760px, 92vw);
+    background: rgba(255,255,255,0.06);
+    color: #f7f7f7;
+    border: 1px solid rgba(255,255,255,0.16);
+    border-radius: 28px;
+    box-shadow: 0 40px 80px rgba(0,0,0,0.24);
+    backdrop-filter: blur(18px);
     overflow: hidden;
-    font-family: system-ui, sans-serif;
+    font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   `;
 
   box.innerHTML = `
-    <div style="padding:20px 24px;background:rgba(255,255,255,0.02);border-bottom:1px solid var(--board-border, rgba(255,255,255,0.08));">
-      <div style="font-size:18px;font-weight:700;letter-spacing:-0.02em;">Blank Board</div>
-      <div style="font-size:13px;color:var(--board-muted, #888);">Everything is a plugin • Fully extensible</div>
-    </div>
-
-    <div style="padding:24px;line-height:1.6;font-size:14px;">
-      <p style="margin:0 0 18px 0;">
-        A minimal, blank canvas where <strong>every feature is a plugin</strong>.<br>
-        No bloat. No built-in tools. Just pure freedom.
-      </p>
-
-      <div style="background:rgba(255,255,255,0.03);border:1px solid var(--board-border, rgba(255,255,255,0.06));border-radius:12px;padding:16px;margin-bottom:18px;">
-        <strong style="color:var(--board-accent, #7c6fff);">Vision</strong><br>
-        <span style="color:var(--board-muted, #aaa);font-size:13px;">
-          Build the ultimate personal workspace together with the community.<br>
-          Anyone can create and share plugins — from notes to kanban, AI tools, games, or full layouts.
-        </span>
-      </div>
-
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:13px;">
-        <div>
-          <strong>Author</strong><br>
-          <span style="color:var(--board-muted, #888);">DRD (@dhvsnv)</span>
+    <div style="padding:32px 32px 24px 32px; background: linear-gradient(180deg, rgba(255,255,255,0.14), rgba(255,255,255,0.06)); border-bottom: 1px solid rgba(255,255,255,0.14);">
+      <div style="font-size:12px; letter-spacing:0.24em; text-transform:uppercase; color:rgba(255,255,255,0.65); margin-bottom:12px;">About Blank Board</div>
+      <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:24px; flex-wrap:wrap;">
+        <div style="max-width: 52%; min-width: 240px;">
+          <div style="font-size:34px; font-weight:800; line-height:1.05; letter-spacing:-0.04em; color:#ffffff;">A blank canvas for adaptive workflows.</div>
+          <div style="margin-top:14px; font-size:15px; color:rgba(255,255,255,0.78); line-height:1.7;">
+            Every capability is a plugin. Every workspace is yours. Designed for focus, built for extension.
+          </div>
         </div>
-        <div>
-          <strong>Tech</strong><br>
-          <span style="color:var(--board-muted, #888);">Vanilla JS • ES Modules • Micro-kernel</span>
+        <div style="min-width:180px; padding:14px 18px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.18); border-radius:20px; backdrop-filter: blur(12px);">
+          <div style="font-size:13px; color:#d3d3ff; text-transform:uppercase; letter-spacing:0.16em; margin-bottom:10px;">Project at a glance</div>
+          <div style="font-size:14px; color:#ffffff; line-height:1.7;">
+            Modular. Minimal. Community-first.
+          </div>
         </div>
-      </div>
-
-      <div style="margin-top:20px;font-size:13px;color:var(--board-muted, #888);">
-        Hosted on Netlify • Community plugins via GitHub
       </div>
     </div>
 
-    <div style="padding:16px 24px;background:rgba(255,255,255,0.02);border-top:1px solid var(--board-border, rgba(255,255,255,0.08));display:flex;gap:12px;justify-content:flex-end;">
-      <button id="close-about" class="pm-btn secondary">Close</button>
+    <div style="display:grid; grid-template-columns: 1.15fr 0.85fr; gap:24px; padding:28px 32px 24px 32px;">
+      <div>
+        <div style="display:flex; gap:12px; align-items:center; margin-bottom:20px;">
+          <div style="width:10px; height:10px; border-radius:50%; background: #7c6fff;"></div>
+          <div style="font-size:13px; text-transform:uppercase; letter-spacing:0.22em; color:#9fa3c2;">The idea</div>
+        </div>
+
+        <p style="margin:0 0 18px 0; font-size:15px; color:rgba(255,255,255,0.92); line-height:1.75;">
+          Blank Board removes assumptions. It does not decide what you need — it gives you the freedom to create your own productivity system using plugins. The result is a clean, elegant experience with infinite possibility.
+        </p>
+
+        <div style="display:grid; gap:16px;">
+          <div style="padding:18px; border-radius:22px; background: rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12);">
+            <div style="font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color:#bdbff0; margin-bottom:8px;">Minimal by default</div>
+            <div style="font-size:14px; color:rgba(255,255,255,0.9); line-height:1.7;">
+              Start with a pure canvas. Add exactly what you need with plugins, not presets.
+            </div>
+          </div>
+
+          <div style="padding:18px; border-radius:22px; background: rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12);">
+            <div style="font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color:#bdbff0; margin-bottom:8px;">Modular by design</div>
+            <div style="font-size:14px; color:rgba(255,255,255,0.9); line-height:1.7;">
+              Every feature is a plugin, so your workspace grows organically with your workflow.
+            </div>
+          </div>
+
+          <div style="padding:18px; border-radius:22px; background: rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12);">
+            <div style="font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color:#bdbff0; margin-bottom:8px;">Community first</div>
+            <div style="font-size:14px; color:rgba(255,255,255,0.9); line-height:1.7;">
+              Build, share, and discover plugins from creators around the world.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:18px;">
+        <div style="border-radius:24px; overflow:hidden; background: rgba(0,0,0,0.15); border:1px solid rgba(255,255,255,0.12); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);">
+          <img src="${assetBase}main.gif" alt="Blank Board overview" style="width:100%; display:block; object-fit:cover;">
+        </div>
+        <div style="padding:18px; border-radius:22px; background: rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.12);">
+          <div style="font-size:13px; color:#d3d3ff; text-transform:uppercase; letter-spacing:0.18em; margin-bottom:10px;">Project highlight</div>
+          <div style="font-size:14px; color:rgba(255,255,255,0.9); line-height:1.75;">
+            main.gif captures the project’s spirit: elegant, effortless, and extensible. It shows the experience, not just the features.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex; flex-wrap:wrap; gap:16px; align-items:center; justify-content:space-between; padding:22px 32px 28px 32px; background: rgba(255,255,255,0.04); border-top: 1px solid rgba(255,255,255,0.12);">
+      <div style="min-width:200px;">
+        <div style="font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:#9fa3c2; margin-bottom:6px;">Designed with care</div>
+        <div style="font-size:13px; color:rgba(255,255,255,0.8); line-height:1.6;">
+          A modern aesthetics system with soft light, rounded geometry, and thoughtful spacing.
+        </div>
+      </div>
+      <button id="close-about" style="border:none; padding:12px 20px; border-radius:16px; background:rgba(124,111,255,0.96); color:#fff; font-weight:700; cursor:pointer; box-shadow: 0 16px 32px rgba(124,111,255,0.24); transition: transform 0.2s ease;">
+        Close
+      </button>
     </div>
   `;
 
   api.boardEl.appendChild(box);
   api.makeDraggable(box);
 
-  box.querySelector('#close-about').addEventListener('click', () => {
-    box.remove();
-  });
+  const closeButton = box.querySelector('#close-about');
+  closeButton.addEventListener('click', () => box.remove());
+  closeButton.addEventListener('mouseover', () => closeButton.style.transform = 'translateY(-1px)');
+  closeButton.addEventListener('mouseout', () => closeButton.style.transform = 'translateY(0)');
 }
 
 export function teardown() {}
