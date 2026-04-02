@@ -593,7 +593,7 @@ export function setup(api) {
           <div style="flex:1">
             <b style="font-size:15px">${p.name}</b>
 
-            ${p.version ? `<div style="font-size:11px;color:#888;margin-top:2px">v${p.version}</div>` : ''}
+            ${displayVersion ? `<div style="font-size:11px;color:#888;margin-top:2px">v${displayVersion}</div>` : ''}
 
             <div style="font-size:11px;color:#7c6fff;margin-top:2px">
               by ${p.author || 'Unknown'}
