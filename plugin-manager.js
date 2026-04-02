@@ -46,6 +46,8 @@ export function setup(api) {
     isolation: isolate;
   }
 
+  .h3 { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif; }
+
   .pm-sidebar {
     width: 210px;
     background: rgba(0, 0, 0, 0.03);
