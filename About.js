@@ -1,12 +1,30 @@
 export const meta = {
   id: 'about',
   name: 'About Blank Board',
-  version: '0.3.1',
+  version: '0.3.2',
   compat: '>=1.0.0'
 };
 
 export function setup(api) {
-  const assetBase = new URL('.', import.meta.url).href;
+  function getAssetUrl(name) {
+    try {
+      return new URL(name, import.meta.url).href;
+    } catch (e) {
+      // fallback below
+    }
+
+    const script = document.currentScript;
+    if (script && script.src) {
+      try {
+        return new URL(name, script.src).href;
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    return name;
+  }
+
   const box = document.createElement('div');
   box.className = 'plugin-box';
   box.style.cssText = `
@@ -79,7 +97,7 @@ export function setup(api) {
 
       <div style="display:flex; flex-direction:column; gap:18px;">
         <div style="border-radius:24px; overflow:hidden; background: rgba(0,0,0,0.15); border:1px solid rgba(255,255,255,0.12); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);">
-          <img src="${assetBase}main.gif" alt="Blank Board overview" style="width:100%; display:block; object-fit:cover;">
+          <img src="${getAssetUrl('main.gif')}" alt="Blank Board overview" style="width:100%; display:block; object-fit:cover;">
         </div>
         <div style="padding:18px; border-radius:22px; background: rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.12);">
           <div style="font-size:13px; color:#d3d3ff; text-transform:uppercase; letter-spacing:0.18em; margin-bottom:10px;">Project highlight</div>
