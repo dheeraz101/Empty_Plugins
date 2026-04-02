@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.6.7',
+  version: '3.6.8',
   compat: '>=3.3.0'
 };
 
@@ -452,7 +452,7 @@ export function setup(api) {
     };
   }
 
-  // ───────── RENDER INSTALLED (with badge support) ─────────
+// ───────── RENDER INSTALLED (With Persistence Fix) ─────────
   async function renderInstalled(forceCheck = false) {
     if (!root || !document.body.contains(root)) return;
     await ensureCommunityCache();
@@ -479,20 +479,18 @@ export function setup(api) {
       let updateBtn = '';
       let statusBadge = '';
 
+      // 1. Fetch remote info if needed
       if (p.url && (shouldCheck || !installedVer)) {
         remoteMeta = await fetchRemoteMeta(p.url);
         remoteVer = remoteMeta?.version || null;
       }
 
+      // 2. Resolve Name: Priority is Remote Meta > Stored Name > ID
       const displayName = remoteMeta?.name || p.name || p.id;
 
       if (!installedVer && remoteVer) {
         saveRegistryPluginVersion(p.id, remoteVer);
         installedVer = remoteVer;
-      }
-
-      if (!p.icon && p.url && !remoteMeta) {
-        remoteMeta = await fetchRemoteMeta(p.url);
       }
 
       if (installedVer && remoteVer) {
@@ -504,12 +502,15 @@ export function setup(api) {
         }
       }
 
+      // 3. System/Active Badges
+      let typeBadge = '';
       if (isSelf) {
-        statusBadge = '<span class="plugin-badge badge-enabled">System</span>';
+        typeBadge = '<span class="plugin-badge badge-enabled">System</span>';
       } else if (p.enabled) {
-        statusBadge = '<span class="plugin-badge badge-enabled">Active</span>';
+        typeBadge = '<span class="plugin-badge badge-enabled">Active</span>';
       }
 
+      // 4. Icon Logic
       const versionText = installedVer ? `v${installedVer}` : 'Version unknown';
       const colors = ['#007AFF', '#5856D6', '#AF52DE', '#FF2D55', '#FF9500'];
       const iconBg = colors[p.id.length % colors.length];
@@ -518,15 +519,18 @@ export function setup(api) {
         ? `<img src="${iconContent}" alt="${displayName}" style="width:100%;height:100%;border-radius:10px;object-fit:cover;" />`
         : iconContent;
 
-      // persist icon to registry so installed list keeps community icon
-      if (!p.icon && iconContent && iconContent !== '📦') {
+      // 5. 🔥 PERSISTENCE FIX: Save the "Pretty Name" and Icon to the registry
+      // This ensures that when you switch tabs, the registry already HAS the correct name.
+      if ((remoteMeta?.name && p.name !== remoteMeta.name) || (!p.icon && iconContent && iconContent !== '📦')) {
         const reg = api.registry.getAll();
         const entry = reg.find(item => item.id === p.id);
         if (entry) {
-          entry.icon = iconContent;
-          if (remoteMeta?.name) entry.name = remoteMeta.name; 
+          if (remoteMeta?.name) entry.name = remoteMeta.name;
+          if (iconContent && iconContent !== '📦') entry.icon = iconContent;
           api.registry.save([...reg]);
-          p.icon = iconContent;
+          // Update local reference so the current loop uses the new data immediately
+          p.name = entry.name;
+          p.icon = entry.icon;
         }
       }
 
@@ -535,7 +539,8 @@ export function setup(api) {
           <div class="plugin-icon-box" style="background: ${iconBg};">${iconHtml}</div>
           <div class="plugin-info">
             <span class="plugin-name">${displayName}</span>
-            <div class="plugin-meta">${versionText} • <span style="opacity: 0.7">${p.id}</span></div>
+            <div class="plugin-meta">${versionText} • <span style="opacity: 0.7">${p.id}</span> ${statusBadge}</div>
+            ${typeBadge ? `<div style="margin-top:4px">${typeBadge}</div>` : ''}
           </div>
           <div class="pm-action-group">
             <button class="pm-btn pm-btn-secondary reload-btn" data-act="reload" data-id="${p.id}">Reload</button>
