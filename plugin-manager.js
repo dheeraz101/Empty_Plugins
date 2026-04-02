@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.5.4',
+  version: '3.5.5',
   compat: '>=3.3.0'
 };
 
@@ -565,9 +565,16 @@ export function setup(api) {
       }
     }
 
-    const installed = new Set(api.registry.getAll().map(p => p.id));
+    const registry = api.registry.getAll();
+    const installed = new Set(registry.map(p => p.id));
+    const installedVersions = registry.reduce((acc, item) => {
+      if (item.version) acc[item.id] = item.version;
+      return acc;
+    }, {});
 
-    el.innerHTML = communityCache.map(p => `
+    el.innerHTML = communityCache.map(p => {
+      const displayVersion = p.version || installedVersions[p.id];
+      return `
       <div class="pm-card">
         <div style="display:flex; gap:12px;">
 
@@ -586,7 +593,7 @@ export function setup(api) {
           <div style="flex:1">
             <b style="font-size:15px">${p.name}</b>
 
-            ${p.version ? `<div style="font-size:11px;color:#888;margin-top:2px">v${p.version}</div>` : ''}
+            ${displayVersion ? `<div style="font-size:11px;color:#888;margin-top:2px">v${displayVersion}</div>` : ''}
 
             <div style="font-size:11px;color:#7c6fff;margin-top:2px">
               by ${p.author || 'Unknown'}
@@ -698,7 +705,7 @@ export function setup(api) {
   };
   api.boardEl.addEventListener('contextmenu', contextMenuHandler);
 
-  console.log('🔥 Plugin Manager v3.5.3 – Update badge + auto-check loaded');
+  console.log('🔥 Plugin Manager v3.5.5 – Update badge + auto-check loaded');
 }
 
 export function teardown() {
