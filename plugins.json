@@ -8,11 +8,11 @@
     "icon": "👋"
   },
   {
-    "id": "layout",
-    "name": "Layout(Beta)",
+    "id": "layout-engine",
+    "name": "Layout Engine",
     "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/layout.js",
     "author": "Dheeraz",
-    "description": "Advanced layout tools and grid helpers for your board.",
+    "description": "Advanced layout engine with column presets, resizers, and drag-to-zone support.",
     "icon": "📐"
   },
   {
