@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.6.2',
+  version: '3.6.3',
   compat: '>=3.3.0'
 };
 
@@ -238,11 +238,11 @@ export function setup(api) {
       Community
     </div>
     <div id="pm-actions" style="padding: 14px; display: flex; flex-direction: column; gap: 10px;"></div>
-    <a href="${DOCS_URL}" target="_blank" class="docs-link">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
-      Developer Portal
-    </a>
     <div style="margin-top: auto; padding-top: 20px;">
+      <a href="${DOCS_URL}" target="_blank" class="docs-link">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+        Developer Portal
+      </a>
        <p class="sidebar-footer-text">Curate your workspace with precision. All plugins are sandboxed for security.</p>
        <div style="padding: 0 12px 14px 12px;">
          <button id="close-pm" class="pm-btn pm-btn-secondary" style="width: 100%">Close</button>
@@ -447,7 +447,8 @@ export function setup(api) {
       lastCheckedTime = now;
     }
 
-    const el = root.querySelector('#installed .pm-list');
+    const el = root.querySelector('#installed .pm-list') || root.querySelector('#installed');
+    if (!el) return;
     const plugins = api.registry.getAll();
 
     let html = '';
@@ -537,7 +538,8 @@ export function setup(api) {
   // ───────── RENDER COMMUNITY (unchanged) ─────────
   let communityCache = [];
   async function renderCommunity() {
-    const el = root.querySelector('#community .pm-list');
+    const el = root.querySelector('#community .pm-list') || root.querySelector('#community');
+    if (!el) return;
 
     if (!communityCache.length) {
       try {
