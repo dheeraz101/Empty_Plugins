@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.6.1',
+  version: '3.6.2',
   compat: '>=3.3.0'
 };
 
@@ -46,13 +46,73 @@ export function setup(api) {
   }
 
   .pm-sidebar {
-    width: 210px;
+    width: 220px;
     background: rgba(0, 0, 0, 0.03);
     border-right: 1px solid rgba(0, 0, 0, 0.05);
-    padding: 32px 12px;
+    padding: 20px;
     display: flex;
     flex-direction: column;
+    justify-content: space-between;
   }
+
+  .pm-sidebar-top {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .pm-logo {
+    font-size: 20px;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: 0.05em;
+  }
+
+  .pm-dev-link {
+    display: block;
+    margin-bottom: 10px;
+    padding: 10px 12px;
+    background: #00d4ff;
+    color: white;
+    text-align: center;
+    border-radius: 10px;
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: bold;
+  }
+
+  .pm-tagline {
+    font-size: 11px;
+    color: #666;
+    margin-bottom: 10px;
+    font-style: italic;
+    line-height: 1.4;
+  }
+
+  .pm-sidebar-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .pm-action-btn {
+    padding: 12px 14px;
+    border-radius: 999px;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 700;
+    transition: all 0.2s ease;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .pm-action-btn#check-updates { background: rgba(0,0,0,0.06); color: #1d1d1f; }
+  .pm-action-btn#check-updates:hover { background: rgba(0,0,0,0.1); }
+  .pm-action-btn#install-url { background: #0071e3; color: white; }
+  .pm-action-btn#install-url:hover { background: #0065d4; }
+  .pm-close-btn { background: rgba(255,255,255,0.9); color: #1d1d1f; border: 1px solid rgba(0,0,0,0.08); }
+  .pm-close-btn:hover { background: #ff3b30; color: white; }
 
   .pm-tab {
     padding: 10px 14px;
@@ -70,7 +130,7 @@ export function setup(api) {
   .pm-tab.active { background: rgba(0, 0, 0, 0.06); color: #000; font-weight: 600; }
   .pm-tab:hover:not(.active) { background: rgba(0, 0, 0, 0.03); }
 
-  .pm-content { flex: 1; padding: 40px; overflow-y: auto; }
+  .pm-main { flex: 1; padding: 40px; overflow-y: auto; }
 
   .pm-view-title { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 4px; }
   .pm-view-subtitle { font-size: 15px; color: #86868b; margin-bottom: 32px; font-weight: 400; }
@@ -219,41 +279,27 @@ export function setup(api) {
 
   root.innerHTML = `
   <div class="pm-sidebar">
-    <div style="padding: 0 14px 20px 14px;">
-      <div style="font-size: 12px; font-weight: 700; color: #86868b; text-transform: uppercase; letter-spacing: 1px;">Library</div>
+    <div class="pm-sidebar-top">
+      <div class="pm-logo">PM</div>
+      <a href="${DOCS_URL}" target="_blank" class="pm-dev-link">
+        Developer Portal
+      </a>
+      <div class="pm-tagline">Curate your workspace...</div>
+      <div class="pm-tabs">
+        <div class="pm-tab active" data-tab="installed">Installed</div>
+        <div class="pm-tab" data-tab="community">Community</div>
+      </div>
     </div>
-    <div class="pm-tab active" data-tab="installed">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-      Installed
-    </div>
-    <div class="pm-tab" data-tab="community">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
-      Community
-    </div>
-    <div id="pm-actions" style="padding: 14px; display: flex; flex-direction: column; gap: 10px;"></div>
-    <a href="${DOCS_URL}" target="_blank" class="docs-link">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
-      Developer Portal
-    </a>
-    <div style="margin-top: auto; padding-top: 20px;">
-       <p class="sidebar-footer-text">Curate your workspace with precision. All plugins are sandboxed for security.</p>
-       <div style="padding: 0 12px 14px 12px;">
-         <button id="close-pm" class="pm-btn pm-btn-secondary" style="width: 100%">Close</button>
-       </div>
+
+    <div class="pm-sidebar-footer">
+      <button class="pm-action-btn" id="check-updates">Check for Updates</button>
+      <button class="pm-action-btn" id="install-url">Install via URL</button>
+      <button id="close-pm" class="pm-action-btn pm-close-btn">Close</button>
     </div>
   </div>
-
-  <div class="pm-content">
-    <div id="installed">
-      <h1 class="pm-view-title">Installed Plugins</h1>
-      <p class="pm-view-subtitle">Manage and configure your active workspace tools.</p>
-      <div class="pm-list"></div>
-    </div>
-    <div id="community" style="display:none;">
-      <h1 class="pm-view-title">Discovery</h1>
-      <p class="pm-view-subtitle">Explore new extensions built by the community.</p>
-      <div class="pm-list"></div>
-    </div>
+  <div class="pm-main">
+    <div id="installed"></div>
+    <div id="community" style="display:none"></div>
   </div>
 `;
 
@@ -261,7 +307,7 @@ export function setup(api) {
   api.makeDraggable(root);
   api.makeResizable(root);
 
-  const slots = { 'header-actions': root.querySelector('#pm-actions') };
+  const slots = { 'header-actions': root.querySelector('.pm-sidebar-footer') };
   const slotRegistry = new Map();
 
   api.registerUI = (slot, el, id) => {
@@ -298,26 +344,20 @@ export function setup(api) {
   document.addEventListener('keydown', escHandler);
 
   // ───────── HEADER BUTTONS + BADGE ─────────
-  const actions = root.querySelector('#pm-actions');
+  const checkUpdatesBtn = root.querySelector('#check-updates');
+  const installBtn = root.querySelector('#install-url');
 
-  const checkUpdatesBtn = document.createElement('button');
-  checkUpdatesBtn.className = 'pm-btn pm-btn-secondary check-updates';
-  checkUpdatesBtn.innerHTML = `
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
-    Check Updates
-  `;
-  checkUpdatesBtn.onclick = async () => {
-    checkUpdatesBtn.classList.add('spinning');
-    await renderInstalled(true);
-    setTimeout(() => checkUpdatesBtn.classList.remove('spinning'), 800);
-  };
-  actions.appendChild(checkUpdatesBtn);
+  if (checkUpdatesBtn) {
+    checkUpdatesBtn.onclick = async () => {
+      checkUpdatesBtn.classList.add('spinning');
+      await renderInstalled(true);
+      setTimeout(() => checkUpdatesBtn.classList.remove('spinning'), 800);
+    };
+  }
 
-  const installBtn = document.createElement('button');
-  installBtn.className = 'pm-btn pm-btn-primary';
-  installBtn.textContent = 'Install via URL';
-  installBtn.onclick = openInstallModal;
-  actions.appendChild(installBtn);
+  if (installBtn) {
+    installBtn.onclick = openInstallModal;
+  }
 
   // ───────── HELPERS ─────────
   function timeAgo(timestamp) {
