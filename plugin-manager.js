@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.6.7',
+  version: '3.6.8',
   compat: '>=3.3.0'
 };
 
@@ -484,6 +484,8 @@ export function setup(api) {
         remoteVer = remoteMeta?.version || null;
       }
 
+      const displayName = remoteMeta?.name || p.name || p.id;
+
       if (!installedVer && remoteVer) {
         saveRegistryPluginVersion(p.id, remoteVer);
         installedVer = remoteVer;
@@ -513,7 +515,7 @@ export function setup(api) {
       const iconBg = colors[p.id.length % colors.length];
       const iconContent = p.icon || remoteMeta?.icon || getCommunityIcon(p.id) || '📦';
       const iconHtml = (typeof iconContent === 'string' && (iconContent.startsWith('http://') || iconContent.startsWith('https://')))
-        ? `<img src="${iconContent}" alt="${p.name || p.id}" style="width:100%;height:100%;border-radius:10px;object-fit:cover;" />`
+        ? `<img src="${iconContent}" alt="${displayName}" style="width:100%;height:100%;border-radius:10px;object-fit:cover;" />`
         : iconContent;
 
       // persist icon to registry so installed list keeps community icon
@@ -522,6 +524,7 @@ export function setup(api) {
         const entry = reg.find(item => item.id === p.id);
         if (entry) {
           entry.icon = iconContent;
+          if (remoteMeta?.name) entry.name = remoteMeta.name; 
           api.registry.save([...reg]);
           p.icon = iconContent;
         }
@@ -531,7 +534,7 @@ export function setup(api) {
         <div class="plugin-item">
           <div class="plugin-icon-box" style="background: ${iconBg};">${iconHtml}</div>
           <div class="plugin-info">
-            <span class="plugin-name">${p.name || p.id}</span>
+            <span class="plugin-name">${displayName}</span>
             <div class="plugin-meta">${versionText} • <span style="opacity: 0.7">${p.id}</span></div>
           </div>
           <div class="pm-action-group">
