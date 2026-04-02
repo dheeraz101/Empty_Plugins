@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.6.8',
+  version: '3.6.9',
   compat: '>=3.3.0'
 };
 
@@ -453,112 +453,125 @@ export function setup(api) {
   }
 
 // ───────── RENDER INSTALLED (With Persistence Fix) ─────────
-  async function renderInstalled(forceCheck = false) {
-    if (!root || !document.body.contains(root)) return;
-    await ensureCommunityCache();
+ // ───────── RENDER INSTALLED (Improved: Disable Reload when plugin is inactive) ─────────
+async function renderInstalled(forceCheck = false) {
+  if (!root || !document.body.contains(root)) return;
+  await ensureCommunityCache();
 
-    const now = Date.now();
-    const shouldCheck = forceCheck || (now - lastCheckedTime > CACHE_TIMEOUT);
+  const now = Date.now();
+  const shouldCheck = forceCheck || (now - lastCheckedTime > CACHE_TIMEOUT);
 
-    if (shouldCheck) {
-      lastCheckedTime = now;
-    }
-
-    const el = root.querySelector('#installed .pm-list') || root.querySelector('#installed');
-    if (!el) return;
-    const plugins = api.registry.getAll();
-
-    let html = '';
-    let availableUpdates = 0;
-
-    for (const p of plugins) {
-      const isSelf = p.id === SELF_ID;
-      let installedVer = p.version || null;
-      let remoteVer = null;
-      let remoteMeta = null;
-      let updateBtn = '';
-      let statusBadge = '';
-
-      // 1. Fetch remote info if needed
-      if (p.url && (shouldCheck || !installedVer)) {
-        remoteMeta = await fetchRemoteMeta(p.url);
-        remoteVer = remoteMeta?.version || null;
-      }
-
-      // 2. Resolve Name: Priority is Remote Meta > Stored Name > ID
-      const displayName = remoteMeta?.name || p.name || p.id;
-
-      if (!installedVer && remoteVer) {
-        saveRegistryPluginVersion(p.id, remoteVer);
-        installedVer = remoteVer;
-      }
-
-      if (installedVer && remoteVer) {
-        const cmp = compareVersions(remoteVer, installedVer);
-        if (cmp > 0) {
-          availableUpdates++;
-          updateBtn = `<button class="pm-btn pm-btn-primary" data-update="${p.id}">Update</button>`;
-          statusBadge = '<span class="plugin-badge badge-update">Update Available</span>';
-        }
-      }
-
-      // 3. System/Active Badges
-      let typeBadge = '';
-      if (isSelf) {
-        typeBadge = '<span class="plugin-badge badge-enabled">System</span>';
-      } else if (p.enabled) {
-        typeBadge = '<span class="plugin-badge badge-enabled">Active</span>';
-      }
-
-      // 4. Icon Logic
-      const versionText = installedVer ? `v${installedVer}` : 'Version unknown';
-      const colors = ['#007AFF', '#5856D6', '#AF52DE', '#FF2D55', '#FF9500'];
-      const iconBg = colors[p.id.length % colors.length];
-      const iconContent = p.icon || remoteMeta?.icon || getCommunityIcon(p.id) || '📦';
-      const iconHtml = (typeof iconContent === 'string' && (iconContent.startsWith('http://') || iconContent.startsWith('https://')))
-        ? `<img src="${iconContent}" alt="${displayName}" style="width:100%;height:100%;border-radius:10px;object-fit:cover;" />`
-        : iconContent;
-
-      // 5. 🔥 PERSISTENCE FIX: Save the "Pretty Name" and Icon to the registry
-      // This ensures that when you switch tabs, the registry already HAS the correct name.
-      if ((remoteMeta?.name && p.name !== remoteMeta.name) || (!p.icon && iconContent && iconContent !== '📦')) {
-        const reg = api.registry.getAll();
-        const entry = reg.find(item => item.id === p.id);
-        if (entry) {
-          if (remoteMeta?.name) entry.name = remoteMeta.name;
-          if (iconContent && iconContent !== '📦') entry.icon = iconContent;
-          api.registry.save([...reg]);
-          // Update local reference so the current loop uses the new data immediately
-          p.name = entry.name;
-          p.icon = entry.icon;
-        }
-      }
-
-      html += `
-        <div class="plugin-item">
-          <div class="plugin-icon-box" style="background: ${iconBg};">${iconHtml}</div>
-          <div class="plugin-info">
-            <span class="plugin-name">${displayName}</span>
-            <div class="plugin-meta">${versionText} • <span style="opacity: 0.7">${p.id}</span> ${statusBadge}</div>
-            ${typeBadge ? `<div style="margin-top:4px">${typeBadge}</div>` : ''}
-          </div>
-          <div class="pm-action-group">
-            <button class="pm-btn pm-btn-secondary reload-btn" data-act="reload" data-id="${p.id}">Reload</button>
-            ${isSelf ? '' : `<button class="pm-btn ${p.enabled ? 'pm-btn-secondary' : 'pm-btn-primary'} toggle-btn" data-act="toggle" data-id="${p.id}">${p.enabled ? 'Disable' : 'Enable'}</button>`}
-            ${isSelf ? '' : `<button class="pm-btn pm-btn-secondary delete-btn" data-act="delete" data-id="${p.id}" style="color:#ff3b30;">Delete</button>`}
-            ${updateBtn}
-          </div>
-        </div>
-      `;
-    }
-
-    const lastCheckedHTML = lastCheckedTime
-      ? `<div class="last-checked">Last update checked: ${timeAgo(lastCheckedTime)}</div>`
-      : '';
-
-    el.innerHTML = html + lastCheckedHTML;
-    updateBadge(availableUpdates);
+  if (shouldCheck) {
+    lastCheckedTime = now;
   }
+
+  const el = root.querySelector('#installed .pm-list') || root.querySelector('#installed');
+  if (!el) return;
+
+  const plugins = api.registry.getAll();
+
+  let html = '';
+  let availableUpdates = 0;
+
+  for (const p of plugins) {
+    const isSelf = p.id === SELF_ID;
+    let installedVer = p.version || null;
+    let remoteVer = null;
+    let remoteMeta = null;
+    let updateBtn = '';
+    let statusBadge = '';
+
+    // 1. Fetch remote info if needed
+    if (p.url && (shouldCheck || !installedVer)) {
+      remoteMeta = await fetchRemoteMeta(p.url);
+      remoteVer = remoteMeta?.version || null;
+    }
+
+    // 2. Resolve Name & Version
+    const displayName = remoteMeta?.name || p.name || p.id;
+
+    if (!installedVer && remoteVer) {
+      saveRegistryPluginVersion(p.id, remoteVer);
+      installedVer = remoteVer;
+    }
+
+    if (installedVer && remoteVer) {
+      const cmp = compareVersions(remoteVer, installedVer);
+      if (cmp > 0) {
+        availableUpdates++;
+        updateBtn = `<button class="pm-btn pm-btn-primary" data-update="${p.id}">Update</button>`;
+        statusBadge = '<span class="plugin-badge badge-update">Update Available</span>';
+      }
+    }
+
+    // 3. Badges
+    let typeBadge = '';
+    if (isSelf) {
+      typeBadge = '<span class="plugin-badge badge-enabled">System</span>';
+    } else if (p.enabled) {
+      typeBadge = '<span class="plugin-badge badge-enabled">Active</span>';
+    } else {
+      typeBadge = '<span class="plugin-badge" style="background:rgba(142,142,147,0.15);color:#8e8e93;">Inactive</span>';
+    }
+
+    // 4. Icon
+    const versionText = installedVer ? `v${installedVer}` : 'Version unknown';
+    const colors = ['#007AFF', '#5856D6', '#AF52DE', '#FF2D55', '#FF9500'];
+    const iconBg = colors[p.id.length % colors.length];
+    const iconContent = p.icon || remoteMeta?.icon || getCommunityIcon(p.id) || '📦';
+    const iconHtml = (typeof iconContent === 'string' && (iconContent.startsWith('http://') || iconContent.startsWith('https://')))
+      ? `<img src="${iconContent}" alt="${displayName}" style="width:100%;height:100%;border-radius:10px;object-fit:cover;" />`
+      : iconContent;
+
+    // 5. Persistence fix (name + icon)
+    if ((remoteMeta?.name && p.name !== remoteMeta.name) || (!p.icon && iconContent && iconContent !== '📦')) {
+      const reg = api.registry.getAll();
+      const entry = reg.find(item => item.id === p.id);
+      if (entry) {
+        if (remoteMeta?.name) entry.name = remoteMeta.name;
+        if (iconContent && iconContent !== '📦') entry.icon = iconContent;
+        api.registry.save([...reg]);
+        p.name = entry.name;
+        p.icon = entry.icon;
+      }
+    }
+
+    // 🔥 NEW: Reload button logic
+    const reloadDisabled = !p.enabled && !isSelf;
+    const reloadBtnHTML = `
+      <button class="pm-btn pm-btn-secondary reload-btn" 
+              data-act="reload" 
+              data-id="${p.id}"
+              ${reloadDisabled ? 'disabled style="opacity:0.5; cursor:not-allowed;" title="Enable the plugin first to reload"' : ''}>
+        Reload
+      </button>
+    `;
+
+    html += `
+      <div class="plugin-item">
+        <div class="plugin-icon-box" style="background: ${iconBg};">${iconHtml}</div>
+        <div class="plugin-info">
+          <span class="plugin-name">${displayName}</span>
+          <div class="plugin-meta">${versionText} • <span style="opacity: 0.7">${p.id}</span> ${statusBadge}</div>
+          ${typeBadge ? `<div style="margin-top:4px">${typeBadge}</div>` : ''}
+        </div>
+        <div class="pm-action-group">
+          ${reloadBtnHTML}
+          ${isSelf ? '' : `<button class="pm-btn ${p.enabled ? 'pm-btn-secondary' : 'pm-btn-primary'} toggle-btn" data-act="toggle" data-id="${p.id}">${p.enabled ? 'Disable' : 'Enable'}</button>`}
+          ${isSelf ? '' : `<button class="pm-btn pm-btn-secondary delete-btn" data-act="delete" data-id="${p.id}" style="color:#ff3b30;">Delete</button>`}
+          ${updateBtn}
+        </div>
+      </div>
+    `;
+  }
+
+  const lastCheckedHTML = lastCheckedTime
+    ? `<div class="last-checked">Last update checked: ${timeAgo(lastCheckedTime)}</div>`
+    : '';
+
+  el.innerHTML = html + lastCheckedHTML;
+  updateBadge(availableUpdates);
+}
 
   // ───────── RENDER COMMUNITY (unchanged) ─────────
   let communityCache = [];
@@ -626,12 +639,17 @@ export function setup(api) {
     }
 
     if (btn.dataset.act === 'reload') {
+      const plugin = api.registry.getAll().find(p => p.id === id);
+      if (!plugin || (!plugin.enabled && id !== SELF_ID)) {
+        api.notify('Enable the plugin first before reloading', 'warning');
+        return;
+      }
+
       try {
         await api.reloadPlugin(id);
         api.notify(`Reloaded ${id}`, 'success');
         cleanupPluginUI(id);
 
-        // 🔥 STOP execution if self reload happened
         if (id === SELF_ID) return;
       } catch {
         api.notify('Reload failed', 'error');
