@@ -461,21 +461,21 @@ export function setup(api) {
       const isSelf = p.id === SELF_ID;
       let versionInfo = '';
       let updateBtn = '';
-      let installedVer = p.version || 'unknown';
+      let installedVer = p.version || null;
       let remoteVer = null;
       let remoteMeta = null;
 
-      if (p.url && shouldCheck) {
+      if (p.url && (shouldCheck || !installedVer)) {
         remoteMeta = await fetchRemoteMeta(p.url);
         remoteVer = remoteMeta?.version || null;
       }
 
-      if (!p.version && remoteVer) {
+      if (!installedVer && remoteVer) {
         saveRegistryPluginVersion(p.id, remoteVer);
         installedVer = remoteVer;
       }
 
-      if (remoteVer && installedVer !== 'unknown') {
+      if (installedVer && remoteVer) {
         const cmp = compareVersions(remoteVer, installedVer);
         if (cmp > 0) {
           availableUpdates++;
@@ -484,8 +484,10 @@ export function setup(api) {
         } else {
           versionInfo = `<span class="pm-version">v${installedVer}</span>`;
         }
+      } else if (installedVer) {
+        versionInfo = `<span class="pm-version">v${installedVer}</span>`;
       } else {
-        versionInfo = `<span class="pm-version">${installedVer === 'unknown' ? 'v?' : 'v' + installedVer}</span>`;
+        versionInfo = `<span class="pm-version">Version unknown</span>`;
       }
 
       html += `
