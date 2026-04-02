@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.6.6',
+  version: '3.6.7',
   compat: '>=3.3.0'
 };
 
@@ -59,8 +59,8 @@ export function setup(api) {
 
   .pm-sidebar-footer {
     margin-top: auto;
-    padding-bottom: 30px;
-    padding-top: 20px;
+    padding-bottom: 60px;
+    padding-top: 0px;
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -209,7 +209,7 @@ export function setup(api) {
   .last-checked {
     font-size: 11px;
     color: #86868b;
-    margin-top: 10px;
+    margin-top: 2px;
     text-align: right;
     opacity: 0.8;
   }
@@ -255,7 +255,7 @@ export function setup(api) {
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
         Developer Portal
       </a>
-       <p class="sidebar-footer-text">Curate your workspace with precision. All plugins are sandboxed for security.</p>
+       <p class="sidebar-footer-text">Add, manage, and control your tools in one place. Plugins extend and reshape your workspace.</p>
        <div style="padding: 0 12px 14px 12px;">
          <button id="close-pm" class="pm-btn pm-btn-secondary" style="width: 100%">Close</button>
        </div>
