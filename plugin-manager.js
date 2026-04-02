@@ -5,7 +5,14 @@ export const meta = {
   compat: '>=3.3.0'
 };
 
+let root = null;
+let style = null;
+let escHandler = null;
+let contextMenuHandler = null;
+let apiRef = null;
+
 export function setup(api) {
+  apiRef = api;
   const SELF_ID = meta.id;
   const COMMUNITY_URL = 'https://raw.githubusercontent.com/dheeraz101/Empty_Plugins/refs/heads/main/plugins.json';
 
@@ -15,7 +22,7 @@ export function setup(api) {
   let updateCount = 0; // number of plugins with available updates
 
   // ───────── STYLE ─────────
-  const style = document.createElement('style');
+  style = document.createElement('style');
   style.textContent = `
     /* YOUR ORIGINAL UI — untouched */
     .pm-root {
@@ -225,7 +232,7 @@ export function setup(api) {
   document.head.appendChild(style);
 
   // ───────── ROOT ─────────
-  const root = document.createElement('div');
+  root = document.createElement('div');
   root.className = 'pm-root';
   root.style.display = 'none';
 
@@ -291,11 +298,12 @@ export function setup(api) {
   };
 
   // ───────── FIX: ESC KEY CLOSE ─────────
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && root.style.display === 'flex') {
+  escHandler = (e) => {
+    if (e.key === 'Escape' && root?.style.display === 'flex') {
       root.style.display = 'none';
     }
-  });
+  };
+  document.addEventListener('keydown', escHandler);
 
   // ───────── HEADER BUTTONS + BADGE ─────────
   const actions = root.querySelector('#pm-actions');
@@ -655,6 +663,9 @@ export function setup(api) {
         await api.reloadPlugin(updateId);
         if (remoteVersion) saveRegistryPluginVersion(updateId, remoteVersion);
         api.notify(`${updateId} updated successfully!`, 'success');
+        if (updateId === SELF_ID) {
+          setTimeout(() => window.location.reload(), 200);
+        }
       } catch {
         api.notify('Update failed', 'error');
       }
@@ -679,14 +690,37 @@ export function setup(api) {
     };
   });
 
-  api.boardEl.addEventListener('contextmenu', (e) => {
+  contextMenuHandler = (e) => {
     if (e.target.closest('.pm-root')) return;
     e.preventDefault();
     root.style.display = 'flex';
     renderInstalled();
-  });
+  };
+  api.boardEl.addEventListener('contextmenu', contextMenuHandler);
 
   console.log('🔥 Plugin Manager v3.5.3 – Update badge + auto-check loaded');
 }
 
-export function teardown() {}
+export function teardown() {
+  if (root) {
+    root.remove();
+    root = null;
+  }
+
+  if (style) {
+    style.remove();
+    style = null;
+  }
+
+  if (escHandler) {
+    document.removeEventListener('keydown', escHandler);
+    escHandler = null;
+  }
+
+  if (contextMenuHandler && apiRef?.boardEl) {
+    apiRef.boardEl.removeEventListener('contextmenu', contextMenuHandler);
+    contextMenuHandler = null;
+  }
+
+  apiRef = null;
+}
