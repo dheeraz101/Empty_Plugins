@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.6.5',
+  version: '3.6.6',
   compat: '>=3.3.0'
 };
 
@@ -59,7 +59,7 @@ export function setup(api) {
 
   .pm-sidebar-footer {
     margin-top: auto;
-    padding-bottom: 10px;
+    padding-bottom: 30px;
     padding-top: 20px;
     display: flex;
     flex-direction: column;
