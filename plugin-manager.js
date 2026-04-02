@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.7.0',
+  version: '3.7.1',
   compat: '>=3.3.0'
 };
 
