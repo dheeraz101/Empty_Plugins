@@ -405,6 +405,10 @@ export function setup(api) {
         installedVer = remoteVer;
       }
 
+      if (!p.icon && p.url && !remoteMeta) {
+        remoteMeta = await fetchRemoteMeta(p.url);
+      }
+
       if (installedVer && remoteVer) {
         const cmp = compareVersions(remoteVer, installedVer);
         if (cmp > 0) {
@@ -423,10 +427,11 @@ export function setup(api) {
       const versionText = installedVer ? `v${installedVer}` : 'Version unknown';
       const colors = ['#007AFF', '#5856D6', '#AF52DE', '#FF2D55', '#FF9500'];
       const iconBg = colors[p.id.length % colors.length];
+      const iconContent = p.icon || remoteMeta?.icon || '📦';
 
       html += `
         <div class="plugin-item">
-          <div class="plugin-icon-box" style="background: ${iconBg};">${p.icon || '📦'}</div>
+          <div class="plugin-icon-box" style="background: ${iconBg};">${iconContent}</div>
           <div class="plugin-info">
             <span class="plugin-name">${p.name || p.id}</span>
             <div class="plugin-meta">${versionText} • <span style="opacity: 0.7">${p.id}</span></div>
