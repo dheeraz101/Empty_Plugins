@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.9.2',
+  version: '3.9.3',
   compat: '>=3.3.0'
 };
 
@@ -95,9 +95,7 @@ export function setup(api) {
     overflow-y: auto;
     padding-right: 12px; 
     scroll-behavior: smooth;
-    scrollbar-gutter: stable;
-    scroll-padding-top: 12px;
-    scroll-padding-bottom: 12px;
+    margin: 15px 0;
   }
 
   .pm-view-title { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 4px; }
@@ -155,7 +153,7 @@ export function setup(api) {
   .pm-action-group { display: flex; gap: 8px; align-items: center; }
 
   .pm-content::-webkit-scrollbar {
-      width: 8px; 
+      width: 12px; 
   }
 
   .pm-content::-webkit-scrollbar-track {
@@ -164,13 +162,10 @@ export function setup(api) {
   }
 
   .pm-content::-webkit-scrollbar-thumb {
-    background-color: rgba(0, 0, 0, 0.15);
-    border-radius: 10px;
-    border-left: 4px solid transparent;
-    border-right: 4px solid transparent;
-    border-top: 20px solid transparent; 
-    border-bottom: 20px solid transparent;
-    background-clip: content-box;
+      background-color: rgba(0, 0, 0, 0.15);
+      border-radius: 10px;
+      border: 4px solid transparent;
+      background-clip: content-box;
   }
 
   .pm-content:hover::-webkit-scrollbar-thumb {
@@ -358,8 +353,8 @@ export function setup(api) {
         <div style="display: flex; align-items: center; gap: 10px;">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
           <span style="flex: 1;">Installed</span>
+          </div>
           <span id="update-badge-count" class="pm-badge"></span>
-        </div>
       </div>
     </div>
     <div class="pm-tab" data-tab="community">
