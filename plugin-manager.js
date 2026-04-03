@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.7.7',
+  version: '3.7.8',
   compat: '>=3.3.0'
 };
 
@@ -547,6 +547,7 @@ export function setup(api) {
 
       let hasUpdate = false;
       let updateBadge = '';
+      let updateBtn = '';
 
       if (installedVer && remoteVer) {
         const cmp = compareVersions(remoteVer, installedVer);
