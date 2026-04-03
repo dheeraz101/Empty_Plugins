@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.7.2',
+  version: '3.7.3',
   compat: '>=3.3.0'
 };
 
@@ -26,8 +26,8 @@ export function setup(api) {
   style = document.createElement('style');
   style.textContent = `
   :root {
-    --pm-bg: rgba(255,255,255,0.92);
-    --pm-card: rgba(255,255,255,0.75);
+    --pm-bg: rgba(255,255,255,0.96); 
+    --pm-card: rgba(255,255,255,0.82); 
   }
 
   .pm-root {
@@ -37,11 +37,7 @@ export function setup(api) {
     transform: translate(-50%, -50%);
     width: 820px;
     height: 600px;
-    background: linear-gradient(
-    to bottom,
-    rgba(255,255,255,0.96),
-    rgba(245,245,247,0.92)
-    );
+    background: var(--pm-bg);
     backdrop-filter: blur(30px) saturate(180%);
     -webkit-backdrop-filter: blur(30px) saturate(180%);
     border: 1px solid rgba(0, 0, 0, 0.12);
@@ -57,18 +53,9 @@ export function setup(api) {
     isolation: isolate;
   }
 
-  .pm-root::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: 28px;
-    pointer-events: none;
-    box-shadow: inset 0 1px rgba(255,255,255,0.6);
-  }
-
   .pm-sidebar {
     width: 210px;
-    background: rgba(0, 0, 0, 0.06);
+    background: var(--pm-card);
     border-right: 1px solid rgba(0, 0, 0, 0.1);
     padding: 32px 12px;
     display: flex;
@@ -109,7 +96,7 @@ export function setup(api) {
   .pm-list { display: flex; flex-direction: column; gap: 12px; }
 
   .plugin-item {
-    background: rgba(255, 255, 255, 0.75); /* was 0.4 → too faint */
+    background: var(--pm-card);
     border: 1px solid rgba(0, 0, 0, 0.08);
     border-radius: 20px;
     padding: 16px 20px;
@@ -121,7 +108,7 @@ export function setup(api) {
   }
 
   .plugin-item:hover {
-    background: rgba(255, 255, 255, 0.95);
+    background: color-mix(in srgb, var(--pm-card) 85%, white);
     border-color: rgba(0, 0, 0, 0.15);
     box-shadow: 0 8px 20px rgba(0,0,0,0.04);
   }
@@ -174,11 +161,11 @@ export function setup(api) {
   .pm-btn-primary { background: #0071e3; color: white; }
   .pm-btn-primary:hover { background: #0077ed; }
   .pm-btn-secondary {
-    background: rgba(0,0,0,0.06);
+    background: color-mix(in srgb, var(--pm-card) 70%, black);
     border: 1px solid rgba(0,0,0,0.08);
   }
   .pm-btn-secondary:hover {
-    background: rgba(0,0,0,0.1);
+    background: color-mix(in srgb, var(--pm-card) 80%, black);
   }
 
   #close-pm:hover { background: #ff3b30 !important; color: white !important; }
@@ -264,11 +251,11 @@ export function setup(api) {
     --pm-bg: rgba(28,28,30,0.75);
     --pm-card: rgba(255,255,255,0.05);
     }
-    .pm-root { background: rgba(28, 28, 30, 0.75); border-color: rgba(255,255,255,0.1); color: #f5f5f7; }
-    .pm-sidebar { background: rgba(255, 255, 255, 0.02); }
+    .pm-root { background: var(--pm-bg); border-color: rgba(255,255,255,0.1); color: #f5f5f7; }
+    .pm-sidebar { background: var(--pm-card); }
     .pm-tab { color: #a1a1a6; }
     .pm-tab.active { background: rgba(255, 255, 255, 0.1); color: #fff; }
-    .plugin-item { background: rgba(255, 255, 255, 0.05); border-color: rgba(255,255,255,0.1); }
+    .plugin-item { background: var(--pm-card); border-color: rgba(255,255,255,0.1); }
     .plugin-item:hover { background: rgba(255, 255, 255, 0.08); }
     .plugin-name { color: #f5f5f7; }
     .pm-btn-secondary { background: rgba(255,255,255,0.1); color: #f5f5f7; }
@@ -439,6 +426,16 @@ export function setup(api) {
     return 0;
   }
 
+  function saveRemoteVersion(pluginId, version) {
+    if (!version) return;
+    const registry = api.registry.getAll();
+    const item = registry.find(entry => entry.id === pluginId);
+    if (!item) return;
+
+    item.remoteVersion = version; // ✅ NEW FIELD
+    api.registry.save([...registry]);
+  }
+
   function saveRegistryPluginVersion(pluginId, version) {
     if (!version) return;
     const registry = api.registry.getAll();
@@ -527,15 +524,19 @@ export function setup(api) {
     for (const p of plugins) {
       const isSelf = p.id === SELF_ID;
       let installedVer = p.version || null;
-      let remoteVer = null;
+      let remoteVer = p.remoteVersion || null;
       let remoteMeta = null;
       let updateBtn = '';
       let statusBadge = '';
 
       // 1. Fetch remote info if needed
-      if (p.url && (shouldCheck || !installedVer)) {
+      if (p.url && shouldCheck) {
         remoteMeta = await fetchRemoteMeta(p.url);
         remoteVer = remoteMeta?.version || null;
+
+        if (remoteVer) {
+          saveRemoteVersion(p.id, remoteVer); // ✅ persist it
+        }
       }
 
       // 2. Resolve Name & Version
@@ -546,12 +547,20 @@ export function setup(api) {
         installedVer = remoteVer;
       }
 
+      let hasUpdate = false;
+      let updateBadge = '';
+
       if (installedVer && remoteVer) {
         const cmp = compareVersions(remoteVer, installedVer);
         if (cmp > 0) {
+          hasUpdate = true;
           availableUpdates++;
           updateBtn = `<button class="pm-btn pm-btn-primary" data-update="${p.id}">Update</button>`;
         }
+      }
+      
+      if (hasUpdate) {
+        updateBadge = '<span class="plugin-badge badge-update" style="margin-left:6px;">Update Available</span>';
       }
 
       // 3. Badges
@@ -563,12 +572,6 @@ export function setup(api) {
       } else {
         typeBadge = '<span class="plugin-badge" style="background:rgba(142,142,147,0.15);color:#8e8e93;">Inactive</span>';
       }
-
-    let updateBadge = '';
-    if (installedVer && remoteVer && compareVersions(remoteVer, installedVer) > 0) {
-      availableUpdates++;
-      updateBadge = '<span class="plugin-badge badge-update" style="margin-left:6px;">Update Available</span>';
-    }
 
     const statusBadges = `<div style="margin-top:4px; display:flex; align-items:center;">${typeBadge}${updateBadge}</div>`;
 
@@ -749,7 +752,10 @@ export function setup(api) {
       try {
         api.notify(`Updating ${updateId}...`, 'info');
         await api.reloadPlugin(updateId);
-        if (remoteVersion) saveRegistryPluginVersion(updateId, remoteVersion);
+        if (remoteVersion) {
+          saveRegistryPluginVersion(updateId, remoteVersion);
+          saveRemoteVersion(updateId, remoteVersion); // 🔥 REQUIRED
+        }
         api.notify(`${updateId} updated successfully!`, 'success');
         if (updateId === SELF_ID) {
           setTimeout(() => window.location.reload(), 200);
@@ -787,7 +793,7 @@ export function setup(api) {
   };
   api.boardEl.addEventListener('contextmenu', contextMenuHandler);
 
-  console.log('🔥 Plugin Manager v3.5.6 – Update badge + auto-check loaded');
+  console.log('🔥 Plugin Manager v3.7.3 loaded');
 }
 
 export function teardown() {
