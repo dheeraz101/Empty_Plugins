@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.8.2',
+  version: '3.8.3',
   compat: '>=3.3.0'
 };
 
@@ -91,9 +91,28 @@ export function setup(api) {
 
   .pm-content {
     flex: 1;
-    padding: 40px;
-    padding-right: 28px; /* 👈 add this */
+    padding: 0 28px; 
+    overflow: hidden; 
+  }
+
+  .pm-scroll-inner {
+    height: 100%;
     overflow-y: auto;
+    padding-top: 20px;  
+    padding-bottom: 20px;
+    padding-right: 12px; 
+    box-sizing: border-box;
+  }
+
+  .pm-scroll-inner::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .pm-scroll-inner::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.18);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
   }
 
   .pm-view-title { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 4px; }
@@ -347,6 +366,7 @@ export function setup(api) {
   </div>
 
   <div class="pm-content">
+  <div class="pm-scroll-inner">
     <div id="installed">
       <h1 class="pm-view-title">Installed Plugins</h1>
       <p class="pm-view-subtitle">Manage and configure your active workspace tools.</p>
@@ -356,6 +376,7 @@ export function setup(api) {
       <h1 class="pm-view-title">Discovery</h1>
       <p class="pm-view-subtitle">Explore new extensions built by the community.</p>
       <div class="pm-list"></div>
+    </div>
     </div>
   </div>
 `;
