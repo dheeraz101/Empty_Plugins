@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.9.3',
+  version: '3.9.4',
   compat: '>=3.3.0'
 };
 
@@ -91,11 +91,11 @@ export function setup(api) {
 
   .pm-content {
     flex: 1;
-    padding: 32px 28px;
+    margin: 0; 
+    padding: 32px 28px 32px 28px; 
     overflow-y: auto;
-    padding-right: 12px; 
     scroll-behavior: smooth;
-    margin: 15px 0;
+    scrollbar-gutter: stable; 
   }
 
   .pm-view-title { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 4px; }
@@ -153,23 +153,23 @@ export function setup(api) {
   .pm-action-group { display: flex; gap: 8px; align-items: center; }
 
   .pm-content::-webkit-scrollbar {
-      width: 12px; 
+      width: 8px;
   }
 
   .pm-content::-webkit-scrollbar-track {
     background: transparent; 
-    margin: 15px 0;
+    margin: 0; 
   }
 
   .pm-content::-webkit-scrollbar-thumb {
-      background-color: rgba(0, 0, 0, 0.15);
+      background-color: rgba(0, 0, 0, 0.1);
       border-radius: 10px;
-      border: 4px solid transparent;
+      border: 2px solid transparent;
       background-clip: content-box;
   }
 
   .pm-content:hover::-webkit-scrollbar-thumb {
-    background-color: rgba(0, 0, 0, 0.2); /* Only show clearly on hover */
+    background-color: rgba(0, 0, 0, 0.25);
   }
 
   /* Firefox support */
