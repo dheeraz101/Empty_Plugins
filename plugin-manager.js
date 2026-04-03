@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.7.1',
+  version: '3.7.2',
   compat: '>=3.3.0'
 };
 
@@ -25,6 +25,11 @@ export function setup(api) {
   // ───────── STYLE ─────────
   style = document.createElement('style');
   style.textContent = `
+  :root {
+    --pm-bg: rgba(255,255,255,0.92);
+    --pm-card: rgba(255,255,255,0.75);
+  }
+
   .pm-root {
     position: fixed;
     top: 50%;
@@ -32,12 +37,18 @@ export function setup(api) {
     transform: translate(-50%, -50%);
     width: 820px;
     height: 600px;
-    background: rgba(255, 255, 255, 0.75);
-    backdrop-filter: blur(40px) saturate(210%);
-    -webkit-backdrop-filter: blur(40px) saturate(210%);
+    background: linear-gradient(
+    to bottom,
+    rgba(255,255,255,0.96),
+    rgba(245,245,247,0.92)
+    );
+    backdrop-filter: blur(30px) saturate(180%);
+    -webkit-backdrop-filter: blur(30px) saturate(180%);
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    box-shadow: 
+      0 20px 60px rgba(0,0,0,0.12),
+      0 2px 8px rgba(0,0,0,0.06);
     border-radius: 28px;
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    box-shadow: 0 30px 80px rgba(0,0,0,0.15);
     display: flex;
     overflow: hidden;
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
@@ -46,12 +57,19 @@ export function setup(api) {
     isolation: isolate;
   }
 
-  .h3 { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif; }
+  .pm-root::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 28px;
+    pointer-events: none;
+    box-shadow: inset 0 1px rgba(255,255,255,0.6);
+  }
 
   .pm-sidebar {
     width: 210px;
-    background: rgba(0, 0, 0, 0.03);
-    border-right: 1px solid rgba(0, 0, 0, 0.05);
+    background: rgba(0, 0, 0, 0.06);
+    border-right: 1px solid rgba(0, 0, 0, 0.1);
     padding: 32px 12px;
     display: flex;
     flex-direction: column;
@@ -87,12 +105,12 @@ export function setup(api) {
   .pm-content { flex: 1; padding: 40px; overflow-y: auto; }
 
   .pm-view-title { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 4px; }
-  .pm-view-subtitle { font-size: 15px; color: #86868b; margin-bottom: 32px; font-weight: 400; }
+  .pm-view-subtitle { font-size: 15px; color: #6e6e73; margin-bottom: 32px; font-weight: 400; }
   .pm-list { display: flex; flex-direction: column; gap: 12px; }
 
   .plugin-item {
-    background: rgba(255, 255, 255, 0.4);
-    border: 1px solid rgba(0, 0, 0, 0.06);
+    background: rgba(255, 255, 255, 0.75); /* was 0.4 → too faint */
+    border: 1px solid rgba(0, 0, 0, 0.08);
     border-radius: 20px;
     padding: 16px 20px;
     display: flex;
@@ -103,8 +121,8 @@ export function setup(api) {
   }
 
   .plugin-item:hover {
-    background: rgba(255, 255, 255, 0.6);
-    border-color: rgba(0, 0, 0, 0.12);
+    background: rgba(255, 255, 255, 0.95);
+    border-color: rgba(0, 0, 0, 0.15);
     box-shadow: 0 8px 20px rgba(0,0,0,0.04);
   }
 
@@ -125,7 +143,7 @@ export function setup(api) {
 
   .plugin-info { flex: 1; min-width: 0; }
   .plugin-name { font-weight: 600; font-size: 16px; color: #1d1d1f; display: block; overflow: hidden; text-overflow: ellipsis; }
-  .plugin-meta { font-size: 13px; color: #86868b; margin-top: 2px; }
+  .plugin-meta { font-size: 13px; color: #8e8e93; margin-top: 2px; }
 
   .plugin-badge {
     padding: 2px 8px;
@@ -155,8 +173,13 @@ export function setup(api) {
   }
   .pm-btn-primary { background: #0071e3; color: white; }
   .pm-btn-primary:hover { background: #0077ed; }
-  .pm-btn-secondary { background: rgba(0,0,0,0.05); color: #1d1d1f; }
-  .pm-btn-secondary:hover { background: rgba(0,0,0,0.1); }
+  .pm-btn-secondary {
+    background: rgba(0,0,0,0.06);
+    border: 1px solid rgba(0,0,0,0.08);
+  }
+  .pm-btn-secondary:hover {
+    background: rgba(0,0,0,0.1);
+  }
 
   #close-pm:hover { background: #ff3b30 !important; color: white !important; }
 
@@ -197,10 +220,10 @@ export function setup(api) {
     display: flex; align-items: center; justify-content: center;
   }
   .pm-modal-content {
-    background: rgba(255,255,255,0.9);
+    background: rgba(255,255,255,0.97);
     width: 380px; padding: 24px; border-radius: 24px;
     box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-    border: 1px solid rgba(0,0,0,0.05);
+    border: 1px solid rgba(0,0,0,0.08);
   }
   .pm-input {
     width: 100%; padding: 12px; border-radius: 12px;
@@ -217,7 +240,30 @@ export function setup(api) {
   }
   .pm-input:focus { border-color: #0071e3; }
 
+  .pm-modal-title {
+    margin: 0 0 18px 0;
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.2px;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+    color: #1d1d1f;
+    line-height: 1.2;
+  }
+
+  .pm-modal-title::after {
+    content: "";
+    display: block;
+    margin-top: 12px;
+    height: 1px;
+    width: 100%;
+    background: rgba(0,0,0,0.08);
+  }
+
   @media (prefers-color-scheme: dark) {
+    :root {
+    --pm-bg: rgba(28,28,30,0.75);
+    --pm-card: rgba(255,255,255,0.05);
+    }
     .pm-root { background: rgba(28, 28, 30, 0.75); border-color: rgba(255,255,255,0.1); color: #f5f5f7; }
     .pm-sidebar { background: rgba(255, 255, 255, 0.02); }
     .pm-tab { color: #a1a1a6; }
@@ -229,6 +275,12 @@ export function setup(api) {
     .pm-modal-content { background: rgba(44, 44, 46, 0.95); color: white; border-color: rgba(255,255,255,0.1); }
     .pm-input { background: rgba(0,0,0,0.2); border-color: rgba(255,255,255,0.1); color: white; }
     .last-checked { color: #6e6e73; }
+    .pm-modal-title {
+      color: #f5f5f7;
+    }
+    .pm-modal-title::after {
+      background: rgba(255,255,255,0.08);
+    }
   }
 `;
   document.head.appendChild(style);
@@ -419,7 +471,7 @@ export function setup(api) {
 
     overlay.innerHTML = `
       <div class="pm-modal-content">
-        <h3 style="margin-top:0; font-size:18px; font-weight:600; margin-bottom:16px;">Install Extension</h3>
+        <h3 class="pm-modal-title">Install Extension</h3>
         <input type="text" id="pm-url" class="pm-input" placeholder="https://source.com/plugin.js">
         <input type="text" id="pm-id" class="pm-input" placeholder="Unique Plugin ID">
         <div style="display:flex; gap:10px; margin-top:8px;">
