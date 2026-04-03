@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.9.5',
+  version: '3.9.6',
   compat: '>=3.3.0'
 };
 
@@ -159,20 +159,29 @@ export function setup(api) {
   }
 
   .pm-content::-webkit-scrollbar-track {
-    background: transparent; 
-    margin: 120px; 
+      background: transparent;
+      margin-top: 120px;
+      margin-bottom: 120px;
+      border-radius: 20px;  
   }
 
   .pm-content::-webkit-scrollbar-thumb {
-    background-color: rgba(0, 0, 0, 0.08);
-    border-radius: 20px;
-    border: 2px solid transparent;
-    background-clip: content-box;
-    transition: background-color 0.2s;
+      background-color: rgba(0, 0, 0, 0.08);
+      border-radius: 20px;
+      border: 2px solid transparent;
+      background-clip: content-box; 
+      transition: background-color 0.2s;
+      /* Alternative inset method if margins fail: */
+      /* box-shadow: inset 0 0 8px 8px transparent; */
+      /* border: solid 3px transparent; */
   }
 
   .pm-content:hover::-webkit-scrollbar-thumb {
-    background-color: rgba(0, 0, 0, 0.2);
+      background-color: rgba(0, 0, 0, 0.2);
+  }
+
+  .pm-content::-webkit-scrollbar-button {
+      display: none;
   }
 
   /* Firefox support */
