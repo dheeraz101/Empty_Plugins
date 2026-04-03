@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.9.4',
+  version: '3.9.5',
   compat: '>=3.3.0'
 };
 
@@ -18,9 +18,8 @@ export function setup(api) {
   const DOCS_URL = 'https://empty-ad9a3406.mintlify.app/introduction';
 
   let lastCheckedTime = 0;
-  const CACHE_TIMEOUT = 10 * 60 * 1000; // 10 minutes
-
-  let updateCount = 0; // number of plugins with available updates
+  const CACHE_TIMEOUT = 10 * 60 * 1000; 
+  let updateCount = 0; 
 
   // ───────── STYLE ─────────
   style = document.createElement('style');
@@ -28,6 +27,7 @@ export function setup(api) {
   :root {
     --pm-bg: rgba(255,255,255,0.96); 
     --pm-card: rgba(255,255,255,0.82); 
+    --apple-red: #ff3b30;
   }
 
   .pm-root {
@@ -47,14 +47,14 @@ export function setup(api) {
     border-radius: 28px;
     display: flex;
     overflow: hidden;
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
     color: #1d1d1f;
     z-index: 10000;
     isolation: isolate;
   }
 
   .pm-sidebar {
-    width: 210px;
+    width: 220px;
     background: var(--pm-card);
     border-right: 1px solid rgba(0, 0, 0, 0.1);
     padding: 32px 12px;
@@ -74,16 +74,17 @@ export function setup(api) {
   }
 
   .pm-tab {
-    padding: 10px 14px;
-    border-radius: 10px;
-    font-size: 14px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 13.5px;
     font-weight: 500;
     color: #424245;
     cursor: pointer;
     display: flex;
     align-items: center;
     gap: 10px;
-    transition: all 0.2s;
+    transition: all 0.15s ease;
+    margin-bottom: 2px;
   }
 
   .pm-tab.active { background: rgba(0, 0, 0, 0.06); color: #000; font-weight: 600; }
@@ -92,10 +93,11 @@ export function setup(api) {
   .pm-content {
     flex: 1;
     margin: 0; 
-    padding: 32px 28px 32px 28px; 
+    padding: 40px 32px;
     overflow-y: auto;
     scroll-behavior: smooth;
-    scrollbar-gutter: stable; 
+    scrollbar-gutter: stable;
+    position: relative; 
   }
 
   .pm-view-title { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 4px; }
@@ -158,25 +160,25 @@ export function setup(api) {
 
   .pm-content::-webkit-scrollbar-track {
     background: transparent; 
-    margin: 0; 
+    margin: 120px; 
   }
 
   .pm-content::-webkit-scrollbar-thumb {
-      background-color: rgba(0, 0, 0, 0.1);
-      border-radius: 10px;
-      border: 2px solid transparent;
-      background-clip: content-box;
+    background-color: rgba(0, 0, 0, 0.08);
+    border-radius: 20px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+    transition: background-color 0.2s;
   }
 
   .pm-content:hover::-webkit-scrollbar-thumb {
-    background-color: rgba(0, 0, 0, 0.25);
+    background-color: rgba(0, 0, 0, 0.2);
   }
 
   /* Firefox support */
   .pm-content {
     scrollbar-width: thin;
-    scrollbar-color: rgba(0,0,0,0.2) transparent;
-    scrollbar-gutter: stable; 
+    scrollbar-color: rgba(0,0,0,0.1) transparent;
   }
 
   .pm-btn {
@@ -288,18 +290,22 @@ export function setup(api) {
   }
 
   .pm-badge {
-    background: #ff3b30;
+    background: var(--apple-red);
     color: white;
-    font-size: 10px;
-    font-weight: 700;
-    min-width: 18px;
-    height: 18px;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: -apple-system, "SF Pro Text", sans-serif;
+    min-width: 20px;
+    height: 20px;
     border-radius: 10px;
-    display: none; /* Managed by JS */
+    display: none;
     align-items: center;
     justify-content: center;
-    margin-left: auto; /* Pushes badge to the right */
-    box-shadow: 0 2px 4px rgba(255, 59, 48, 0.3);
+    margin-left: auto;
+    padding: 0 6px;
+    box-shadow: 0 2px 5px rgba(255, 59, 48, 0.3);
+    letter-spacing: -0.3px;
+    line-height: 1;
   }
 
   @media (prefers-color-scheme: dark) {
