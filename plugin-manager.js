@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.9.1',
+  version: '3.9.2',
   compat: '>=3.3.0'
 };
 
@@ -160,14 +160,17 @@ export function setup(api) {
 
   .pm-content::-webkit-scrollbar-track {
     background: transparent; 
+    margin: 15px 0;
   }
 
   .pm-content::-webkit-scrollbar-thumb {
-    background-color: rgba(0, 0, 0, 0.1);
+    background-color: rgba(0, 0, 0, 0.15);
     border-radius: 10px;
-    border: 2px solid transparent; /* Creates a 'floating' effect */
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 20px solid transparent; 
+    border-bottom: 20px solid transparent;
     background-clip: content-box;
-    transition: background 0.3s;
   }
 
   .pm-content:hover::-webkit-scrollbar-thumb {
