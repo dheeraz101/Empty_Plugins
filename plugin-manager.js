@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.9.7',
+  version: '3.9.8',
   compat: '>=3.3.0'
 };
 
@@ -570,7 +570,19 @@ export function setup(api) {
 
       try {
         const remoteMeta = await fetchRemoteMeta(url);
-        const newDef = { id, url, name: remoteMeta?.name || id, enabled: true, source: 'registry', version: remoteMeta?.version };
+        if (!remoteMeta) {
+          return api.notify('Invalid plugin (meta not found)', 'error');
+        }
+        const newDef = {
+          id: remoteMeta.id || id,
+          url,
+          name: remoteMeta.name,
+          version: remoteMeta.version,
+          icon: remoteMeta.icon,
+          enabled: true,
+          source: 'registry',
+          remoteVersion: remoteMeta.version
+        };
         const registry = api.registry.getAll();
         api.registry.save([...registry, newDef]);
         await api.reloadPlugin(id);
@@ -801,13 +813,21 @@ export function setup(api) {
     }
 
     if (btn.dataset.install) {
+      const remoteMeta = await fetchRemoteMeta(btn.dataset.url);
+
+      if (!remoteMeta) {
+        return api.notify('Invalid plugin', 'error');
+      }
+
       const newDef = {
-        id: btn.dataset.install,
+        id: remoteMeta.id || btn.dataset.install,
         url: btn.dataset.url,
-        name: btn.dataset.install,
+        name: remoteMeta.name,
+        version: remoteMeta.version,
+        icon: remoteMeta.icon || btn.dataset.icon,
         enabled: true,
         source: 'registry',
-        icon: btn.dataset.icon || undefined
+        remoteVersion: remoteMeta.version
       };
 
       const registry = api.registry.getAll();
