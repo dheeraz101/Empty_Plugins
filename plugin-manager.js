@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.7.3',
+  version: '3.7.4',
   compat: '>=3.3.0'
 };
 
@@ -707,7 +707,7 @@ export function setup(api) {
       }
 
       try {
-        await api.reloadPlugin(id);
+        setTimeout(() => api.reloadPlugin(id), 0);
         api.notify(`Reloaded ${id}`, 'success');
         cleanupPluginUI(id);
 
