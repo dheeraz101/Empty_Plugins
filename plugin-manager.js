@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.9.0',
+  version: '3.9.1',
   compat: '>=3.3.0'
 };
 
@@ -155,23 +155,23 @@ export function setup(api) {
   .pm-action-group { display: flex; gap: 8px; align-items: center; }
 
   .pm-content::-webkit-scrollbar {
-      width: 14px; 
+      width: 8px; 
   }
 
   .pm-content::-webkit-scrollbar-track {
-    background: transparent;
-    margin-block: 12px;
+    background: transparent; 
   }
 
   .pm-content::-webkit-scrollbar-thumb {
-      background-color: rgba(0, 0, 0, 0.15); 
-      border-radius: 20px;
-      border: 4px solid transparent;
-      background-clip: content-box;
+    background-color: rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+    border: 2px solid transparent; /* Creates a 'floating' effect */
+    background-clip: content-box;
+    transition: background 0.3s;
   }
 
-  .pm-content::-webkit-scrollbar-thumb:hover {
-      background-color: rgba(0, 0, 0, 0.3);
+  .pm-content:hover::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.2); /* Only show clearly on hover */
   }
 
   /* Firefox support */
@@ -290,20 +290,18 @@ export function setup(api) {
   }
 
   .pm-badge {
-    background: #ff3b30; /* Apple System Red */
+    background: #ff3b30;
     color: white;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
     min-width: 18px;
     height: 18px;
-    padding: 0 5px;
-    border-radius: 50%;
-    display: none; /* Hidden by default */
+    border-radius: 10px;
+    display: none; /* Managed by JS */
     align-items: center;
     justify-content: center;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    margin-left: 8px;
-    flex-shrink: 0;
+    margin-left: auto; /* Pushes badge to the right */
+    box-shadow: 0 2px 4px rgba(255, 59, 48, 0.3);
   }
 
   @media (prefers-color-scheme: dark) {
@@ -356,9 +354,9 @@ export function setup(api) {
       <div class="pm-tab-container">
         <div style="display: flex; align-items: center; gap: 10px;">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-          Installed
+          <span style="flex: 1;">Installed</span>
+          <span id="update-badge-count" class="pm-badge"></span>
         </div>
-        <span id="update-badge" class="pm-badge"></span>
       </div>
     </div>
     <div class="pm-tab" data-tab="community">
@@ -513,7 +511,7 @@ export function setup(api) {
 
   function updateBadge(count) {
     updateCount = count;
-    const badge = root.querySelector('#update-badge');
+    const badge = root.querySelector('#update-badge-count');
     if (!badge) return;
 
     if (count > 0) {
@@ -531,20 +529,6 @@ export function setup(api) {
     if (!item) return;
     item.version = version;
     api.registry.save([...registry]);
-  }
-
-  function updateBadge(count) {
-    updateCount = count;
-    const badgeContainer = document.getElementById('update-badge');
-    const badgeCount = document.getElementById('badge-count');
-    if (!badgeContainer || !badgeCount) return;
-
-    if (count > 0) {
-      badgeCount.textContent = count;
-      badgeContainer.style.display = 'inline-flex';
-    } else {
-      badgeContainer.style.display = 'none';
-    }
   }
 
   // ───────── INSTALL MODAL ─────────
