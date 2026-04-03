@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.8.7',
+  version: '3.8.8',
   compat: '>=3.3.0'
 };
 
@@ -282,6 +282,30 @@ export function setup(api) {
     background: rgba(0,0,0,0.08);
   }
 
+  .pm-tab-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .pm-badge {
+    background: #ff3b30; /* Apple System Red */
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 50%;
+    display: none; /* Hidden by default */
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    margin-left: 8px;
+    flex-shrink: 0;
+  }
+
   @media (prefers-color-scheme: dark) {
     :root {
     --pm-bg: rgba(28,28,30,0.75);
@@ -329,8 +353,13 @@ export function setup(api) {
       <div style="font-size: 12px; font-weight: 700; color: #86868b; text-transform: uppercase; letter-spacing: 1px;">Library</div>
     </div>
     <div class="pm-tab active" data-tab="installed">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-      Installed
+      <div class="pm-tab-container">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+          Installed
+        </div>
+        <span id="update-badge" class="pm-badge"></span>
+      </div>
     </div>
     <div class="pm-tab" data-tab="community">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
@@ -480,6 +509,19 @@ export function setup(api) {
 
     item.remoteVersion = version; // ✅ NEW FIELD
     api.registry.save([...registry]);
+  }
+
+  function updateBadge(count) {
+    updateCount = count;
+    const badge = root.querySelector('#update-badge');
+    if (!badge) return;
+
+    if (count > 0) {
+      badge.textContent = count;
+      badge.style.display = 'inline-flex';
+    } else {
+      badge.style.display = 'none';
+    }
   }
 
   function saveRegistryPluginVersion(pluginId, version) {
