@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.9.8',
+  version: '3.9.9',
   compat: '>=3.3.0'
 };
 
@@ -562,19 +562,40 @@ export function setup(api) {
 
     document.documentElement.appendChild(overlay);
 
-    overlay.querySelector('#pm-cancel').onclick = () => overlay.remove();
     overlay.querySelector('#pm-confirm').onclick = async () => {
       const url = overlay.querySelector('#pm-url').value.trim();
-      const id = overlay.querySelector('#pm-id').value.trim();
-      if (!url || !id) return api.notify('All fields required', 'error');
+      const inputId = overlay.querySelector('#pm-id').value.trim();
+
+      if (!url || !inputId) {
+        return api.notify('All fields required', 'error');
+      }
 
       try {
         const remoteMeta = await fetchRemoteMeta(url);
+
         if (!remoteMeta) {
           return api.notify('Invalid plugin (meta not found)', 'error');
         }
+
+        // 🔴 STRICT VALIDATION
+        if (!remoteMeta.id || typeof remoteMeta.id !== 'string') {
+          return api.notify('Invalid plugin (missing id)', 'error');
+        }
+
+        if (remoteMeta.id !== inputId) {
+          console.error('ID mismatch:', {
+            inputId,
+            pluginId: remoteMeta.id
+          });
+
+          return api.notify(
+            `ID mismatch → Expected "${inputId}", got "${remoteMeta.id}"`,
+            'error'
+          );
+        }
+
         const newDef = {
-          id: remoteMeta.id || id,
+          id: remoteMeta.id, // no fallback
           url,
           name: remoteMeta.name,
           version: remoteMeta.version,
@@ -583,17 +604,29 @@ export function setup(api) {
           source: 'registry',
           remoteVersion: remoteMeta.version
         };
+
         const registry = api.registry.getAll();
+
+        if (registry.some(p => p.id === newDef.id)) {
+          return api.notify('Plugin already installed', 'warning');
+        }
+
         api.registry.save([...registry, newDef]);
-        await api.reloadPlugin(id);
+
+        await api.reloadPlugin(newDef.id);
+
         api.notify('Installed Successfully', 'success');
         overlay.remove();
         renderInstalled();
-      } catch {
+
+      } catch (e) {
+        console.error(e);
         api.notify('Installation failed', 'error');
       }
     };
   }
+
+  let remoteMetaCache = new Map();
 
 // ───────── RENDER INSTALLED (With Persistence Fix) ─────────
   async function renderInstalled(forceCheck = false) {
@@ -611,31 +644,57 @@ export function setup(api) {
     if (!el) return;
 
     const plugins = api.registry.getAll();
+    let remoteMetas = [];
+
+    if (shouldCheck) {
+      const results = await Promise.all(
+        plugins.map(p => p.url ? fetchRemoteMeta(p.url) : Promise.resolve(null))
+      );
+
+      results.forEach((meta, i) => {
+        if (plugins[i]?.id && meta) {
+          remoteMetaCache.set(plugins[i].id, meta);
+        }
+      });
+
+      remoteMetas = results;
+    } else {
+      remoteMetas = plugins.map(p => remoteMetaCache.get(p.id) || null);
+    }
+    let registryChanged = false;
+    const registryCopy = [...plugins];
 
     let html = '';
     let availableUpdates = 0;
 
-    for (const p of plugins) {
+    for (let i = 0; i < plugins.length; i++) {
+      const p = plugins[i];
       const isSelf = p.id === SELF_ID;
 
-      let remoteMeta = null;
       let installedVer = p.version || null;
       let remoteVer = p.remoteVersion || null; // use cached first
 
       // fetch latest
-      if (p.url && shouldCheck) {
-        remoteMeta = await fetchRemoteMeta(p.url);
+      const remoteMeta = shouldCheck ? remoteMetas[i] : null;
         if (remoteMeta?.version) {
           remoteVer = remoteMeta.version;
-          saveRemoteVersion(p.id, remoteVer);
+
+          const entry = registryCopy.find(e => e.id === p.id);
+          if (entry && entry.remoteVersion !== remoteVer) {
+            entry.remoteVersion = remoteVer;
+            registryChanged = true;
+          }
         }
-      }
 
       // 2. Resolve Name & Version
       const displayName = remoteMeta?.name || p.name || p.id;
 
       if (!installedVer && remoteVer) {
-        saveRegistryPluginVersion(p.id, remoteVer);
+        const entry = registryCopy.find(e => e.id === p.id);
+        if (entry && entry.version !== remoteVer) {
+          entry.version = remoteVer;
+          registryChanged = true;
+        }
         installedVer = remoteVer;
       }
 
@@ -680,11 +739,18 @@ export function setup(api) {
       // 5. Persistence fix (name + icon)
       if ((remoteMeta?.name && p.name !== remoteMeta.name) || (!p.icon && iconContent && iconContent !== '📦')) {
         const reg = api.registry.getAll();
-        const entry = reg.find(item => item.id === p.id);
+        const entry = registryCopy.find(item => item.id === p.id);
         if (entry) {
-          if (remoteMeta?.name) entry.name = remoteMeta.name;
-          if (iconContent && iconContent !== '📦') entry.icon = iconContent;
-          api.registry.save([...reg]);
+          let updated = false;
+          if (remoteMeta?.name && entry.name !== remoteMeta.name) {
+            entry.name = remoteMeta.name;
+            updated = true;
+          }
+          if (iconContent && iconContent !== '📦' && entry.icon !== iconContent) {
+            entry.icon = iconContent;
+            updated = true;
+          }
+          if (updated) registryChanged = true;
           p.name = entry.name;
           p.icon = entry.icon;
         }
@@ -723,6 +789,11 @@ export function setup(api) {
     const lastCheckedHTML = lastCheckedTime
       ? `<div class="last-checked">Last update checked: ${timeAgo(lastCheckedTime)}</div>`
       : '';
+      if (registryChanged) {
+        setTimeout(() => {
+          api.registry.save(registryCopy);
+        }, 0);
+      }
 
     el.innerHTML = html + lastCheckedHTML;
     updateBadge(availableUpdates);
@@ -816,7 +887,23 @@ export function setup(api) {
       const remoteMeta = await fetchRemoteMeta(btn.dataset.url);
 
       if (!remoteMeta) {
-        return api.notify('Invalid plugin', 'error');
+        return api.notify('Invalid plugin (meta not found)', 'error');
+      }
+
+      if (!remoteMeta.id || typeof remoteMeta.id !== 'string') {
+        return api.notify('Invalid plugin (missing id)', 'error');
+      }
+
+      if (remoteMeta.id !== btn.dataset.install) {
+        console.warn('ID mismatch:', {
+          jsonId: btn.dataset.install,
+          pluginId: remoteMeta.id
+        });
+
+        return api.notify(
+          `Plugin ID mismatch (expected "${btn.dataset.install}", got "${remoteMeta.id}")`,
+          'error'
+        );
       }
 
       const newDef = {
@@ -831,6 +918,11 @@ export function setup(api) {
       };
 
       const registry = api.registry.getAll();
+
+      if (registry.some(p => p.id === newDef.id)) {
+        return api.notify('Plugin already installed', 'warning');
+      }
+
       api.registry.save([...registry, newDef]);
 
       try {
