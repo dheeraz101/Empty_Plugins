@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.7.5',
+  version: '3.7.6',
   compat: '>=3.3.0'
 };
 
@@ -524,7 +524,7 @@ export function setup(api) {
     for (const p of plugins) {
       const isSelf = p.id === SELF_ID;
       let installedVer = p.version || null;
-      let remoteVer = p.remoteVersion || null;
+      let remoteVer = remoteMeta?.version || p.remoteVersion || null;
       let remoteMeta = null;
       let updateBtn = '';
       let statusBadge = '';
@@ -706,10 +706,12 @@ export function setup(api) {
         return;
       }
 
-        setTimeout(() => api.reloadPlugin(id), 0);
-        api.notify(`Reloaded ${id}`, 'success');
-        cleanupPluginUI(id);
-        return; 
+      setTimeout(() => api.reloadPlugin(id), 0);
+      api.notify(`Reloaded ${id}`, 'success');
+      cleanupPluginUI(id);
+
+      renderInstalled();
+      return;
     }
 
     if (btn.dataset.install) {
