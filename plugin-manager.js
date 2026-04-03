@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.8.8',
+  version: '3.8.9',
   compat: '>=3.3.0'
 };
 
@@ -160,8 +160,7 @@ export function setup(api) {
 
   .pm-content::-webkit-scrollbar-track {
     background: transparent;
-    margin-top: 12px;
-    margin-bottom: 12px;
+    margin-block: 12px;
   }
 
   .pm-content::-webkit-scrollbar-thumb {
@@ -179,6 +178,7 @@ export function setup(api) {
   .pm-content {
     scrollbar-width: thin;
     scrollbar-color: rgba(0,0,0,0.2) transparent;
+    scrollbar-gutter: stable; 
   }
 
   .pm-btn {
