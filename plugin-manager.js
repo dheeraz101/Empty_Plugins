@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.7.6',
+  version: '3.7.7',
   compat: '>=3.3.0'
 };
 
@@ -523,19 +523,17 @@ export function setup(api) {
 
     for (const p of plugins) {
       const isSelf = p.id === SELF_ID;
-      let installedVer = p.version || null;
-      let remoteVer = remoteMeta?.version || p.remoteVersion || null;
-      let remoteMeta = null;
-      let updateBtn = '';
-      let statusBadge = '';
 
-      // 1. Fetch remote info if needed
+      let remoteMeta = null;
+      let installedVer = p.version || null;
+      let remoteVer = p.remoteVersion || null; // use cached first
+
+      // fetch latest
       if (p.url && shouldCheck) {
         remoteMeta = await fetchRemoteMeta(p.url);
-        remoteVer = remoteMeta?.version || null;
-
-        if (remoteVer) {
-          saveRemoteVersion(p.id, remoteVer); // ✅ persist it
+        if (remoteMeta?.version) {
+          remoteVer = remoteMeta.version;
+          saveRemoteVersion(p.id, remoteVer);
         }
       }
 
