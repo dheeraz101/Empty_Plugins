@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.8.1',
+  version: '3.8.2',
   compat: '>=3.3.0'
 };
 
@@ -89,7 +89,12 @@ export function setup(api) {
   .pm-tab.active { background: rgba(0, 0, 0, 0.06); color: #000; font-weight: 600; }
   .pm-tab:hover:not(.active) { background: rgba(0, 0, 0, 0.03); }
 
-  .pm-content { flex: 1; padding: 40px; overflow-y: auto; }
+  .pm-content {
+    flex: 1;
+    padding: 40px;
+    padding-right: 28px; /* 👈 add this */
+    overflow-y: auto;
+  }
 
   .pm-view-title { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 4px; }
   .pm-view-subtitle { font-size: 15px; color: #6e6e73; margin-bottom: 32px; font-weight: 400; }
@@ -146,10 +151,12 @@ export function setup(api) {
   .pm-action-group { display: flex; gap: 8px; align-items: center; }
 
   .pm-content::-webkit-scrollbar {
-    width: 10px;
+    width: 8px;
   }
 
   .pm-content::-webkit-scrollbar-track {
+    margin-top: 10px;
+    margin-bottom: 10px;
     background: transparent;
   }
 
@@ -158,7 +165,6 @@ export function setup(api) {
     border-radius: 999px;
     border: 2px solid transparent;
     background-clip: content-box;
-    transition: background 0.2s ease;
   }
 
   .pm-content::-webkit-scrollbar-thumb:hover {
