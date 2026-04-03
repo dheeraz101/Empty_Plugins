@@ -56,7 +56,7 @@
     "icon": "🔨"
   },
   {
-  "id": "plugin-manager-enhancer",
+  "id": "pm-enhancer",
   "name": "Plugin Manager Enhancer",
   "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/plugin-manager-enhancer.js",
   "author": "Dheeraz",
