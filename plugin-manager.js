@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.7.9',
+  version: '3.8.1',
   compat: '>=3.3.0'
 };
 
@@ -145,6 +145,32 @@ export function setup(api) {
 
   .pm-action-group { display: flex; gap: 8px; align-items: center; }
 
+  .pm-content::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  .pm-content::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .pm-content::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.18);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+    transition: background 0.2s ease;
+  }
+
+  .pm-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.28);
+  }
+
+  /* Firefox support */
+  .pm-content {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0,0,0,0.25) transparent;
+  }
+
   .pm-btn {
     padding: 6px 14px;
     border-radius: 999px;
@@ -267,6 +293,17 @@ export function setup(api) {
     }
     .pm-modal-title::after {
       background: rgba(255,255,255,0.08);
+    }
+    .pm-content::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .pm-content::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.35);
+    }
+
+    .pm-content {
+      scrollbar-color: rgba(255,255,255,0.3) transparent;
     }
   }
 `;
