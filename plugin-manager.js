@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.8.4',
+  version: '3.8.5',
   compat: '>=3.3.0'
 };
 
@@ -89,10 +89,11 @@ export function setup(api) {
   .pm-tab.active { background: rgba(0, 0, 0, 0.06); color: #000; font-weight: 600; }
   .pm-tab:hover:not(.active) { background: rgba(0, 0, 0, 0.03); }
 
-  .pm-content {
+.pm-content {
     flex: 1;
     padding: 0 28px; 
-    overflow-y: auto; 
+    overflow-y: auto;
+    padding-right: 20px; 
   }
 
   .pm-view-title { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 4px; }
@@ -149,29 +150,31 @@ export function setup(api) {
 
   .pm-action-group { display: flex; gap: 8px; align-items: center; }
 
-  .pm-content::-webkit-scrollbar {
-    width: 6px;
+.pm-content::-webkit-scrollbar {
+    width: 8px; /* Total width of the scroll area */
   }
 
   .pm-content::-webkit-scrollbar-track {
     background: transparent;
-    margin-top: 12px;   /* ← gap from top */
-    margin-bottom: 12px;/* ← gap from bottom */
+    margin-top: 20px;
+    margin-bottom: 20px;
   }
 
   .pm-content::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 999px;
+    background-color: rgba(0, 0, 0, 0.15); /* Light gray for light mode */
+    border-radius: 10px;
+    border: 2px solid transparent;
+    background-clip: content-box;
   }
 
   .pm-content::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 0, 0, 0.35);
+    background-color: rgba(0, 0, 0, 0.3);
   }
 
   /* Firefox support */
   .pm-content {
     scrollbar-width: thin;
-    scrollbar-color: rgba(0,0,0,0.25) transparent;
+    scrollbar-color: rgba(0,0,0,0.2) transparent;
   }
 
   .pm-btn {
@@ -297,13 +300,12 @@ export function setup(api) {
     .pm-modal-title::after {
       background: rgba(255,255,255,0.08);
     }
-    .pm-content::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.2);
-    }
-
-    .pm-content::-webkit-scrollbar-thumb:hover {
-      background: rgba(255, 255, 255, 0.35);
-    }
+      .pm-content::-webkit-scrollbar-thumb {
+        background-color: rgba(255, 255, 255, 0.2);
+      }
+      .pm-content::-webkit-scrollbar-thumb:hover {
+        background-color: rgba(255, 255, 255, 0.35);
+      }
 
     .pm-content {
       scrollbar-color: rgba(255,255,255,0.3) transparent;
