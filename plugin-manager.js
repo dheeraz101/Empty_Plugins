@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.7.8',
+  version: '3.7.9',
   compat: '>=3.3.0'
 };
 
@@ -596,16 +596,17 @@ export function setup(api) {
         }
       }
 
-      // 🔥 NEW: Reload button logic
       const reloadDisabled = !p.enabled && !isSelf;
-      const reloadBtnHTML = `
-        <button class="pm-btn pm-btn-secondary reload-btn" 
-                data-act="reload" 
-                data-id="${p.id}"
-                ${reloadDisabled ? 'disabled style="opacity:0.5; cursor:not-allowed;" title="Enable the plugin first to reload"' : ''}>
-          Reload
-        </button>
-      `;
+      const reloadBtnHTML = isSelf
+        ? '' 
+        : `
+          <button class="pm-btn pm-btn-secondary reload-btn" 
+                  data-act="reload" 
+                  data-id="${p.id}"
+                  ${reloadDisabled ? 'disabled style="opacity:0.5; cursor:not-allowed;" title="Enable the plugin first to reload"' : ''}>
+            Reload
+          </button>
+        `;
 
       html += `
         <div class="plugin-item">
@@ -699,6 +700,10 @@ export function setup(api) {
     }
 
     if (btn.dataset.act === 'reload') {
+        if (id === SELF_ID) {
+          api.notify('Plugin Manager cannot reload itself', 'warning');
+          return;
+        }
       const plugin = api.registry.getAll().find(p => p.id === id);
       if (!plugin || (!plugin.enabled && id !== SELF_ID)) {
         api.notify('Enable the plugin first before reloading', 'warning');
