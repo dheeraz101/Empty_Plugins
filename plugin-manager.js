@@ -89,12 +89,15 @@ export function setup(api) {
   .pm-tab.active { background: rgba(0, 0, 0, 0.06); color: #000; font-weight: 600; }
   .pm-tab:hover:not(.active) { background: rgba(0, 0, 0, 0.03); }
 
-.pm-content {
-flex: 1;
+  .pm-content {
+    flex: 1;
     padding: 32px 28px;
     overflow-y: auto;
     padding-right: 12px; 
     scroll-behavior: smooth;
+    scrollbar-gutter: stable;
+    scroll-padding-top: 12px;
+    scroll-padding-bottom: 12px;
   }
 
   .pm-view-title { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 4px; }
@@ -156,9 +159,9 @@ flex: 1;
   }
 
   .pm-content::-webkit-scrollbar-track {
-      background: transparent;
-      border-top: 12px solid transparent;
-      border-bottom: 12px solid transparent;
+    background: transparent;
+    margin-top: 12px;
+    margin-bottom: 12px;
   }
 
   .pm-content::-webkit-scrollbar-thumb {
