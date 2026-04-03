@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.9.6',
+  version: '3.9.7',
   compat: '>=3.3.0'
 };
 
@@ -155,32 +155,29 @@ export function setup(api) {
   .pm-action-group { display: flex; gap: 8px; align-items: center; }
 
   .pm-content::-webkit-scrollbar {
-      width: 8px;
+      width: 12px;
   }
 
   .pm-content::-webkit-scrollbar-track {
       background: transparent;
-      margin-top: 120px;
-      margin-bottom: 120px;
-      border-radius: 20px;  
   }
 
   .pm-content::-webkit-scrollbar-thumb {
       background-color: rgba(0, 0, 0, 0.08);
       border-radius: 20px;
-      border: 2px solid transparent;
-      background-clip: content-box; 
+      border: 3px solid transparent;
+      background-clip: padding-box;
+      box-shadow: inset 0 100px 0 100px transparent;  /* ~17% inset for 600px; increase to 120px for 20% */
+      min-height: 40px;
       transition: background-color 0.2s;
-      /* Alternative inset method if margins fail: */
-      /* box-shadow: inset 0 0 8px 8px transparent; */
-      /* border: solid 3px transparent; */
   }
 
   .pm-content:hover::-webkit-scrollbar-thumb {
       background-color: rgba(0, 0, 0, 0.2);
   }
 
-  .pm-content::-webkit-scrollbar-button {
+  .pm-content::-webkit-scrollbar-button,
+  .pm-content::-webkit-scrollbar-corner {
       display: none;
   }
 
