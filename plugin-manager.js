@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '4.0.7',
+  version: '4.0.8',
   compat: '>=3.3.0'
 };
 
@@ -1071,7 +1071,7 @@ export function setup(api) {
           return;
         }
 
-      const cooldownMs = 5000;
+      const cooldownMs = 10000;
       const lastReload = reloadCooldowns.get(id) || 0;
       const now = Date.now();
       if (now - lastReload < cooldownMs) {
