@@ -9,7 +9,7 @@
 export const meta = {
   id: 'rollback-manager',
   name: 'Rollback Manager',
-  version: '2.3.0',
+  version: '2.3.1',
   compat: '>=4.0.0'
 };
 
@@ -647,6 +647,9 @@ export function teardown() {
     apiRef.reloadPlugin = originalReloadPlugin;
     originalReloadPlugin = null;
   }
+  // Remove all injected UI
+  document.querySelectorAll('.rb-sidebar-btn').forEach(el => el.remove());
+  document.querySelectorAll('[data-rb-rollback]').forEach(el => el.remove());
   document.querySelectorAll('.rb-overlay').forEach(el => el.remove());
   apiRef = null;
 }
