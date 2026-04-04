@@ -1,7 +1,7 @@
 export const meta = {
   id: 'about',
   name: 'About Blank Board',
-  version: '0.3.8',
+  version: '0.3.9',
   compat: '>=1.0.0'
 };
 
@@ -99,9 +99,8 @@ export function setup(api) {
     <div class="about-container">
       <header class="about-header">
         <div class="about-label">Blank Board</div>
-        <div class="about-title">Start empty. Build your own workspace.</div>
-        <p class="about-subtitle">A blank grid with no tools. </p>
-        <p class="about-subtitle">Add only what you need with simple plugins.</p>
+        <div class="about-title">Start empty.<br>Build your own workspace.</div>
+        <p class="about-subtitle">A blank grid with no tools. Add only what you need with simple plugins.</p>
       </header>
 
       <div class="about-grid-main">
