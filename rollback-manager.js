@@ -1,7 +1,7 @@
 export const meta = {
   id: 'rollback-manager',
   name: 'Rollback Manager',
-  version: '1.0.3',
+  version: '1.1.0',
   compat: '>=4.0.0'
 };
 
@@ -19,6 +19,13 @@ export function setup(api) {
     background: rgba(255, 149, 0, 0.1);
     color: #d97706;
     border: 1px solid rgba(255, 149, 0, 0.15);
+    padding: 6px 10px;
+    border-radius: 999px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
   }
   .pm-btn-rollback:hover {
     background: rgba(255, 149, 0, 0.18);
@@ -37,14 +44,14 @@ export function setup(api) {
   }
   .rb-confirm-box {
     background: rgba(255,255,255,0.97);
-    width: 380px; padding: 28px; border-radius: 20px;
+    width: 400px; padding: 28px; border-radius: 20px;
     box-shadow: 0 20px 40px rgba(0,0,0,0.1);
     border: 1px solid rgba(0,0,0,0.08);
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
   }
   .rb-confirm-title {
     font-size: 20px; font-weight: 600; color: #1d1d1f;
-    margin: 0 0 4px 0; letter-spacing: -0.3px;
+    margin: 0 0 16px 0; letter-spacing: -0.3px;
   }
   .rb-confirm-title::after {
     content: "";
@@ -54,8 +61,26 @@ export function setup(api) {
     width: 100%;
     background: rgba(0,0,0,0.08);
   }
+  .rb-version-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 16px 0 4px 0;
+    font-size: 14px;
+  }
+  .rb-version-from {
+    color: #8e8e93;
+    text-decoration: line-through;
+  }
+  .rb-version-arrow {
+    color: #8e8e93;
+  }
+  .rb-version-to {
+    color: #ff9500;
+    font-weight: 600;
+  }
   .rb-confirm-desc {
-    font-size: 14px; color: #6e6e73; margin: 16px 0 22px 0; line-height: 1.5;
+    font-size: 14px; color: #6e6e73; margin: 12px 0 22px 0; line-height: 1.5;
   }
   .rb-confirm-actions {
     display: flex; gap: 10px;
@@ -80,6 +105,9 @@ export function setup(api) {
     .rb-confirm-box { background: rgba(44, 44, 46, 0.95); color: #f5f5f7; border-color: rgba(255,255,255,0.1); }
     .rb-confirm-title { color: #f5f5f7; }
     .rb-confirm-title::after { background: rgba(255,255,255,0.08); }
+    .rb-version-from { color: #6e6e73; }
+    .rb-version-arrow { color: #6e6e73; }
+    .rb-version-to { color: #ffb340; }
     .rb-confirm-desc { color: #a1a1a6; }
     .rb-cancel-btn { background: rgba(255,255,255,0.1); color: #f5f5f7; }
     .rb-cancel-btn:hover { background: rgba(255,255,255,0.15); }
@@ -87,16 +115,16 @@ export function setup(api) {
 `;
   document.head.appendChild(style);
 
-  function getStoredBackup(pluginId) {
+  function getBackup(pluginId) {
     try {
-      const data = localStorage.getItem(`rb_backup_${pluginId}`);
+      const data = localStorage.getItem(`rb_${pluginId}`);
       return data ? JSON.parse(data) : null;
     } catch {
       return null;
     }
   }
 
-  function storeBackup(pluginId, code, version, originalUrl) {
+  function saveBackup(pluginId, code, version, originalUrl) {
     try {
       const data = {
         code,
@@ -104,10 +132,9 @@ export function setup(api) {
         originalUrl,
         timestamp: Date.now()
       };
-      localStorage.setItem(`rb_backup_${pluginId}`, JSON.stringify(data));
-      console.log(`[Rollback] Stored backup: ${pluginId} v${version}`);
+      localStorage.setItem(`rb_${pluginId}`, JSON.stringify(data));
     } catch (e) {
-      console.error('[Rollback] Failed to store backup:', e);
+      console.error('[Rollback] Failed to save backup:', e);
     }
   }
 
@@ -115,7 +142,7 @@ export function setup(api) {
     return 'data:application/javascript;charset=utf-8,' + encodeURIComponent(code);
   }
 
-  async function capturePluginCode(pluginId) {
+  async function captureBeforeUpdate(pluginId) {
     const registry = api.registry.getAll();
     const entry = registry.find(p => p.id === pluginId);
     if (!entry || !entry.url) {
@@ -123,16 +150,16 @@ export function setup(api) {
       return false;
     }
 
+    const urlToFetch = entry.originalUrl && !entry.originalUrl.startsWith('blob:') && !entry.originalUrl.startsWith('data:')
+      ? entry.originalUrl
+      : entry.url;
+
+    if (urlToFetch.startsWith('blob:') || urlToFetch.startsWith('data:')) {
+      console.log(`[Rollback] Cannot capture ${pluginId}: URL is ${urlToFetch.substring(0, 30)}...`);
+      return false;
+    }
+
     try {
-      const urlToFetch = entry.originalUrl && !entry.originalUrl.startsWith('blob:') && !entry.originalUrl.startsWith('data:')
-        ? entry.originalUrl
-        : entry.url;
-
-      if (urlToFetch.startsWith('blob:') || urlToFetch.startsWith('data:')) {
-        console.log(`[Rollback] Cannot capture ${pluginId}: URL is ${urlToFetch.substring(0, 20)}...`);
-        return false;
-      }
-
       const res = await fetch(urlToFetch + (urlToFetch.includes('?') ? '&' : '?') + 't=' + Date.now());
       if (!res.ok) {
         console.log(`[Rollback] Cannot capture ${pluginId}: HTTP ${res.status}`);
@@ -140,10 +167,11 @@ export function setup(api) {
       }
 
       const code = await res.text();
-      storeBackup(pluginId, code, entry.version || null, entry.originalUrl || urlToFetch);
+      saveBackup(pluginId, code, entry.version || null, entry.originalUrl || urlToFetch);
+      console.log(`[Rollback] Captured ${pluginId} v${entry.version || 'unknown'}`);
       return true;
     } catch (e) {
-      console.error('[Rollback] Failed to capture code for', pluginId, e);
+      console.error('[Rollback] Failed to capture', pluginId, e);
       return false;
     }
   }
@@ -153,12 +181,11 @@ export function setup(api) {
     const entry = registry.find(p => p.id === pluginId);
     if (!entry) return api.notify('Plugin not found', 'error');
 
-    const backup = getStoredBackup(pluginId);
+    const backup = getBackup(pluginId);
     if (!backup?.code) return api.notify('No rollback code available', 'warning');
 
     try {
-      api.notify(`Rolling back ${entry.name || pluginId} to v${backup.version}...`, 'info');
-
+      const currentVersion = entry.version;
       const dataUrl = createDataUrl(backup.code);
 
       entry.url = dataUrl;
@@ -173,30 +200,38 @@ export function setup(api) {
 
       api.notify(`Rolled back to v${entry.version}`, 'success');
 
-      setTimeout(() => injectRollbackButtons(), 800);
+      setTimeout(() => injectButtons(), 800);
     } catch (e) {
       console.error('[Rollback] Rollback failed:', e);
       api.notify('Rollback failed', 'error');
     }
   }
 
-  function openRollbackConfirm(pluginId) {
+  function openConfirm(pluginId) {
     const registry = api.registry.getAll();
     const entry = registry.find(p => p.id === pluginId);
     if (!entry) return;
 
-    const backup = getStoredBackup(pluginId);
+    const backup = getBackup(pluginId);
     if (!backup?.code) return;
+
+    const currentVersion = entry.version || entry.remoteVersion || 'unknown';
+    const revertVersion = backup.version || 'unknown';
 
     const overlay = document.createElement('div');
     overlay.className = 'rb-confirm-overlay';
     overlay.innerHTML = `
       <div class="rb-confirm-box">
         <h3 class="rb-confirm-title">Revert ${entry.name || pluginId}</h3>
-        <p class="rb-confirm-desc">This will replace the current version with <strong>v${backup.version}</strong> and reload the plugin.</p>
+        <div class="rb-version-row">
+          <span class="rb-version-from">v${currentVersion}</span>
+          <span class="rb-version-arrow">→</span>
+          <span class="rb-version-to">v${revertVersion}</span>
+        </div>
+        <p class="rb-confirm-desc">This will replace the current version with <strong>v${revertVersion}</strong> and reload the plugin.</p>
         <div class="rb-confirm-actions">
           <button class="rb-cancel-btn">Cancel</button>
-          <button class="rb-confirm-btn">Revert to v${backup.version}</button>
+          <button class="rb-confirm-btn">Revert to v${revertVersion}</button>
         </div>
       </div>
     `;
@@ -214,24 +249,15 @@ export function setup(api) {
     };
   }
 
-  function injectRollbackButtons() {
+  function injectButtons() {
     const pmList = document.querySelector('#installed .pm-list');
-    if (!pmList) {
-      return;
-    }
+    if (!pmList) return;
 
     const registry = api.registry.getAll();
     let injected = 0;
-    let skipped = 0;
 
-    const items = pmList.querySelectorAll('.plugin-item');
-    if (items.length === 0) return;
-
-    items.forEach((item) => {
-      if (item.querySelector('[data-rb]')) {
-        skipped++;
-        return;
-      }
+    pmList.querySelectorAll('.plugin-item').forEach((item) => {
+      if (item.querySelector('[data-rb]')) return;
 
       const nameEl = item.querySelector('.plugin-meta span');
       if (!nameEl) return;
@@ -240,7 +266,7 @@ export function setup(api) {
       const plugin = registry.find(p => p.id === pluginId);
       if (!plugin) return;
 
-      const backup = getStoredBackup(pluginId);
+      const backup = getBackup(pluginId);
       if (!backup?.code) return;
       if (!backup.version) return;
 
@@ -256,11 +282,10 @@ export function setup(api) {
       btn.dataset.rb = pluginId;
       btn.title = `Revert to v${backup.version}`;
       btn.innerHTML = `
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="9 14 4 9 9 4"></polyline>
           <path d="M20 20v-7a4 4 0 0 0-4-4H4"></path>
         </svg>
-        v${backup.version}
       `;
 
       const updateBtn = actionGroup.querySelector('[data-update]');
@@ -273,7 +298,7 @@ export function setup(api) {
     });
 
     if (injected > 0) {
-      console.log(`[Rollback] Injected ${injected} button(s), skipped ${skipped} existing`);
+      console.log(`[Rollback] Injected ${injected} button(s)`);
     }
   }
 
@@ -282,7 +307,7 @@ export function setup(api) {
     pollInterval = setInterval(() => {
       const pmRoot = document.querySelector('.pm-root');
       if (pmRoot && pmRoot.style.display !== 'none') {
-        injectRollbackButtons();
+        injectButtons();
       }
     }, 600);
   }
@@ -290,7 +315,7 @@ export function setup(api) {
   originalReloadPlugin = api.reloadPlugin;
   api.reloadPlugin = async function(id) {
     console.log(`[Rollback] Intercepted reloadPlugin for ${id}`);
-    await capturePluginCode(id);
+    await captureBeforeUpdate(id);
     return originalReloadPlugin.call(api, id);
   };
 
@@ -299,45 +324,14 @@ export function setup(api) {
     if (btn) {
       e.preventDefault();
       e.stopPropagation();
-      openRollbackConfirm(btn.dataset.rb);
+      openConfirm(btn.dataset.rb);
       return;
     }
   }, true);
 
   startPolling();
 
-  api.bus.on('board:allPluginsLoaded', () => {
-    console.log('[Rollback] board:allPluginsLoaded — capturing all plugins');
-    (async () => {
-      const registry = api.registry.getAll();
-      for (const plugin of registry) {
-        if (plugin.id === meta.id) continue;
-        if (!getStoredBackup(plugin.id)) {
-          await capturePluginCode(plugin.id);
-        }
-      }
-      injectRollbackButtons();
-    })();
-  });
-
-  (async () => {
-    await new Promise(r => setTimeout(r, 2000));
-    const registry = api.registry.getAll();
-    console.log(`[Rollback] Initial scan: ${registry.length} plugins in registry`);
-    for (const plugin of registry) {
-      if (plugin.id === meta.id) continue;
-      const existing = getStoredBackup(plugin.id);
-      if (existing) {
-        console.log(`[Rollback] ${plugin.id} already has backup v${existing.version}`);
-      } else {
-        const captured = await capturePluginCode(plugin.id);
-        console.log(`[Rollback] ${plugin.id} captured: ${captured}`);
-      }
-    }
-    injectRollbackButtons();
-  })();
-
-  console.log('🔙 Rollback Manager v1.0.3 loaded');
+  console.log('🔙 Rollback Manager v1.1.0 loaded');
 }
 
 export function teardown() {
