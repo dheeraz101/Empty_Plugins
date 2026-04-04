@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '3.9.9',
+  version: '4.0.0',
   compat: '>=3.3.0'
 };
 
@@ -18,8 +18,9 @@ export function setup(api) {
   const DOCS_URL = 'https://empty-ad9a3406.mintlify.app/introduction';
 
   let lastCheckedTime = 0;
-  const CACHE_TIMEOUT = 10 * 60 * 1000; 
-  let updateCount = 0; 
+  const CACHE_TIMEOUT = 10 * 60 * 1000;
+  let updateCount = 0;
+  const reloadCooldowns = new Map();
 
   // ───────── STYLE ─────────
   style = document.createElement('style');
@@ -624,6 +625,9 @@ export function setup(api) {
         api.notify('Installation failed', 'error');
       }
     };
+
+    overlay.querySelector('#pm-cancel').onclick = () => overlay.remove();
+
   }
 
   let remoteMetaCache = new Map();
@@ -869,6 +873,16 @@ export function setup(api) {
           api.notify('Plugin Manager cannot reload itself', 'warning');
           return;
         }
+
+      const cooldownMs = 1000;
+      const lastReload = reloadCooldowns.get(id) || 0;
+      const now = Date.now();
+      if (now - lastReload < cooldownMs) {
+        api.notify('Please wait before reloading again', 'warning');
+        return;
+      }
+      reloadCooldowns.set(id, now);
+
       const plugin = api.registry.getAll().find(p => p.id === id);
       if (!plugin || (!plugin.enabled && id !== SELF_ID)) {
         api.notify('Enable the plugin first before reloading', 'warning');
