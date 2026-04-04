@@ -1,17 +1,16 @@
 // ╔════════════════════════════════════════════════════════════╗
-// ║  ROLLBACK MANAGER  v2.1.0                                  ║
-// ║  • "Manage Snapshots" button injected after "Install via   ║
-// ║    URL" in the Plugin Manager sidebar via registerUI       ║
-// ║  • Selector popup: choose up to 10 plugins to track       ║
-// ║  • Snapshots are LOCKED — never auto-overwritten           ║
-// ║  • Per-card: ↩ rollback btn + ⚙ manage btn               ║
-// ║  • Manage popup: Regenerate / Delete / Stop Tracking       ║
+// ║  ROLLBACK MANAGER  v2.2.0                                  ║
+// ║  • "Manage Snapshots" button in PM sidebar (after Install) ║
+// ║  • Selector popup with per-plugin manage options           ║
+// ║  • No per-card gear button — all management in main popup  ║
+// ║  • Snapshots LOCKED — never auto-overwritten               ║
+// ║  • Per-card: ↩ rollback button only (when version differs) ║
 // ╚════════════════════════════════════════════════════════════╝
 
 export const meta = {
   id: 'rollback-manager',
   name: 'Rollback Manager',
-  version: '2.1.0',
+  version: '2.2.0',
   compat: '>=4.0.0'
 };
 
@@ -52,30 +51,18 @@ async function fetchCode(url) {
     const sep = url.includes('?') ? '&' : '?';
     const res = await fetch(url + sep + 't=' + Date.now());
     return res.ok ? await res.text() : null;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
 // ── Capture snapshot ──────────────────────────────────────────────────────────
 async function captureSnapshot(api, pluginId) {
   const entry = api.registry.getAll().find(p => p.id === pluginId);
   if (!entry) return false;
-
   const remoteUrl = (entry.originalUrl && !entry.originalUrl.startsWith('blob:') && !entry.originalUrl.startsWith('data:'))
-    ? entry.originalUrl
-    : entry.url;
-
+    ? entry.originalUrl : entry.url;
   const code = await fetchCode(remoteUrl);
   if (!code) return false;
-
-  setSnapshot(pluginId, {
-    code,
-    version: entry.version || null,
-    url: remoteUrl,
-    timestamp: Date.now()
-  });
-
+  setSnapshot(pluginId, { code, version: entry.version || null, url: remoteUrl, timestamp: Date.now() });
   console.log('[Rollback] Captured ' + pluginId + ' v' + (entry.version || '?'));
   return true;
 }
@@ -87,7 +74,7 @@ function createDataUrl(code) {
 // ── CSS ───────────────────────────────────────────────────────────────────────
 function buildCSS() {
   return `
-    /* ── Sidebar "Manage Snapshots" button ── */
+    /* Sidebar button */
     .rb-sidebar-btn {
       width: 100%;
       padding: 8px 12px;
@@ -110,7 +97,7 @@ function buildCSS() {
       border-color: rgba(255,149,0,0.28);
     }
 
-    /* ── Per-card rollback button ── */
+    /* Per-card rollback button */
     .pm-btn-rollback {
       background: rgba(255,149,0,0.1);
       color: #d97706;
@@ -133,21 +120,7 @@ function buildCSS() {
       border-color: rgba(255,149,0,0.25);
     }
 
-    /* ── Per-card manage (gear) button ── */
-    .pm-btn-rb-gear {
-      background: rgba(0,0,0,0.04);
-      border: 1px solid rgba(0,0,0,0.08);
-      color: #8e8e93;
-      width: 30px; height: 30px; min-width: 30px;
-      border-radius: 50%;
-      cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      transition: all 0.15s;
-      padding: 0;
-    }
-    .pm-btn-rb-gear:hover { background: rgba(0,0,0,0.08); color: #1d1d1f; }
-
-    /* ── Overlay + modal base ── */
+    /* Overlay */
     .rb-overlay {
       position: fixed; inset: 0;
       background: rgba(0,0,0,0.22);
@@ -159,6 +132,7 @@ function buildCSS() {
     }
     @keyframes rb-fi { from { opacity:0 } to { opacity:1 } }
 
+    /* Modal */
     .rb-modal {
       background: rgba(255,255,255,0.97);
       border-radius: 22px;
@@ -166,111 +140,140 @@ function buildCSS() {
       box-shadow: 0 24px 60px rgba(0,0,0,0.13), 0 2px 8px rgba(0,0,0,0.06);
       border: 1px solid rgba(0,0,0,0.08);
       font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", Helvetica Neue, sans-serif;
-      width: 480px;
+      width: 500px;
       max-width: calc(100vw - 40px);
-      max-height: 80vh;
+      max-height: 82vh;
       display: flex;
       flex-direction: column;
       animation: rb-su 0.2s cubic-bezier(0.16,1,0.3,1);
     }
     @keyframes rb-su { from { transform:translateY(10px);opacity:0 } to { transform:none;opacity:1 } }
 
-    .rb-title  { font-size:20px; font-weight:700; color:#1d1d1f; margin:0 0 3px; letter-spacing:-0.3px; flex-shrink:0; }
-    .rb-sub    { font-size:13px; color:#8e8e93; margin:0 0 18px; flex-shrink:0; }
-    .rb-hr     { height:1px; background:rgba(0,0,0,0.08); margin:0 0 18px; flex-shrink:0; }
-    .rb-info   { font-size:13px; color:#6e6e73; margin-bottom:18px; line-height:1.65; }
-    .rb-info strong { color:#1d1d1f; }
+    .rb-title { font-size:20px; font-weight:700; color:#1d1d1f; margin:0 0 3px; letter-spacing:-0.3px; flex-shrink:0; }
+    .rb-sub   { font-size:13px; color:#8e8e93; margin:0 0 18px; flex-shrink:0; }
+    .rb-hr    { height:1px; background:rgba(0,0,0,0.08); margin:0 0 16px; flex-shrink:0; }
 
-    /* Plugin selector list */
+    /* Plugin rows in main popup */
     .rb-list {
       overflow-y: auto; flex:1;
-      display: flex; flex-direction: column; gap:8px;
+      display: flex; flex-direction: column; gap:10px;
       margin-bottom:18px;
       scrollbar-width:thin; scrollbar-color:rgba(0,0,0,0.1) transparent;
     }
-    .rb-row {
+
+    /* Untracked row — simple checkbox style */
+    .rb-row-untracked {
       display:flex; align-items:center; gap:12px;
-      padding:10px 14px; border-radius:12px;
-      border:1.5px solid rgba(0,0,0,0.08);
+      padding:11px 14px; border-radius:13px;
+      border:1.5px solid rgba(0,0,0,0.07);
       cursor:pointer; transition:all 0.14s; user-select:none;
     }
-    .rb-row:hover:not(.rb-dis) { background:rgba(0,0,0,0.025); border-color:rgba(0,0,0,0.13); }
-    .rb-row.rb-sel { background:rgba(0,122,255,0.06); border-color:rgba(0,122,255,0.35); }
-    .rb-row.rb-dis { opacity:0.4; cursor:not-allowed; }
+    .rb-row-untracked:hover { background:rgba(0,0,0,0.025); border-color:rgba(0,0,0,0.12); }
+    .rb-row-untracked.rb-sel { background:rgba(0,122,255,0.06); border-color:rgba(0,122,255,0.3); }
+    .rb-row-untracked.rb-dis { opacity:0.38; cursor:not-allowed; }
 
     .rb-chk {
       width:20px; height:20px; border-radius:50%;
-      border:2px solid rgba(0,0,0,0.2);
+      border:2px solid rgba(0,0,0,0.18);
       display:flex; align-items:center; justify-content:center;
       flex-shrink:0; transition:all 0.14s;
     }
-    .rb-row.rb-sel .rb-chk { background:#007AFF; border-color:#007AFF; }
+    .rb-row-untracked.rb-sel .rb-chk { background:#007AFF; border-color:#007AFF; }
     .rb-dot { width:8px; height:8px; border-radius:50%; background:white; opacity:0; transition:opacity 0.14s; }
-    .rb-row.rb-sel .rb-dot { opacity:1; }
+    .rb-row-untracked.rb-sel .rb-dot { opacity:1; }
 
-    .rb-pname { font-size:14px; font-weight:600; color:#1d1d1f; }
-    .rb-pid   { font-size:12px; color:#8e8e93; }
-    .rb-snap-ok {
-      margin-left:auto; font-size:11px; font-weight:600;
-      padding:2px 8px; border-radius:999px;
-      background:rgba(52,199,89,0.15); color:#248a3d; white-space:nowrap;
+    /* Tracked row — expanded card with action buttons */
+    .rb-row-tracked {
+      border:1.5px solid rgba(0,122,255,0.2);
+      border-radius:13px;
+      background: rgba(0,122,255,0.03);
+      overflow:hidden;
     }
-    .rb-limit { font-size:12px; color:#ff9500; text-align:center; margin-bottom:13px; flex-shrink:0; }
+    .rb-row-tracked-header {
+      display:flex; align-items:center; gap:12px;
+      padding:11px 14px;
+    }
+    .rb-tracked-icon {
+      width:8px; height:8px; border-radius:50%;
+      background:#007AFF; flex-shrink:0;
+    }
+    .rb-tracked-actions {
+      display:flex; gap:7px;
+      padding:0 14px 11px 34px;
+    }
+    .rb-tracked-actions button {
+      padding:5px 12px; border-radius:999px;
+      font-size:12px; font-weight:600; border:none; cursor:pointer;
+      transition:all 0.15s; display:flex; align-items:center; gap:5px;
+    }
+    .rb-act-regen  { background:rgba(0,122,255,0.1); color:#0071e3; }
+    .rb-act-regen:hover  { background:rgba(0,122,255,0.18); }
+    .rb-act-del    { background:rgba(0,0,0,0.05); color:#6e6e73; }
+    .rb-act-del:hover    { background:rgba(0,0,0,0.09); }
+    .rb-act-stop   { background:rgba(255,59,48,0.08); color:#ff3b30; }
+    .rb-act-stop:hover   { background:rgba(255,59,48,0.15); }
 
-    /* Action row */
-    .rb-actions { display:flex; gap:10px; flex-shrink:0; }
-    .rb-actions button {
+    .rb-pname  { font-size:14px; font-weight:600; color:#1d1d1f; }
+    .rb-pid    { font-size:12px; color:#8e8e93; }
+    .rb-snap-badge {
+      margin-left:auto; font-size:11px; font-weight:600; padding:2px 8px;
+      border-radius:999px; white-space:nowrap;
+    }
+    .rb-snap-badge.ok  { background:rgba(52,199,89,0.15); color:#248a3d; }
+    .rb-snap-badge.nil { background:rgba(142,142,147,0.15); color:#8e8e93; }
+
+    .rb-limit { font-size:12px; color:#ff9500; text-align:center; margin-bottom:12px; flex-shrink:0; }
+
+    /* Bottom action row */
+    .rb-footer { display:flex; gap:10px; flex-shrink:0; }
+    .rb-footer button {
       flex:1; padding:11px 16px; border-radius:999px;
       font-size:14px; font-weight:600; border:none; cursor:pointer; transition:all 0.18s;
     }
-    .rb-cancel { background:rgba(0,0,0,0.05); color:#1d1d1f; }
-    .rb-cancel:hover { background:rgba(0,0,0,0.09); }
-    .rb-primary { background:#007AFF; color:white; }
-    .rb-primary:hover { background:#0066dd; }
-    .rb-warn { background:#ff9500; color:white; }
-    .rb-warn:hover { background:#e08600; }
-    .rb-danger { background:rgba(255,59,48,0.1); color:#ff3b30; border:1px solid rgba(255,59,48,0.18) !important; }
-    .rb-danger:hover { background:rgba(255,59,48,0.18); }
+    .rb-btn-cancel  { background:rgba(0,0,0,0.05); color:#1d1d1f; }
+    .rb-btn-cancel:hover  { background:rgba(0,0,0,0.09); }
+    .rb-btn-primary { background:#007AFF; color:white; }
+    .rb-btn-primary:hover { background:#0066dd; }
 
-    /* Manage grid */
-    .rb-mgrid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:18px; }
-
-    /* Version row */
+    /* Rollback confirm modal reuse */
     .rb-ver-old   { color:#8e8e93; text-decoration:line-through; }
     .rb-ver-arrow { color:#8e8e93; margin:0 4px; }
     .rb-ver-new   { color:#ff9500; font-weight:700; }
-
     .rb-confirm-desc { font-size:14px; color:#6e6e73; margin:12px 0 22px; line-height:1.55; }
+    .rb-btn-warn  { background:#ff9500; color:white; }
+    .rb-btn-warn:hover { background:#e08600; }
 
     /* Spinner */
     .rb-spin {
       display:inline-block; width:13px; height:13px;
       border:2px solid rgba(255,255,255,0.35); border-top-color:white;
       border-radius:50%; animation:rb-sp 0.7s linear infinite;
-      vertical-align:middle; margin-right:4px;
+      vertical-align:middle; margin-right:3px;
+    }
+    .rb-spin.dark {
+      border-color:rgba(0,113,227,0.25); border-top-color:#0071e3;
     }
     @keyframes rb-sp { to { transform:rotate(360deg); } }
 
-    /* ── Dark mode ── */
+    /* Dark mode */
     @media (prefers-color-scheme: dark) {
       .rb-sidebar-btn { color:#ffb340; background:rgba(255,149,0,0.12); border-color:rgba(255,149,0,0.22); }
       .rb-sidebar-btn:hover { background:rgba(255,149,0,0.2); color:#ffc566; }
       .pm-btn-rollback { background:rgba(255,149,0,0.15); color:#ffb340; border-color:rgba(255,149,0,0.2); }
       .pm-btn-rollback:hover { background:rgba(255,149,0,0.25); color:#ffc566; }
-      .pm-btn-rb-gear { background:rgba(255,255,255,0.08); border-color:rgba(255,255,255,0.1); color:#8e8e93; }
-      .pm-btn-rb-gear:hover { background:rgba(255,255,255,0.14); color:#f5f5f7; }
       .rb-modal { background:rgba(30,30,32,0.97); border-color:rgba(255,255,255,0.1); box-shadow:0 24px 60px rgba(0,0,0,0.5); }
       .rb-title { color:#f5f5f7; }
       .rb-sub   { color:#6e6e73; }
       .rb-hr    { background:rgba(255,255,255,0.08); }
-      .rb-info  { color:#a1a1a6; }
-      .rb-info strong { color:#f5f5f7; }
-      .rb-row { border-color:rgba(255,255,255,0.1); }
-      .rb-row:hover:not(.rb-dis) { background:rgba(255,255,255,0.04); border-color:rgba(255,255,255,0.16); }
-      .rb-row.rb-sel { background:rgba(0,122,255,0.12); border-color:rgba(10,132,255,0.4); }
+      .rb-row-untracked { border-color:rgba(255,255,255,0.09); }
+      .rb-row-untracked:hover { background:rgba(255,255,255,0.04); border-color:rgba(255,255,255,0.14); }
+      .rb-row-untracked.rb-sel { background:rgba(0,122,255,0.1); border-color:rgba(10,132,255,0.35); }
+      .rb-row-tracked { border-color:rgba(10,132,255,0.25); background:rgba(0,122,255,0.06); }
       .rb-pname { color:#f5f5f7; }
-      .rb-cancel { background:rgba(255,255,255,0.1); color:#f5f5f7; }
-      .rb-cancel:hover { background:rgba(255,255,255,0.16); }
+      .rb-act-del { background:rgba(255,255,255,0.08); color:#a1a1a6; }
+      .rb-act-del:hover { background:rgba(255,255,255,0.13); }
+      .rb-btn-cancel { background:rgba(255,255,255,0.1); color:#f5f5f7; }
+      .rb-btn-cancel:hover { background:rgba(255,255,255,0.16); }
       .rb-limit { color:#ffb340; }
       .rb-confirm-desc { color:#a1a1a6; }
     }
@@ -285,9 +288,7 @@ export async function setup(api) {
   style.textContent = buildCSS();
   document.head.appendChild(style);
 
-  // ── Intercept reloadPlugin ─────────────────────────────────────────────────
-  // ONLY opportunistically captures if tracked but no snapshot exists yet.
-  // Snapshots are NEVER auto-overwritten on update — must be manually regenerated.
+  // Intercept reloadPlugin — opportunistic capture only (tracked + no snapshot yet)
   originalReloadPlugin = api.reloadPlugin;
   api.reloadPlugin = async function(id) {
     const entry = api.registry.getAll().find(p => p.id === id);
@@ -299,11 +300,10 @@ export async function setup(api) {
     return originalReloadPlugin.call(api, id);
   };
 
-  // ── Inject "Manage Snapshots" button after Install via URL ─────────────────
+  // Inject sidebar button + rollback card buttons
   function tryInjectSidebarButton() {
     const pmActions = document.querySelector('#pm-actions');
     if (!pmActions || pmActions.querySelector('.rb-sidebar-btn')) return;
-
     const btn = document.createElement('button');
     btn.className = 'rb-sidebar-btn';
     btn.innerHTML = `
@@ -315,11 +315,7 @@ export async function setup(api) {
       Manage Snapshots
     `;
     btn.title = 'Manage Rollback Snapshots';
-    btn.onclick = (e) => {
-      e.stopPropagation();
-      openSelectorPopup(api);
-    };
-
+    btn.onclick = (e) => { e.stopPropagation(); openMainPopup(api); };
     pmActions.appendChild(btn);
   }
 
@@ -330,196 +326,211 @@ export async function setup(api) {
     injectCardButtons(api);
   }, 600);
 
+  // Rollback card button click
   document.addEventListener('click', e => {
     const rb = e.target.closest('[data-rb-rollback]');
     if (rb) {
-      e.preventDefault();
-      e.stopPropagation();
+      e.preventDefault(); e.stopPropagation();
       openRollbackConfirm(api, rb.dataset.rbRollback);
-      return;
-    }
-
-    const mg = e.target.closest('[data-rb-manage]');
-    if (mg) {
-      e.preventDefault();
-      e.stopPropagation();
-      openManagePopup(api, mg.dataset.rbManage);
-      return;
     }
   }, true);
 
   await new Promise(r => setTimeout(r, 700));
-  openSelectorPopup(api);
+  openMainPopup(api);
 
-  console.log('🔙 Rollback Manager v2.1.0 loaded');
+  console.log('\uD83D\uDD19 Rollback Manager v2.2.0 loaded');
 }
 
-// ── POPUP 1 — Plugin Selector ─────────────────────────────────────────────────
-function openSelectorPopup(api) {
-  const registry = api.registry.getAll();
-  const eligible = registry.filter(p => p.id !== 'rollback-manager' && p.id !== 'plugin-manager');
-  const selectedSet = new Set(loadTracked());
-
+// ── MAIN POPUP — unified selector + per-plugin management ─────────────────────
+function openMainPopup(api) {
   const overlay = document.createElement('div');
   overlay.className = 'rb-overlay';
+  document.documentElement.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
 
-  function render() {
-    const atLimit = selectedSet.size >= MAX_TRACKED;
+  // newlySelected tracks plugins the user has checkmarked this session (not yet saved)
+  const newlySelected = new Set();
+
+  async function render() {
+    const registry = api.registry.getAll();
+    const eligible = registry.filter(p => p.id !== 'rollback-manager' && p.id !== 'plugin-manager');
+    const tracked  = new Set(loadTracked());
+    const atLimit  = tracked.size + newlySelected.size >= MAX_TRACKED;
+
+    const trackedPlugins   = eligible.filter(p => tracked.has(p.id));
+    const untrackedPlugins = eligible.filter(p => !tracked.has(p.id));
 
     overlay.innerHTML = `
       <div class="rb-modal">
-        <h3 class="rb-title">🛡️ Rollback Manager</h3>
+        <h3 class="rb-title">\uD83D\uDEE1\uFE0F Rollback Manager</h3>
         <p class="rb-sub">
-          Select plugins to protect. Max ${MAX_TRACKED}.
-          Snapshots are <strong>locked</strong> until you manually regenerate.
+          Tracked plugins get a locked snapshot.
+          Max ${MAX_TRACKED} plugins. Manage or add below.
         </p>
         <div class="rb-hr"></div>
-        ${atLimit ? `<div class="rb-limit">⚠️ Limit reached (${MAX_TRACKED}). Deselect one to add another.</div>` : ''}
+
+        ${(tracked.size + newlySelected.size) >= MAX_TRACKED
+          ? `<div class="rb-limit">\u26A0\uFE0F Limit reached (${MAX_TRACKED}). Remove a tracked plugin to add another.</div>`
+          : ''}
+
         <div class="rb-list">
-          ${eligible.length === 0
-            ? `<div style="text-align:center;color:#8e8e93;padding:20px;font-size:14px">No eligible plugins installed.</div>`
-            : eligible.map(p => {
-                const snap = getSnapshot(p.id);
-                const sel  = selectedSet.has(p.id);
-                const dis  = !sel && atLimit;
-                return `
-                  <div class="rb-row ${sel ? 'rb-sel' : ''} ${dis ? 'rb-dis' : ''}" data-rbsel="${p.id}">
-                    <div class="rb-chk"><div class="rb-dot"></div></div>
-                    <div>
+
+          ${trackedPlugins.length > 0 ? `
+            <div style="font-size:11px;font-weight:700;color:#8e8e93;text-transform:uppercase;letter-spacing:.8px;padding:0 2px;margin-bottom:2px">
+              Tracked (${trackedPlugins.length})
+            </div>
+            ${trackedPlugins.map(p => {
+              const snap    = getSnapshot(p.id);
+              const snapVer = snap?.version || null;
+              const snapDate = snap?.timestamp
+                ? new Date(snap.timestamp).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' })
+                : null;
+              return `
+                <div class="rb-row-tracked">
+                  <div class="rb-row-tracked-header">
+                    <div class="rb-tracked-icon"></div>
+                    <div style="flex:1;min-width:0">
                       <div class="rb-pname">${p.name || p.id}</div>
                       <div class="rb-pid">${p.id}${p.version ? ' · v' + p.version : ''}</div>
                     </div>
-                    ${snap ? `<span class="rb-snap-ok">✓ v${snap.version || '?'}</span>` : ''}
-                  </div>`;
-              }).join('')}
+                    ${snap
+                      ? `<span class="rb-snap-badge ok">\u2713 v${snapVer || '?'}</span>`
+                      : `<span class="rb-snap-badge nil">No snapshot</span>`}
+                  </div>
+                  <div class="rb-tracked-actions">
+                    <button class="rb-act-regen" data-regen="${p.id}">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                      </svg>
+                      Regenerate${snapDate ? ' · ' + snapDate : ''}
+                    </button>
+                    <button class="rb-act-del" data-delsnap="${p.id}" ${!snap ? 'disabled style="opacity:0.38"' : ''}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>
+                      </svg>
+                      Delete
+                    </button>
+                    <button class="rb-act-stop" data-stoptrack="${p.id}">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                      </svg>
+                      Stop Tracking
+                    </button>
+                  </div>
+                </div>`;
+            }).join('')}
+          ` : ''}
+
+          ${untrackedPlugins.length > 0 ? `
+            <div style="font-size:11px;font-weight:700;color:#8e8e93;text-transform:uppercase;letter-spacing:.8px;padding:0 2px;margin-top:${trackedPlugins.length > 0 ? '6' : '0'}px;margin-bottom:2px">
+              Not Tracked
+            </div>
+            ${untrackedPlugins.map(p => {
+              const sel = newlySelected.has(p.id);
+              const dis = !sel && atLimit;
+              return `
+                <div class="rb-row-untracked ${sel ? 'rb-sel' : ''} ${dis ? 'rb-dis' : ''}" data-addtrack="${p.id}">
+                  <div class="rb-chk"><div class="rb-dot"></div></div>
+                  <div style="flex:1;min-width:0">
+                    <div class="rb-pname">${p.name || p.id}</div>
+                    <div class="rb-pid">${p.id}${p.version ? ' · v' + p.version : ''}</div>
+                  </div>
+                </div>`;
+            }).join('')}
+          ` : ''}
+
+          ${eligible.length === 0 ? `
+            <div style="text-align:center;color:#8e8e93;padding:24px;font-size:14px">
+              No eligible plugins installed.
+            </div>` : ''}
         </div>
-        <div class="rb-actions">
-          <button class="rb-cancel" id="rb-sel-cancel">Cancel</button>
-          <button class="rb-primary" id="rb-sel-save">
-            Save &amp; Capture${selectedSet.size > 0 ? ' (' + selectedSet.size + ')' : ''}
-          </button>
+
+        <div class="rb-footer">
+          <button class="rb-btn-cancel" id="rb-main-close">Close</button>
+          ${newlySelected.size > 0
+            ? `<button class="rb-btn-primary" id="rb-main-save">
+                 Capture &amp; Track (${newlySelected.size})
+               </button>`
+            : ''}
         </div>
       </div>
     `;
 
-    overlay.querySelectorAll('[data-rbsel]').forEach(row => {
+    // ── Close / Save
+    overlay.querySelector('#rb-main-close').onclick = () => overlay.remove();
+
+    const saveBtn = overlay.querySelector('#rb-main-save');
+    if (saveBtn) {
+      saveBtn.onclick = async () => {
+        saveBtn.innerHTML = '<span class="rb-spin"></span> Capturing\u2026';
+        saveBtn.disabled = true;
+        let captured = 0;
+        for (const id of newlySelected) {
+          addTracked(id);
+          if (!getSnapshot(id)) {
+            const ok = await captureSnapshot(api, id);
+            if (ok) captured++;
+          }
+        }
+        newlySelected.clear();
+        api.notify(`\u2713 ${captured} snapshot(s) saved.`, 'success');
+        render(); // re-render in place
+      };
+    }
+
+    // ── Toggle untracked row selection
+    overlay.querySelectorAll('[data-addtrack]').forEach(row => {
       row.addEventListener('click', () => {
         if (row.classList.contains('rb-dis')) return;
-        const id = row.dataset.rbsel;
-        selectedSet.has(id) ? selectedSet.delete(id) : (selectedSet.size < MAX_TRACKED && selectedSet.add(id));
+        const id = row.dataset.addtrack;
+        newlySelected.has(id) ? newlySelected.delete(id) : (newlySelected.size + tracked.size < MAX_TRACKED && newlySelected.add(id));
         render();
       });
     });
 
-    overlay.querySelector('#rb-sel-cancel').onclick = () => overlay.remove();
-
-    overlay.querySelector('#rb-sel-save').onclick = async () => {
-      const btn = overlay.querySelector('#rb-sel-save');
-      btn.innerHTML = '<span class="rb-spin"></span> Capturing…';
-      btn.disabled = true;
-
-      const prev = new Set(loadTracked());
-      for (const id of prev) {
-        if (!selectedSet.has(id)) removeTracked(id);
-      }
-
-      let captured = 0;
-      for (const id of selectedSet) {
-        addTracked(id);
-        if (!getSnapshot(id)) {
-          const ok = await captureSnapshot(api, id);
-          if (ok) captured++;
+    // ── Regenerate
+    overlay.querySelectorAll('[data-regen]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.regen;
+        btn.innerHTML = '<span class="rb-spin dark"></span> Fetching\u2026';
+        btn.disabled = true;
+        const ok = await captureSnapshot(api, id);
+        if (ok) {
+          const ns = getSnapshot(id);
+          api.notify(`\u2713 Snapshot regenerated: ${id} v${ns?.version || '?'}`, 'success');
+        } else {
+          api.notify('Could not fetch source. Check network/URL.', 'error');
         }
-      }
+        render();
+      });
+    });
 
-      overlay.remove();
-      api.notify(`✓ Tracking ${selectedSet.size} plugin(s). ${captured} new snapshot(s) saved.`, 'success');
-    };
+    // ── Delete snapshot only
+    overlay.querySelectorAll('[data-delsnap]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        deleteSnapshot(btn.dataset.delsnap);
+        api.notify('Snapshot deleted. Plugin still tracked.', 'info');
+        render();
+      });
+    });
+
+    // ── Stop tracking
+    overlay.querySelectorAll('[data-stoptrack]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        removeTracked(btn.dataset.stoptrack);
+        api.notify(btn.dataset.stoptrack + ' removed from tracking.', 'info');
+        render();
+      });
+    });
   }
 
   render();
-  document.documentElement.appendChild(overlay);
-  overlay.addEventListener('click', e => {
-    if (e.target === overlay) overlay.remove();
-  });
 }
 
-// ── POPUP 2 — Manage snapshot ─────────────────────────────────────────────────
-function openManagePopup(api, pluginId) {
-  const entry = api.registry.getAll().find(p => p.id === pluginId);
-  if (!entry) return;
-
-  const snap       = getSnapshot(pluginId);
-  const currentVer = entry.version || entry.remoteVersion || 'unknown';
-  const snapVer    = snap?.version || 'none';
-  const snapDate   = snap?.timestamp ? new Date(snap.timestamp).toLocaleString() : '—';
-
-  const overlay = document.createElement('div');
-  overlay.className = 'rb-overlay';
-  overlay.innerHTML = `
-    <div class="rb-modal">
-      <h3 class="rb-title">Manage Snapshot</h3>
-      <p class="rb-sub">${entry.name || pluginId}</p>
-      <div class="rb-hr"></div>
-      <div class="rb-info">
-        <strong>Plugin ID:</strong> ${pluginId}<br>
-        <strong>Installed version:</strong> v${currentVer}<br>
-        ${snap
-          ? `<strong>Snapshot version:</strong> v${snapVer}<br><strong>Captured:</strong> ${snapDate}`
-          : `<span style="color:#ff9500">⚠️ No snapshot saved yet.</span>`}
-      </div>
-      <div class="rb-mgrid">
-        <button class="rb-primary" id="rb-mg-regen">🔄 Regenerate Snapshot</button>
-        <button class="rb-cancel" id="rb-mg-del" ${!snap ? 'disabled style="opacity:0.42"' : ''}>🗑 Delete Snapshot</button>
-        <button class="rb-danger" id="rb-mg-stop" style="grid-column:1/-1">✕ Stop Tracking This Plugin</button>
-      </div>
-      <div class="rb-actions">
-        <button class="rb-cancel" id="rb-mg-close">Close</button>
-      </div>
-    </div>
-  `;
-
-  document.documentElement.appendChild(overlay);
-  overlay.addEventListener('click', e => {
-    if (e.target === overlay) overlay.remove();
-  });
-
-  overlay.querySelector('#rb-mg-close').onclick = () => overlay.remove();
-
-  overlay.querySelector('#rb-mg-regen').onclick = async () => {
-    const btn = overlay.querySelector('#rb-mg-regen');
-    btn.innerHTML = '<span class="rb-spin"></span> Fetching…';
-    btn.disabled = true;
-
-    const ok = await captureSnapshot(api, pluginId);
-    overlay.remove();
-
-    if (ok) {
-      const ns = getSnapshot(pluginId);
-      api.notify(`✓ Snapshot regenerated: ${pluginId} v${ns?.version || '?'}`, 'success');
-    } else {
-      api.notify('Could not fetch plugin source. Check network/URL.', 'error');
-    }
-  };
-
-  overlay.querySelector('#rb-mg-del').onclick = () => {
-    deleteSnapshot(pluginId);
-    overlay.remove();
-    api.notify(`Snapshot deleted. ${pluginId} is still tracked.`, 'info');
-  };
-
-  overlay.querySelector('#rb-mg-stop').onclick = () => {
-    removeTracked(pluginId);
-    overlay.remove();
-    api.notify(`${pluginId} removed from Rollback tracking.`, 'info');
-  };
-}
-
-// ── POPUP 3 — Rollback confirm ────────────────────────────────────────────────
+// ── ROLLBACK CONFIRM ──────────────────────────────────────────────────────────
 function openRollbackConfirm(api, pluginId) {
   const entry = api.registry.getAll().find(p => p.id === pluginId);
   if (!entry) return;
-
   const snap = getSnapshot(pluginId);
   if (!snap?.code) return api.notify('No snapshot available', 'warning');
 
@@ -534,28 +545,26 @@ function openRollbackConfirm(api, pluginId) {
       <div class="rb-hr"></div>
       <div style="font-size:14px;margin-bottom:4px">
         <span class="rb-ver-old">v${currentVer}</span>
-        <span class="rb-ver-arrow">→</span>
+        <span class="rb-ver-arrow">\u2192</span>
         <span class="rb-ver-new">v${snapVer}</span>
       </div>
       <p class="rb-confirm-desc">
-        The plugin will be replaced with the <strong>v${snapVer}</strong> snapshot and reloaded.<br><br>
+        The plugin will be replaced with the <strong>v${snapVer}</strong> snapshot
+        and reloaded immediately.<br><br>
         <span style="color:#ff9500;font-size:13px">
-          ⚠️ Snapshot stays locked after rollback.
-          Use ⚙️ Manage Snapshot to regenerate it.
+          \u26A0\uFE0F The snapshot stays locked after rollback.
+          Open <strong>Manage Snapshots</strong> to regenerate it.
         </span>
       </p>
-      <div class="rb-actions">
-        <button class="rb-cancel" id="rb-cf-cancel">Cancel</button>
-        <button class="rb-warn" id="rb-cf-ok">Revert to v${snapVer}</button>
+      <div class="rb-footer">
+        <button class="rb-btn-cancel" id="rb-cf-cancel">Cancel</button>
+        <button class="rb-btn-warn" id="rb-cf-ok">Revert to v${snapVer}</button>
       </div>
     </div>
   `;
 
   document.documentElement.appendChild(overlay);
-  overlay.addEventListener('click', e => {
-    if (e.target === overlay) overlay.remove();
-  });
-
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
   overlay.querySelector('#rb-cf-cancel').onclick = () => overlay.remove();
   overlay.querySelector('#rb-cf-ok').onclick = async () => {
     overlay.remove();
@@ -574,8 +583,7 @@ async function performRollback(api, pluginId) {
 
   try {
     const remoteUrl = (entry.originalUrl && !entry.originalUrl.startsWith('blob:') && !entry.originalUrl.startsWith('data:'))
-      ? entry.originalUrl
-      : (snap.url || entry.url);
+      ? entry.originalUrl : (snap.url || entry.url);
 
     entry.url = createDataUrl(snap.code);
     entry.originalUrl = remoteUrl;
@@ -591,14 +599,14 @@ async function performRollback(api, pluginId) {
       api.registry.save([...reg2]);
     }
 
-    api.notify(`✓ Rolled back ${entry.name || pluginId} to v${snap.version}`, 'success');
+    api.notify(`\u2713 Rolled back ${entry.name || pluginId} to v${snap.version}`, 'success');
   } catch(e) {
     console.error('[Rollback] performRollback failed', e);
     api.notify('Rollback failed — check console', 'error');
   }
 }
 
-// ── Inject per-card buttons ───────────────────────────────────────────────────
+// ── Inject ↩ rollback button into each plugin card ────────────────────────────
 function injectCardButtons(api) {
   const pmList = document.querySelector('#installed .pm-list');
   if (!pmList) return;
@@ -619,55 +627,38 @@ function injectCardButtons(api) {
     const actionGroup = item.querySelector('.pm-action-group');
     if (!actionGroup) return;
 
+    // Remove stale button before re-evaluating
     actionGroup.querySelector('[data-rb-rollback]')?.remove();
-    actionGroup.querySelector('[data-rb-manage]')?.remove();
-
-    const gearBtn = document.createElement('button');
-    gearBtn.className = 'pm-btn pm-btn-rb-gear';
-    gearBtn.dataset.rbManage = pluginId;
-    gearBtn.title = 'Manage Rollback Snapshot';
-    gearBtn.innerHTML = `
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-        stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="3"/>
-        <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/>
-      </svg>`;
-    actionGroup.appendChild(gearBtn);
 
     const snap = getSnapshot(pluginId);
-    if (snap?.code && snap.version) {
-      const currentVer = plugin.version || plugin.remoteVersion;
-      if (currentVer && snap.version !== currentVer) {
-        const rbBtn = document.createElement('button');
-        rbBtn.className = 'pm-btn pm-btn-rollback';
-        rbBtn.dataset.rbRollback = pluginId;
-        rbBtn.title = `Revert to v${snap.version}`;
-        rbBtn.innerHTML = `
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="9 14 4 9 9 4"/>
-            <path d="M20 20v-7a4 4 0 0 0-4-4H4"/>
-          </svg>
-          v${snap.version}
-        `;
-        const updateBtn = actionGroup.querySelector('[data-update]');
-        if (updateBtn) actionGroup.insertBefore(rbBtn, updateBtn);
-        else actionGroup.insertBefore(rbBtn, gearBtn);
-      }
-    }
+    if (!snap?.code || !snap.version) return;
+
+    const currentVer = plugin.version || plugin.remoteVersion;
+    if (!currentVer || snap.version === currentVer) return;
+
+    const rbBtn = document.createElement('button');
+    rbBtn.className = 'pm-btn pm-btn-rollback';
+    rbBtn.dataset.rbRollback = pluginId;
+    rbBtn.title = `Revert to v${snap.version}`;
+    rbBtn.innerHTML = `
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="9 14 4 9 9 4"/>
+        <path d="M20 20v-7a4 4 0 0 0-4-4H4"/>
+      </svg>
+      v${snap.version}
+    `;
+
+    const updateBtn = actionGroup.querySelector('[data-update]');
+    if (updateBtn) actionGroup.insertBefore(rbBtn, updateBtn);
+    else actionGroup.appendChild(rbBtn);
   });
 }
 
 // ── Teardown ──────────────────────────────────────────────────────────────────
 export function teardown() {
-  if (style) {
-    style.remove();
-    style = null;
-  }
-  if (pollInterval) {
-    clearInterval(pollInterval);
-    pollInterval = null;
-  }
+  if (style)        { style.remove(); style = null; }
+  if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
   if (originalReloadPlugin && apiRef) {
     apiRef.reloadPlugin = originalReloadPlugin;
     originalReloadPlugin = null;
