@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '4.0.3',
+  version: '4.0.4',
   compat: '>=3.3.0'
 };
 
@@ -554,23 +554,61 @@ export function setup(api) {
     return URL.createObjectURL(blob);
   }
 
+  function createDataUrl(code) {
+    return 'data:application/javascript;charset=utf-8,' + encodeURIComponent(code);
+  }
+
   function restorePluginBackups() {
     if (!api.registry) return;
     const registry = api.registry.getAll();
-    const updated = [...registry];
     let changed = false;
+    let needsReload = false;
 
-    for (const plugin of updated) {
+    for (const plugin of registry) {
       const stored = getStoredPluginCode(plugin.id);
-      if (stored && stored.code) {
-        plugin.url = createBlobUrl(stored.code);
-        plugin.originalUrl = stored.originalUrl || plugin.originalUrl || plugin.url;
+
+      if (plugin.url && plugin.url.startsWith('blob:')) {
+        if (stored?.originalUrl && !stored.originalUrl.startsWith('blob:')) {
+          plugin.url = stored.originalUrl;
+          plugin.originalUrl = stored.originalUrl;
+          changed = true;
+          needsReload = true;
+        } else if (plugin.originalUrl && !plugin.originalUrl.startsWith('blob:')) {
+          plugin.url = plugin.originalUrl;
+          changed = true;
+          needsReload = true;
+        } else if (stored?.code) {
+          plugin.url = createDataUrl(stored.code);
+          plugin.originalUrl = stored.originalUrl || plugin.url;
+          changed = true;
+          needsReload = true;
+        }
+      }
+
+      if (plugin.originalUrl && plugin.originalUrl.startsWith('blob:')) {
+        if (stored?.originalUrl && !stored.originalUrl.startsWith('blob:')) {
+          plugin.originalUrl = stored.originalUrl;
+          changed = true;
+        } else {
+          plugin.originalUrl = null;
+          changed = true;
+        }
+      }
+
+      if (!plugin.originalUrl && plugin.url && !plugin.url.startsWith('blob:') && !plugin.url.startsWith('data:')) {
+        plugin.originalUrl = plugin.url;
         changed = true;
       }
     }
 
     if (changed) {
-      api.registry.save(updated);
+      api.registry.save(registry);
+    }
+
+    if (needsReload) {
+      console.log('%c🔄 Fixed dead blob URLs in registry — reloading...', 'color:#f39c12;font-weight:bold');
+      api.notify('Fixing plugin URLs... reloading', 'warning', 3000);
+      setTimeout(() => window.location.reload(), 500);
     }
   }
 
@@ -583,7 +621,7 @@ export function setup(api) {
 
     try {
       const urlToFetch = item.originalUrl || item.url;
-      if (urlToFetch.startsWith('blob:')) return true;
+      if (urlToFetch.startsWith('blob:') || urlToFetch.startsWith('data:')) return true;
 
       const response = await fetch(urlToFetch + (urlToFetch.includes('?') ? '&' : '?') + 't=' + Date.now());
       const code = await response.text();
@@ -626,9 +664,9 @@ export function setup(api) {
       api.notify(`Rolling back ${entry.name || pluginId} to v${entry.previousVersion}...`, 'info');
 
       const currentVersion = entry.version;
-      const blobUrl = createBlobUrl(stored.code);
+      const dataUrl = createDataUrl(stored.code);
 
-      entry.url = blobUrl;
+      entry.url = dataUrl;
       entry.version = entry.previousVersion;
       entry.previousVersion = currentVersion;
 
@@ -778,7 +816,12 @@ export function setup(api) {
 
     if (shouldCheck) {
       const results = await Promise.all(
-        plugins.map(p => p.url ? fetchRemoteMeta(p.url) : Promise.resolve(null))
+        plugins.map(p => {
+          const metaUrl = p.originalUrl && !p.originalUrl.startsWith('blob:') ? p.originalUrl : p.url;
+          return metaUrl && !metaUrl.startsWith('blob:') && !metaUrl.startsWith('data:')
+            ? fetchRemoteMeta(metaUrl)
+            : Promise.resolve(null);
+        })
       );
 
       results.forEach((meta, i) => {
@@ -1086,9 +1129,12 @@ export function setup(api) {
       const entry = registry.find(p => p.id === updateId);
       let remoteVersion = null;
 
-      if (entry?.url) {
-        const remoteMeta = await fetchRemoteMeta(entry.url);
-        remoteVersion = remoteMeta?.version || null;
+      if (entry) {
+        const metaUrl = entry.originalUrl && !entry.originalUrl.startsWith('blob:') ? entry.originalUrl : entry.url;
+        if (metaUrl && !metaUrl.startsWith('blob:') && !metaUrl.startsWith('data:')) {
+          const remoteMeta = await fetchRemoteMeta(metaUrl);
+          remoteVersion = remoteMeta?.version || null;
+        }
       }
 
       const previousVersion = entry?.version || null;
@@ -1126,8 +1172,8 @@ export function setup(api) {
             const rollbackRegistry = api.registry.getAll();
             const rollbackEntry = rollbackRegistry.find(p => p.id === updateId);
             if (rollbackEntry) {
-              const blobUrl = createBlobUrl(stored.code);
-              rollbackEntry.url = blobUrl;
+              const dataUrl = createDataUrl(stored.code);
+              rollbackEntry.url = dataUrl;
               rollbackEntry.version = previousVersion;
               api.registry.save([...rollbackRegistry]);
               await api.reloadPlugin(updateId);
