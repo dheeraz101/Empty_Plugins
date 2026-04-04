@@ -1,16 +1,15 @@
 // ╔════════════════════════════════════════════════════════════╗
-// ║  ROLLBACK MANAGER  v2.2.0                                  ║
-// ║  • "Manage Snapshots" button in PM sidebar (after Install) ║
-// ║  • Selector popup with per-plugin manage options           ║
-// ║  • No per-card gear button — all management in main popup  ║
-// ║  • Snapshots LOCKED — never auto-overwritten               ║
-// ║  • Per-card: ↩ rollback button only (when version differs) ║
+// ║  ROLLBACK MANAGER  v2.3.0                                  ║
+// ║  • "Manage Snapshots" button in PM sidebar                  ║
+// ║  • Single unified popup: select, regenerate, delete, stop   ║
+// ║  • Snapshots LOCKED — never auto-overwritten                ║
+// ║  • Per-card: ↩ rollback button (when version differs)       ║
 // ╚════════════════════════════════════════════════════════════╝
 
 export const meta = {
   id: 'rollback-manager',
   name: 'Rollback Manager',
-  version: '2.2.0',
+  version: '2.3.0',
   compat: '>=4.0.0'
 };
 
@@ -20,8 +19,8 @@ let originalReloadPlugin = null;
 let pollInterval = null;
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const SNAPSHOT_KEY = 'rb_snapshots'; // { [id]: { code, version, url, timestamp } }
-const TRACKED_KEY  = 'rb_tracked';   // string[]
+const SNAPSHOT_KEY = 'rb_snapshots';
+const TRACKED_KEY  = 'rb_tracked';
 const MAX_TRACKED  = 10;
 
 // ── Storage helpers ───────────────────────────────────────────────────────────
@@ -74,7 +73,6 @@ function createDataUrl(code) {
 // ── CSS ───────────────────────────────────────────────────────────────────────
 function buildCSS() {
   return `
-    /* Sidebar button */
     .rb-sidebar-btn {
       width: 100%;
       padding: 8px 12px;
@@ -97,7 +95,6 @@ function buildCSS() {
       border-color: rgba(255,149,0,0.28);
     }
 
-    /* Per-card rollback button */
     .pm-btn-rollback {
       background: rgba(255,149,0,0.1);
       color: #d97706;
@@ -120,7 +117,6 @@ function buildCSS() {
       border-color: rgba(255,149,0,0.25);
     }
 
-    /* Overlay */
     .rb-overlay {
       position: fixed; inset: 0;
       background: rgba(0,0,0,0.22);
@@ -132,7 +128,6 @@ function buildCSS() {
     }
     @keyframes rb-fi { from { opacity:0 } to { opacity:1 } }
 
-    /* Modal */
     .rb-modal {
       background: rgba(255,255,255,0.97);
       border-radius: 22px;
@@ -153,7 +148,6 @@ function buildCSS() {
     .rb-sub   { font-size:13px; color:#8e8e93; margin:0 0 18px; flex-shrink:0; }
     .rb-hr    { height:1px; background:rgba(0,0,0,0.08); margin:0 0 16px; flex-shrink:0; }
 
-    /* Plugin rows in main popup */
     .rb-list {
       overflow-y: auto; flex:1;
       display: flex; flex-direction: column; gap:10px;
@@ -161,7 +155,6 @@ function buildCSS() {
       scrollbar-width:thin; scrollbar-color:rgba(0,0,0,0.1) transparent;
     }
 
-    /* Untracked row — simple checkbox style */
     .rb-row-untracked {
       display:flex; align-items:center; gap:12px;
       padding:11px 14px; border-radius:13px;
@@ -182,7 +175,6 @@ function buildCSS() {
     .rb-dot { width:8px; height:8px; border-radius:50%; background:white; opacity:0; transition:opacity 0.14s; }
     .rb-row-untracked.rb-sel .rb-dot { opacity:1; }
 
-    /* Tracked row — expanded card with action buttons */
     .rb-row-tracked {
       border:1.5px solid rgba(0,122,255,0.2);
       border-radius:13px;
@@ -224,7 +216,6 @@ function buildCSS() {
 
     .rb-limit { font-size:12px; color:#ff9500; text-align:center; margin-bottom:12px; flex-shrink:0; }
 
-    /* Bottom action row */
     .rb-footer { display:flex; gap:10px; flex-shrink:0; }
     .rb-footer button {
       flex:1; padding:11px 16px; border-radius:999px;
@@ -235,7 +226,6 @@ function buildCSS() {
     .rb-btn-primary { background:#007AFF; color:white; }
     .rb-btn-primary:hover { background:#0066dd; }
 
-    /* Rollback confirm modal reuse */
     .rb-ver-old   { color:#8e8e93; text-decoration:line-through; }
     .rb-ver-arrow { color:#8e8e93; margin:0 4px; }
     .rb-ver-new   { color:#ff9500; font-weight:700; }
@@ -243,7 +233,6 @@ function buildCSS() {
     .rb-btn-warn  { background:#ff9500; color:white; }
     .rb-btn-warn:hover { background:#e08600; }
 
-    /* Spinner */
     .rb-spin {
       display:inline-block; width:13px; height:13px;
       border:2px solid rgba(255,255,255,0.35); border-top-color:white;
@@ -255,7 +244,6 @@ function buildCSS() {
     }
     @keyframes rb-sp { to { transform:rotate(360deg); } }
 
-    /* Dark mode */
     @media (prefers-color-scheme: dark) {
       .rb-sidebar-btn { color:#ffb340; background:rgba(255,149,0,0.12); border-color:rgba(255,149,0,0.22); }
       .rb-sidebar-btn:hover { background:rgba(255,149,0,0.2); color:#ffc566; }
@@ -288,13 +276,13 @@ export async function setup(api) {
   style.textContent = buildCSS();
   document.head.appendChild(style);
 
-  // Intercept reloadPlugin — opportunistic capture only (tracked + no snapshot yet)
+  // Intercept reloadPlugin — capture BEFORE plugin reloads (only if tracked + no snapshot yet)
   originalReloadPlugin = api.reloadPlugin;
   api.reloadPlugin = async function(id) {
     const entry = api.registry.getAll().find(p => p.id === id);
     const isRollbackReload = entry?.url?.startsWith('data:');
     if (!isRollbackReload && isTracked(id) && !getSnapshot(id)) {
-      console.log('[Rollback] Opportunistic capture for ' + id);
+      console.log('[Rollback] Capturing ' + id + ' before reload');
       await captureSnapshot(api, id);
     }
     return originalReloadPlugin.call(api, id);
@@ -335,20 +323,19 @@ export async function setup(api) {
     }
   }, true);
 
-  await new Promise(r => setTimeout(r, 700));
-  openMainPopup(api);
-
-  console.log('\uD83D\uDD19 Rollback Manager v2.2.0 loaded');
+  console.log('\uD83D\uDD19 Rollback Manager v2.3.0 loaded');
 }
 
 // ── MAIN POPUP — unified selector + per-plugin management ─────────────────────
 function openMainPopup(api) {
+  const existing = document.querySelector('.rb-overlay');
+  if (existing) existing.remove();
+
   const overlay = document.createElement('div');
   overlay.className = 'rb-overlay';
   document.documentElement.appendChild(overlay);
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
 
-  // newlySelected tracks plugins the user has checkmarked this session (not yet saved)
   const newlySelected = new Set();
 
   async function render() {
@@ -391,7 +378,7 @@ function openMainPopup(api) {
                     <div class="rb-tracked-icon"></div>
                     <div style="flex:1;min-width:0">
                       <div class="rb-pname">${p.name || p.id}</div>
-                      <div class="rb-pid">${p.id}${p.version ? ' · v' + p.version : ''}</div>
+                      <div class="rb-pid">${p.id}${p.version ? ' \u00B7 v' + p.version : ''}</div>
                     </div>
                     ${snap
                       ? `<span class="rb-snap-badge ok">\u2713 v${snapVer || '?'}</span>`
@@ -402,7 +389,7 @@ function openMainPopup(api) {
                       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
                       </svg>
-                      Regenerate${snapDate ? ' · ' + snapDate : ''}
+                      Regenerate${snapDate ? ' \u00B7 ' + snapDate : ''}
                     </button>
                     <button class="rb-act-del" data-delsnap="${p.id}" ${!snap ? 'disabled style="opacity:0.38"' : ''}>
                       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -433,7 +420,7 @@ function openMainPopup(api) {
                   <div class="rb-chk"><div class="rb-dot"></div></div>
                   <div style="flex:1;min-width:0">
                     <div class="rb-pname">${p.name || p.id}</div>
-                    <div class="rb-pid">${p.id}${p.version ? ' · v' + p.version : ''}</div>
+                    <div class="rb-pid">${p.id}${p.version ? ' \u00B7 v' + p.version : ''}</div>
                   </div>
                 </div>`;
             }).join('')}
@@ -456,7 +443,6 @@ function openMainPopup(api) {
       </div>
     `;
 
-    // ── Close / Save
     overlay.querySelector('#rb-main-close').onclick = () => overlay.remove();
 
     const saveBtn = overlay.querySelector('#rb-main-save');
@@ -474,21 +460,23 @@ function openMainPopup(api) {
         }
         newlySelected.clear();
         api.notify(`\u2713 ${captured} snapshot(s) saved.`, 'success');
-        render(); // re-render in place
+        render();
       };
     }
 
-    // ── Toggle untracked row selection
     overlay.querySelectorAll('[data-addtrack]').forEach(row => {
       row.addEventListener('click', () => {
         if (row.classList.contains('rb-dis')) return;
         const id = row.dataset.addtrack;
-        newlySelected.has(id) ? newlySelected.delete(id) : (newlySelected.size + tracked.size < MAX_TRACKED && newlySelected.add(id));
+        if (newlySelected.has(id)) {
+          newlySelected.delete(id);
+        } else if (newlySelected.size + tracked.size < MAX_TRACKED) {
+          newlySelected.add(id);
+        }
         render();
       });
     });
 
-    // ── Regenerate
     overlay.querySelectorAll('[data-regen]').forEach(btn => {
       btn.addEventListener('click', async () => {
         const id = btn.dataset.regen;
@@ -505,7 +493,6 @@ function openMainPopup(api) {
       });
     });
 
-    // ── Delete snapshot only
     overlay.querySelectorAll('[data-delsnap]').forEach(btn => {
       btn.addEventListener('click', () => {
         deleteSnapshot(btn.dataset.delsnap);
@@ -514,7 +501,6 @@ function openMainPopup(api) {
       });
     });
 
-    // ── Stop tracking
     overlay.querySelectorAll('[data-stoptrack]').forEach(btn => {
       btn.addEventListener('click', () => {
         removeTracked(btn.dataset.stoptrack);
@@ -549,8 +535,7 @@ function openRollbackConfirm(api, pluginId) {
         <span class="rb-ver-new">v${snapVer}</span>
       </div>
       <p class="rb-confirm-desc">
-        The plugin will be replaced with the <strong>v${snapVer}</strong> snapshot
-        and reloaded immediately.<br><br>
+        This will replace the current version with <strong>v${snapVer}</strong> and reload the plugin.<br><br>
         <span style="color:#ff9500;font-size:13px">
           \u26A0\uFE0F The snapshot stays locked after rollback.
           Open <strong>Manage Snapshots</strong> to regenerate it.
@@ -602,7 +587,7 @@ async function performRollback(api, pluginId) {
     api.notify(`\u2713 Rolled back ${entry.name || pluginId} to v${snap.version}`, 'success');
   } catch(e) {
     console.error('[Rollback] performRollback failed', e);
-    api.notify('Rollback failed — check console', 'error');
+    api.notify('Rollback failed \u2014 check console', 'error');
   }
 }
 
@@ -627,7 +612,6 @@ function injectCardButtons(api) {
     const actionGroup = item.querySelector('.pm-action-group');
     if (!actionGroup) return;
 
-    // Remove stale button before re-evaluating
     actionGroup.querySelector('[data-rb-rollback]')?.remove();
 
     const snap = getSnapshot(pluginId);
