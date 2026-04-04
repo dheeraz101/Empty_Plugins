@@ -9,7 +9,7 @@
 export const meta = {
   id: 'rollback-manager',
   name: 'Rollback Manager',
-  version: '2.3.1',
+  version: '2.3.2',
   compat: '>=4.0.0'
 };
 
@@ -61,8 +61,21 @@ async function captureSnapshot(api, pluginId) {
     ? entry.originalUrl : entry.url;
   const code = await fetchCode(remoteUrl);
   if (!code) return false;
-  setSnapshot(pluginId, { code, version: entry.version || null, url: remoteUrl, timestamp: Date.now() });
-  console.log('[Rollback] Captured ' + pluginId + ' v' + (entry.version || '?'));
+
+  // Parse version from plugin meta in the code itself (most reliable source)
+  let version = null;
+  const metaMatch = code.match(/export const meta\s*=\s*(\{[\s\S]*?\})(?:;|$)/);
+  if (metaMatch) {
+    try {
+      const meta = new Function('return ' + metaMatch[1])();
+      version = meta.version || null;
+    } catch {}
+  }
+  // Fallback to registry version if meta parsing failed
+  if (!version) version = entry.version || null;
+
+  setSnapshot(pluginId, { code, version, url: remoteUrl, timestamp: Date.now() });
+  console.log('[Rollback] Captured ' + pluginId + ' v' + (version || '?'));
   return true;
 }
 
@@ -573,6 +586,8 @@ async function performRollback(api, pluginId) {
     entry.url = createDataUrl(snap.code);
     entry.originalUrl = remoteUrl;
     entry.version = snap.version;
+    // Clear remoteVersion so PM re-fetches it and shows update button
+    delete entry.remoteVersion;
     api.registry.save([...registry]);
 
     await originalReloadPlugin.call(api, pluginId);
@@ -581,10 +596,21 @@ async function performRollback(api, pluginId) {
     const ent2 = reg2.find(p => p.id === pluginId);
     if (ent2 && ent2.version !== snap.version) {
       ent2.version = snap.version;
+      delete ent2.remoteVersion;
       api.registry.save([...reg2]);
     }
 
     api.notify(`\u2713 Rolled back ${entry.name || pluginId} to v${snap.version}`, 'success');
+
+    // Trigger PM to re-render so update button appears
+    setTimeout(() => {
+      const pmRoot = document.querySelector('.pm-root');
+      if (pmRoot && pmRoot.style.display !== 'none') {
+        const checkBtn = pmRoot.querySelector('.check-updates');
+        if (checkBtn) checkBtn.click();
+        injectCardButtons(api);
+      }
+    }, 1000);
   } catch(e) {
     console.error('[Rollback] performRollback failed', e);
     api.notify('Rollback failed \u2014 check console', 'error');
