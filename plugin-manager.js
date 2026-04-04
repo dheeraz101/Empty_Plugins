@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '4.0.0',
+  version: '4.0.1',
   compat: '>=3.3.0'
 };
 
@@ -516,8 +516,61 @@ export function setup(api) {
     const item = registry.find(entry => entry.id === pluginId);
     if (!item) return;
 
-    item.remoteVersion = version; // ✅ NEW FIELD
+    item.remoteVersion = version;
     api.registry.save([...registry]);
+  }
+
+  function saveVersionHistory(pluginId, previousVersion, currentVersion, previousUrl) {
+    const registry = api.registry.getAll();
+    const item = registry.find(entry => entry.id === pluginId);
+    if (!item) return;
+
+    item.previousVersion = previousVersion || null;
+    item.currentVersion = currentVersion || null;
+    item.previousUrl = previousUrl || item.url || null;
+    api.registry.save([...registry]);
+  }
+
+  async function rollbackPlugin(pluginId) {
+    const registry = api.registry.getAll();
+    const entry = registry.find(p => p.id === pluginId);
+
+    if (!entry) {
+      return api.notify('Plugin not found', 'error');
+    }
+
+    if (!entry.previousVersion || !entry.previousUrl) {
+      return api.notify('No rollback version available', 'warning');
+    }
+
+    try {
+      api.notify(`Rolling back ${entry.name || pluginId} to v${entry.previousVersion}...`, 'info');
+
+      const currentVersion = entry.version;
+      const currentUrl = entry.url;
+
+      entry.url = entry.previousUrl;
+      entry.version = entry.previousVersion;
+
+      api.registry.save([...registry]);
+
+      await api.reloadPlugin(pluginId);
+
+      const updatedRegistry = api.registry.getAll();
+      const updatedEntry = updatedRegistry.find(p => p.id === pluginId);
+      if (updatedEntry) {
+        updatedEntry.previousVersion = currentVersion;
+        updatedEntry.previousUrl = currentUrl;
+        updatedEntry.currentVersion = updatedEntry.version;
+        api.registry.save([...updatedRegistry]);
+      }
+
+      api.notify(`Rolled back to v${entry.version}`, 'success');
+      renderInstalled();
+    } catch (e) {
+      console.error('Rollback failed:', e);
+      api.notify('Rollback failed', 'error');
+    }
   }
 
   function updateBadge(count) {
@@ -616,6 +669,8 @@ export function setup(api) {
 
         await api.reloadPlugin(newDef.id);
 
+        saveVersionHistory(newDef.id, null, remoteMeta.version, url);
+
         api.notify('Installed Successfully', 'success');
         overlay.remove();
         renderInstalled();
@@ -705,6 +760,7 @@ export function setup(api) {
       let hasUpdate = false;
       let updateBadge = '';
       let updateBtn = '';
+      let rollbackBtn = '';
 
       if (installedVer && remoteVer) {
         const cmp = compareVersions(remoteVer, installedVer);
@@ -713,6 +769,10 @@ export function setup(api) {
           availableUpdates++;
           updateBtn = `<button class="pm-btn pm-btn-primary" data-update="${p.id}">Update</button>`;
         }
+      }
+
+      if (p.previousVersion && p.previousUrl) {
+        rollbackBtn = `<button class="pm-btn pm-btn-secondary" data-rollback="${p.id}" title="Rollback to v${p.previousVersion}">↶ Rollback</button>`;
       }
       
       if (hasUpdate) {
@@ -784,6 +844,7 @@ export function setup(api) {
             ${reloadBtnHTML}
             ${isSelf ? '' : `<button class="pm-btn ${p.enabled ? 'pm-btn-secondary' : 'pm-btn-primary'} toggle-btn" data-act="toggle" data-id="${p.id}">${p.enabled ? 'Disable' : 'Enable'}</button>`}
             ${isSelf ? '' : `<button class="pm-btn pm-btn-secondary delete-btn" data-act="delete" data-id="${p.id}" style="color:#ff3b30;">Delete</button>`}
+            ${rollbackBtn}
             ${updateBtn}
           </div>
         </div>
@@ -942,6 +1003,7 @@ export function setup(api) {
       try {
         cleanupPluginUI(newDef.id);
         await api.reloadPlugin(newDef.id);
+        saveVersionHistory(newDef.id, null, remoteMeta.version, btn.dataset.url);
       } catch {
         api.notify('Install failed', 'error');
       }
@@ -958,21 +1020,48 @@ export function setup(api) {
         remoteVersion = remoteMeta?.version || null;
       }
 
+      const previousVersion = entry?.version || null;
+      const previousUrl = entry?.url || null;
+
       try {
         api.notify(`Updating ${updateId}...`, 'info');
         await api.reloadPlugin(updateId);
         if (remoteVersion) {
+          saveVersionHistory(updateId, previousVersion, remoteVersion, previousUrl);
           saveRegistryPluginVersion(updateId, remoteVersion);
-          saveRemoteVersion(updateId, remoteVersion); // 🔥 REQUIRED
+          saveRemoteVersion(updateId, remoteVersion);
         }
         api.notify(`${updateId} updated successfully!`, 'success');
         if (updateId === SELF_ID) {
           setTimeout(() => window.location.reload(), 200);
           return;
         }
-      } catch {
-        api.notify('Update failed', 'error');
+      } catch (e) {
+        console.error('Update failed, attempting rollback:', e);
+        api.notify(`Update failed! Rolling back to v${previousVersion}...`, 'error');
+
+        try {
+          if (previousUrl) {
+            const rollbackRegistry = api.registry.getAll();
+            const rollbackEntry = rollbackRegistry.find(p => p.id === updateId);
+            if (rollbackEntry) {
+              rollbackEntry.url = previousUrl;
+              rollbackEntry.version = previousVersion;
+              api.registry.save([...rollbackRegistry]);
+              await api.reloadPlugin(updateId);
+              saveVersionHistory(updateId, remoteVersion, previousVersion, previousUrl);
+              api.notify(`Rolled back to v${previousVersion} after failed update`, 'warning');
+            }
+          }
+        } catch (rollbackError) {
+          console.error('Rollback also failed:', rollbackError);
+          api.notify('Update and rollback both failed! Manual intervention required.', 'error');
+        }
       }
+    }
+
+    if (btn.dataset.rollback) {
+      await rollbackPlugin(btn.dataset.rollback);
     }
 
     renderInstalled();
