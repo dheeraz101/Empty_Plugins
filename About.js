@@ -130,7 +130,7 @@ export function setup(api) {
           <span style="color: #d1d1d6; font-size: 10px;">•</span>
           <a href="https://github.com/dheeraz101/Empty" target="_blank" class="about-link">GitHub Repository</a>
         </div>
-        <button id="close-about" class="about-close">Done</button>
+        <button id="close-about" class="about-close">Close</button>
       </div>
     </div>
   `;
