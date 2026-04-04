@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '4.0.2',
+  version: '4.0.3',
   compat: '>=3.3.0'
 };
 
@@ -555,6 +555,7 @@ export function setup(api) {
   }
 
   function restorePluginBackups() {
+    if (!api.registry) return;
     const registry = api.registry.getAll();
     const updated = [...registry];
     let changed = false;
