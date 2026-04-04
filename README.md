@@ -6,7 +6,10 @@
 [![Docs](https://img.shields.io/badge/docs-Mintlify-blue)](https://empty-ad9a3406.mintlify.app/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](#license)
 
-![Main demo](./main.gif)
+<p align="center">
+  <img src="https://raw.githubusercontent.com/dheeraz101/Empty_Plugins/main/1.jpg" width="49%"/>
+  <img src="https://raw.githubusercontent.com/dheeraz101/Empty_Plugins/main/2.jpg" width="49%"/>
+</p>
 
 ---
 

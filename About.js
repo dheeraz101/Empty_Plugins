@@ -1,7 +1,7 @@
 export const meta = {
   id: 'about',
   name: 'About Blank Board',
-  version: '0.4.0',
+  version: '0.4.1',
   compat: '>=1.0.0'
 };
 
@@ -39,7 +39,6 @@ export function setup(api) {
     <style>
       .about-container { display: flex; flex-direction: column; gap: 28px; position: relative; }
       
-      /* Apple Style Close Button */
       .about-close-btn {
         position: absolute;
         top: -10px;
@@ -78,7 +77,8 @@ export function setup(api) {
         aspect-ratio: 16/10;
         box-shadow: 0 8px 24px rgba(0,0,0,0.12);
       }
-      .about-preview-large img { width: 100%; height: 100%; object-fit: cover; }
+      /* ✅ CHANGED: img → video */
+      .about-preview-large video { width: 100%; height: 100%; object-fit: cover; display: block; }
 
       .about-features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
       .about-feature-card {
@@ -122,7 +122,9 @@ export function setup(api) {
       </header>
 
       <div class="about-preview-large">
-        <img src="https://raw.githubusercontent.com/dheeraz101/Empty_Plugins/main/main.gif" alt="Preview">
+        <video autoplay loop muted playsinline>
+          <source src="https://raw.githubusercontent.com/dheeraz101/Empty_Plugins/main/empty.mp4" type="video/mp4">
+        </video>
       </div>
       
       <div class="about-features">
