@@ -7,8 +7,8 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](#license)
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/dheeraz101/Empty_Plugins/main/1.jpg" width="49%"/>
-  <img src="https://raw.githubusercontent.com/dheeraz101/Empty_Plugins/main/2.jpg" width="49%"/>
+  <img src="./1.png" width="49%"/>
+  <img src="./2.png" width="49%"/>
 </p>
 
 ---
