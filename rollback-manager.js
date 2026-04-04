@@ -1,5 +1,5 @@
 // ╔════════════════════════════════════════════════════════════╗
-// ║  ROLLBACK MANAGER  v2.4.0                                  ║
+// ║  ROLLBACK MANAGER  v2.5.0                                  ║
 // ║  • "Manage Snapshots" button in PM sidebar                  ║
 // ║  • Single unified popup: select, regenerate, delete, stop   ║
 // ║  • Snapshots LOCKED — never auto-overwritten                ║
@@ -9,15 +9,20 @@
 export const meta = {
   id: 'rollback-manager',
   name: 'Rollback Manager',
-  version: '2.4.0',
+  version: '2.5.0',
   compat: '>=4.0.0'
 };
 
-let apiRef = null;
-let style = null;
-let originalReloadPlugin = null;
-let pollInterval = null;
-let clickHandlerBound = false;
+// Shared state via window — survives module re-imports (pause → re-enable)
+if (!window.__rb) {
+  window.__rb = {
+    apiRef: null,
+    style: null,
+    pollInterval: null,
+    clickHandlerBound: false,
+  };
+}
+const rb = window.__rb;
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const SNAPSHOT_KEY = 'rb_snapshots';
@@ -63,6 +68,7 @@ async function captureSnapshot(api, pluginId) {
   const code = await fetchCode(remoteUrl);
   if (!code) return false;
 
+  // Parse version from plugin meta in the code itself (most reliable source)
   let version = null;
   const metaMatch = code.match(/export const meta\s*=\s*(\{[\s\S]*?\})(?:;|$)/);
   if (metaMatch) {
@@ -71,6 +77,7 @@ async function captureSnapshot(api, pluginId) {
       version = meta.version || null;
     } catch {}
   }
+  // Fallback to registry version if meta parsing failed
   if (!version) version = entry.version || null;
 
   setSnapshot(pluginId, { code, version, url: remoteUrl, timestamp: Date.now() });
@@ -282,15 +289,17 @@ function buildCSS() {
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
 export async function setup(api) {
-  apiRef = api;
+  rb.apiRef = api;
 
-  style = document.createElement('style');
-  style.textContent = buildCSS();
-  document.head.appendChild(style);
+  if (!rb.style) {
+    rb.style = document.createElement('style');
+    rb.style.textContent = buildCSS();
+    document.head.appendChild(rb.style);
+  }
 
-  // Save original reloadPlugin — NEVER null this out in teardown
-  if (!originalReloadPlugin) {
-    originalReloadPlugin = api.reloadPlugin;
+  // Save original reloadPlugin on api object — survives pause/re-enable
+  if (!api._rb_origReload) {
+    api._rb_origReload = api.reloadPlugin;
   }
 
   // Intercept reloadPlugin — capture BEFORE plugin reloads (only if tracked + no snapshot yet)
@@ -301,8 +310,7 @@ export async function setup(api) {
       console.log('[Rollback] Capturing ' + id + ' before reload');
       await captureSnapshot(api, id);
     }
-    // Always use the saved original, never the wrapped one
-    return originalReloadPlugin.call(api, id);
+    return api._rb_origReload.call(api, id);
   };
 
   // Inject sidebar button + rollback card buttons
@@ -320,32 +328,33 @@ export async function setup(api) {
       Manage Snapshots
     `;
     btn.title = 'Manage Rollback Snapshots';
-    btn.onclick = (e) => { e.stopPropagation(); openMainPopup(api); };
+    btn.onclick = (e) => { e.stopPropagation(); openMainPopup(rb.apiRef); };
     pmActions.appendChild(btn);
   }
 
-  pollInterval = setInterval(() => {
+  if (rb.pollInterval) clearInterval(rb.pollInterval);
+  rb.pollInterval = setInterval(() => {
     const pmRoot = document.querySelector('.pm-root');
     if (!pmRoot || pmRoot.style.display === 'none') return;
     tryInjectSidebarButton();
-    injectCardButtons(api);
+    injectCardButtons(rb.apiRef);
   }, 600);
 
-  // Single global click handler — uses event delegation, no capture phase conflicts
-  if (!clickHandlerBound) {
+  // Single global click handler — always reads from rb.apiRef (shared via window)
+  if (!rb.clickHandlerBound) {
     document.addEventListener('click', (e) => {
       const rbBtn = e.target.closest('[data-rb-rollback]');
-      if (rbBtn) {
+      if (rbBtn && rb.apiRef) {
         e.preventDefault();
         e.stopImmediatePropagation();
-        openRollbackConfirm(api, rbBtn.dataset.rbRollback);
+        openRollbackConfirm(rb.apiRef, rbBtn.dataset.rbRollback);
         return;
       }
     });
-    clickHandlerBound = true;
+    rb.clickHandlerBound = true;
   }
 
-  console.log('\uD83D\uDD19 Rollback Manager v2.4.0 loaded');
+  console.log('\uD83D\uDD19 Rollback Manager v2.5.0 loaded');
 }
 
 // ── MAIN POPUP — unified selector + per-plugin management ─────────────────────
@@ -356,11 +365,7 @@ function openMainPopup(api) {
   const overlay = document.createElement('div');
   overlay.className = 'rb-overlay';
   document.documentElement.appendChild(overlay);
-
-  // Only close when clicking the backdrop, not the modal content
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) overlay.remove();
-  });
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
 
   const newlySelected = new Set();
 
@@ -541,7 +546,6 @@ function openMainPopup(api) {
 
 // ── ROLLBACK CONFIRM ──────────────────────────────────────────────────────────
 function openRollbackConfirm(api, pluginId) {
-  // Close any existing overlay first
   const existing = document.querySelector('.rb-overlay');
   if (existing) existing.remove();
 
@@ -579,17 +583,8 @@ function openRollbackConfirm(api, pluginId) {
   `;
 
   document.documentElement.appendChild(overlay);
-
-  // Only close on backdrop click
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) overlay.remove();
-  });
-
-  overlay.querySelector('#rb-cf-cancel').onclick = (e) => {
-    e.stopPropagation();
-    overlay.remove();
-  };
-
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  overlay.querySelector('#rb-cf-cancel').onclick = (e) => { e.stopPropagation(); overlay.remove(); };
   overlay.querySelector('#rb-cf-ok').onclick = async (e) => {
     e.stopPropagation();
     overlay.remove();
@@ -613,25 +608,48 @@ async function performRollback(api, pluginId) {
     entry.url = createDataUrl(snap.code);
     entry.originalUrl = remoteUrl;
     entry.version = snap.version;
-    // Clear remoteVersion so PM re-fetches it fresh
-    delete entry.remoteVersion;
     api.registry.save([...registry]);
 
-    // Use the saved original reloadPlugin — never the wrapped one
-    await originalReloadPlugin.call(api, pluginId);
+    // Use the ORIGINAL reloadPlugin saved on api object
+    await api._rb_origReload.call(api, pluginId);
 
     // Ensure version is correct after reload
     const reg2 = api.registry.getAll();
     const ent2 = reg2.find(p => p.id === pluginId);
     if (ent2 && ent2.version !== snap.version) {
       ent2.version = snap.version;
-      delete ent2.remoteVersion;
       api.registry.save([...reg2]);
+    }
+
+    // Fetch remote version ourselves and set entry.remoteVersion
+    // so PM's version comparison works (PM can't fetch from data: URLs)
+    if (remoteUrl && !remoteUrl.startsWith('blob:') && !remoteUrl.startsWith('data:')) {
+      try {
+        const sep = remoteUrl.includes('?') ? '&' : '?';
+        const res = await fetch(remoteUrl + sep + 't=' + Date.now());
+        if (res.ok) {
+          const code = await res.text();
+          const metaMatch = code.match(/export const meta\s*=\s*(\{[\s\S]*?\})(?:;|$)/);
+          if (metaMatch) {
+            const remoteMeta = new Function('return ' + metaMatch[1])();
+            if (remoteMeta.version) {
+              const reg3 = api.registry.getAll();
+              const ent3 = reg3.find(p => p.id === pluginId);
+              if (ent3) {
+                ent3.remoteVersion = remoteMeta.version;
+                api.registry.save([...reg3]);
+              }
+            }
+          }
+        }
+      } catch(e) {
+        console.warn('[Rollback] Could not fetch remote version:', e);
+      }
     }
 
     api.notify(`\u2713 Rolled back ${entry.name || pluginId} to v${snap.version}`, 'success');
 
-    // Force PM to re-check updates after a short delay
+    // Force PM to re-render so update button appears
     setTimeout(() => {
       const pmRoot = document.querySelector('.pm-root');
       if (pmRoot && pmRoot.style.display !== 'none') {
@@ -639,7 +657,7 @@ async function performRollback(api, pluginId) {
         if (checkBtn) checkBtn.click();
         injectCardButtons(api);
       }
-    }, 1200);
+    }, 1500);
   } catch(e) {
     console.error('[Rollback] performRollback failed', e);
     api.notify('Rollback failed \u2014 check console', 'error');
@@ -648,6 +666,7 @@ async function performRollback(api, pluginId) {
 
 // ── Inject ↩ rollback button into each plugin card ────────────────────────────
 function injectCardButtons(api) {
+  if (!api) return;
   const pmList = document.querySelector('#installed .pm-list');
   if (!pmList) return;
 
@@ -696,15 +715,14 @@ function injectCardButtons(api) {
 
 // ── Teardown ──────────────────────────────────────────────────────────────────
 export function teardown() {
-  if (style)        { style.remove(); style = null; }
-  if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
-  // DO NOT null out originalReloadPlugin — it's shared and may be needed
-  if (apiRef) {
-    apiRef.reloadPlugin = originalReloadPlugin;
+  if (rb.style) { rb.style.remove(); rb.style = null; }
+  if (rb.pollInterval) { clearInterval(rb.pollInterval); rb.pollInterval = null; }
+  if (rb.apiRef) {
+    rb.apiRef.reloadPlugin = rb.apiRef._rb_origReload || rb.apiRef.reloadPlugin;
   }
   // Remove all injected UI
   document.querySelectorAll('.rb-sidebar-btn').forEach(el => el.remove());
   document.querySelectorAll('[data-rb-rollback]').forEach(el => el.remove());
   document.querySelectorAll('.rb-overlay').forEach(el => el.remove());
-  apiRef = null;
+  rb.apiRef = null;
 }
