@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '4.0.5',
+  version: '4.0.6',
   compat: '>=3.3.0'
 };
 
@@ -210,6 +210,19 @@ export function setup(api) {
   .pm-btn-secondary:hover {
     background: color-mix(in srgb, var(--pm-card) 80%, black);
   }
+  .pm-btn-rollback {
+    background: rgba(255, 149, 0, 0.1);
+    color: #d97706;
+    border: 1px solid rgba(255, 149, 0, 0.15);
+  }
+  .pm-btn-rollback:hover {
+    background: rgba(255, 149, 0, 0.18);
+    color: #b45309;
+    border-color: rgba(255, 149, 0, 0.25);
+  }
+  .pm-btn-rollback svg {
+    flex-shrink: 0;
+  }
 
   #close-pm:hover { background: #ff3b30 !important; color: white !important; }
 
@@ -328,6 +341,8 @@ export function setup(api) {
     .plugin-item:hover { background: rgba(255, 255, 255, 0.08); }
     .plugin-name { color: #f5f5f7; }
     .pm-btn-secondary { background: rgba(255,255,255,0.1); color: #f5f5f7; }
+    .pm-btn-rollback { background: rgba(255, 149, 0, 0.15); color: #ffb340; border-color: rgba(255, 149, 0, 0.2); }
+    .pm-btn-rollback:hover { background: rgba(255, 149, 0, 0.25); color: #ffc566; }
     .pm-modal-content { background: rgba(44, 44, 46, 0.95); color: white; border-color: rgba(255,255,255,0.1); }
     .pm-input { background: rgba(0,0,0,0.2); border-color: rgba(255,255,255,0.1); color: white; }
     .last-checked { color: #6e6e73; }
@@ -886,7 +901,14 @@ export function setup(api) {
       }
 
       if (p.previousVersion && getStoredPluginCode(p.id)) {
-        rollbackBtn = `<button class="pm-btn pm-btn-secondary" data-rollback="${p.id}" title="Rollback to v${p.previousVersion}">↶ Rollback</button>`;
+        rollbackBtn = `
+          <button class="pm-btn pm-btn-rollback" data-rollback="${p.id}" title="Rollback to v${p.previousVersion}">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="9 14 4 9 9 4"></polyline>
+              <path d="M20 20v-7a4 4 0 0 0-4-4H4"></path>
+            </svg>
+            v${p.previousVersion}
+          </button>`;
       }
       
       if (hasUpdate) {
