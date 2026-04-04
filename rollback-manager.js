@@ -1,14 +1,14 @@
 export const meta = {
   id: 'rollback-manager',
   name: 'Rollback Manager',
-  version: '1.0.1',
+  version: '1.0.3',
   compat: '>=4.0.0'
 };
 
 let apiRef = null;
 let style = null;
 let originalReloadPlugin = null;
-let injectTimer = null;
+let pollInterval = null;
 
 export function setup(api) {
   apiRef = api;
@@ -105,15 +105,10 @@ export function setup(api) {
         timestamp: Date.now()
       };
       localStorage.setItem(`rb_backup_${pluginId}`, JSON.stringify(data));
+      console.log(`[Rollback] Stored backup: ${pluginId} v${version}`);
     } catch (e) {
       console.error('[Rollback] Failed to store backup:', e);
     }
-  }
-
-  function clearBackup(pluginId) {
-    try {
-      localStorage.removeItem(`rb_backup_${pluginId}`);
-    } catch {}
   }
 
   function createDataUrl(code) {
@@ -123,17 +118,26 @@ export function setup(api) {
   async function capturePluginCode(pluginId) {
     const registry = api.registry.getAll();
     const entry = registry.find(p => p.id === pluginId);
-    if (!entry || !entry.url) return false;
+    if (!entry || !entry.url) {
+      console.log(`[Rollback] Cannot capture ${pluginId}: no entry or url`);
+      return false;
+    }
 
     try {
       const urlToFetch = entry.originalUrl && !entry.originalUrl.startsWith('blob:') && !entry.originalUrl.startsWith('data:')
         ? entry.originalUrl
         : entry.url;
 
-      if (urlToFetch.startsWith('blob:') || urlToFetch.startsWith('data:')) return false;
+      if (urlToFetch.startsWith('blob:') || urlToFetch.startsWith('data:')) {
+        console.log(`[Rollback] Cannot capture ${pluginId}: URL is ${urlToFetch.substring(0, 20)}...`);
+        return false;
+      }
 
       const res = await fetch(urlToFetch + (urlToFetch.includes('?') ? '&' : '?') + 't=' + Date.now());
-      if (!res.ok) return false;
+      if (!res.ok) {
+        console.log(`[Rollback] Cannot capture ${pluginId}: HTTP ${res.status}`);
+        return false;
+      }
 
       const code = await res.text();
       storeBackup(pluginId, code, entry.version || null, entry.originalUrl || urlToFetch);
@@ -155,7 +159,6 @@ export function setup(api) {
     try {
       api.notify(`Rolling back ${entry.name || pluginId} to v${backup.version}...`, 'info');
 
-      const currentVersion = entry.version;
       const dataUrl = createDataUrl(backup.code);
 
       entry.url = dataUrl;
@@ -170,7 +173,7 @@ export function setup(api) {
 
       api.notify(`Rolled back to v${entry.version}`, 'success');
 
-      setTimeout(() => injectRollbackButtons(), 600);
+      setTimeout(() => injectRollbackButtons(), 800);
     } catch (e) {
       console.error('[Rollback] Rollback failed:', e);
       api.notify('Rollback failed', 'error');
@@ -213,12 +216,22 @@ export function setup(api) {
 
   function injectRollbackButtons() {
     const pmList = document.querySelector('#installed .pm-list');
-    if (!pmList) return;
+    if (!pmList) {
+      return;
+    }
 
     const registry = api.registry.getAll();
+    let injected = 0;
+    let skipped = 0;
 
-    pmList.querySelectorAll('.plugin-item').forEach((item) => {
-      if (item.querySelector('[data-rb]')) return;
+    const items = pmList.querySelectorAll('.plugin-item');
+    if (items.length === 0) return;
+
+    items.forEach((item) => {
+      if (item.querySelector('[data-rb]')) {
+        skipped++;
+        return;
+      }
 
       const nameEl = item.querySelector('.plugin-meta span');
       if (!nameEl) return;
@@ -229,6 +242,11 @@ export function setup(api) {
 
       const backup = getStoredBackup(pluginId);
       if (!backup?.code) return;
+      if (!backup.version) return;
+
+      const currentVersion = plugin.version || plugin.remoteVersion;
+      if (!currentVersion) return;
+      if (backup.version === currentVersion) return;
 
       const actionGroup = item.querySelector('.pm-action-group');
       if (!actionGroup) return;
@@ -251,42 +269,27 @@ export function setup(api) {
       } else {
         actionGroup.appendChild(btn);
       }
+      injected++;
     });
+
+    if (injected > 0) {
+      console.log(`[Rollback] Injected ${injected} button(s), skipped ${skipped} existing`);
+    }
   }
 
-  function startWatching() {
-    const observer = new MutationObserver((mutations) => {
-      for (const m of mutations) {
-        if (m.addedNodes.length) {
-          setTimeout(injectRollbackButtons, 250);
-          break;
-        }
-      }
-    });
-
-    const tryObserve = () => {
-      const pmList = document.querySelector('#installed .pm-list');
-      if (pmList) {
-        observer.observe(pmList, { childList: true, subtree: true });
+  function startPolling() {
+    if (pollInterval) clearInterval(pollInterval);
+    pollInterval = setInterval(() => {
+      const pmRoot = document.querySelector('.pm-root');
+      if (pmRoot && pmRoot.style.display !== 'none') {
         injectRollbackButtons();
-        return true;
       }
-      return false;
-    };
-
-    if (!tryObserve()) {
-      let attempts = 0;
-      const poll = setInterval(() => {
-        if (tryObserve() || attempts > 60) {
-          clearInterval(poll);
-        }
-        attempts++;
-      }, 500);
-    }
+    }, 600);
   }
 
   originalReloadPlugin = api.reloadPlugin;
   api.reloadPlugin = async function(id) {
+    console.log(`[Rollback] Intercepted reloadPlugin for ${id}`);
     await capturePluginCode(id);
     return originalReloadPlugin.call(api, id);
   };
@@ -301,29 +304,50 @@ export function setup(api) {
     }
   }, true);
 
-  api.bus.on('plugin:loaded', () => setTimeout(injectRollbackButtons, 400));
-  api.bus.on('plugin:unloaded', () => setTimeout(injectRollbackButtons, 400));
+  startPolling();
 
-  startWatching();
+  api.bus.on('board:allPluginsLoaded', () => {
+    console.log('[Rollback] board:allPluginsLoaded — capturing all plugins');
+    (async () => {
+      const registry = api.registry.getAll();
+      for (const plugin of registry) {
+        if (plugin.id === meta.id) continue;
+        if (!getStoredBackup(plugin.id)) {
+          await capturePluginCode(plugin.id);
+        }
+      }
+      injectRollbackButtons();
+    })();
+  });
 
   (async () => {
+    await new Promise(r => setTimeout(r, 2000));
     const registry = api.registry.getAll();
+    console.log(`[Rollback] Initial scan: ${registry.length} plugins in registry`);
     for (const plugin of registry) {
       if (plugin.id === meta.id) continue;
-      if (!getStoredBackup(plugin.id)) {
-        await capturePluginCode(plugin.id);
+      const existing = getStoredBackup(plugin.id);
+      if (existing) {
+        console.log(`[Rollback] ${plugin.id} already has backup v${existing.version}`);
+      } else {
+        const captured = await capturePluginCode(plugin.id);
+        console.log(`[Rollback] ${plugin.id} captured: ${captured}`);
       }
     }
     injectRollbackButtons();
   })();
 
-  console.log('🔙 Rollback Manager v1.0.0 loaded');
+  console.log('🔙 Rollback Manager v1.0.3 loaded');
 }
 
 export function teardown() {
   if (style) {
     style.remove();
     style = null;
+  }
+  if (pollInterval) {
+    clearInterval(pollInterval);
+    pollInterval = null;
   }
   if (originalReloadPlugin) {
     apiRef.reloadPlugin = originalReloadPlugin;
