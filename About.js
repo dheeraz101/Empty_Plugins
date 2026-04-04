@@ -1,7 +1,7 @@
 export const meta = {
   id: 'about',
   name: 'About Blank Board',
-  version: '0.3.6',
+  version: '0.3.8',
   compat: '>=1.0.0'
 };
 
@@ -99,8 +99,9 @@ export function setup(api) {
     <div class="about-container">
       <header class="about-header">
         <div class="about-label">Blank Board</div>
-        <div class="about-title">A compact, elegant<br/>overview.</div>
-        <p class="about-subtitle">A minimal plugin host with instant preview and a refined, theme-safe layout.</p>
+        <div class="about-title">Start empty. Build your own workspace.</div>
+        <p class="about-subtitle">A blank grid with no tools. </p>
+        <p class="about-subtitle">Add only what you need with simple plugins.</p>
       </header>
 
       <div class="about-grid-main">
@@ -111,15 +112,15 @@ export function setup(api) {
         <div class="about-features">
           <div class="about-feature-card">
             <strong>Modular</strong>
-            <p>Every feature is a plugin.</p>
+            <p>Everything is a plugin.</p>
           </div>
           <div class="about-feature-card">
             <strong>Minimal</strong>
-            <p>Light core, powerful extensions.</p>
+            <p>A tiny core. Nothing extra.</p>
           </div>
           <div class="about-feature-card">
-            <strong>Community</strong>
-            <p>Ecosystem first design.</p>
+            <strong>Open</strong>
+            <p>Built and shared by anyone.</p>
           </div>
         </div>
       </div>
@@ -128,7 +129,7 @@ export function setup(api) {
         <div style="display: flex; align-items: center; gap: 12px;">
           <span class="about-version">v${meta.version}</span>
           <span style="color: #d1d1d6; font-size: 10px;">•</span>
-          <a href="https://github.com/dheeraz101/Empty" target="_blank" class="about-link">GitHub Repository</a>
+          <a href="https://github.com/dheeraz101/Empty" target="_blank" class="about-link">View on GitHub</a>
         </div>
         <button id="close-about" class="about-close">Close</button>
       </div>
