@@ -520,15 +520,92 @@ export function setup(api) {
     api.registry.save([...registry]);
   }
 
-  function saveVersionHistory(pluginId, previousVersion, currentVersion, previousUrl) {
+  function storePluginCode(pluginId, code, originalUrl) {
+    try {
+      const data = {
+        code,
+        originalUrl,
+        version: api.registry.getAll().find(p => p.id === pluginId)?.version || null,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(`plugin_backup_${pluginId}`, JSON.stringify(data));
+    } catch (e) {
+      console.error('Failed to store plugin code:', e);
+    }
+  }
+
+  function getStoredPluginCode(pluginId) {
+    try {
+      const data = localStorage.getItem(`plugin_backup_${pluginId}`);
+      return data ? JSON.parse(data) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function clearStoredPluginCode(pluginId) {
+    try {
+      localStorage.removeItem(`plugin_backup_${pluginId}`);
+    } catch (e) {}
+  }
+
+  function createBlobUrl(code) {
+    const blob = new Blob([code], { type: 'application/javascript' });
+    return URL.createObjectURL(blob);
+  }
+
+  function restorePluginBackups() {
+    const registry = api.registry.getAll();
+    const updated = [...registry];
+    let changed = false;
+
+    for (const plugin of updated) {
+      const stored = getStoredPluginCode(plugin.id);
+      if (stored && stored.code) {
+        plugin.url = createBlobUrl(stored.code);
+        plugin.originalUrl = stored.originalUrl || plugin.originalUrl || plugin.url;
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      api.registry.save(updated);
+    }
+  }
+
+  restorePluginBackups();
+
+  async function fetchAndStoreCode(pluginId) {
+    const registry = api.registry.getAll();
+    const item = registry.find(entry => entry.id === pluginId);
+    if (!item || !item.url) return false;
+
+    try {
+      const urlToFetch = item.originalUrl || item.url;
+      if (urlToFetch.startsWith('blob:')) return true;
+
+      const response = await fetch(urlToFetch + (urlToFetch.includes('?') ? '&' : '?') + 't=' + Date.now());
+      const code = await response.text();
+      storePluginCode(pluginId, code, item.originalUrl || item.url);
+      return true;
+    } catch (e) {
+      console.error('Failed to store plugin code for rollback:', e);
+      return false;
+    }
+  }
+
+  async function saveVersionHistory(pluginId, previousVersion, currentVersion) {
+    const stored = await fetchAndStoreCode(pluginId);
+
     const registry = api.registry.getAll();
     const item = registry.find(entry => entry.id === pluginId);
     if (!item) return;
 
     item.previousVersion = previousVersion || null;
     item.currentVersion = currentVersion || null;
-    item.previousUrl = previousUrl || item.url || null;
     api.registry.save([...registry]);
+
+    return stored;
   }
 
   async function rollbackPlugin(pluginId) {
@@ -539,31 +616,24 @@ export function setup(api) {
       return api.notify('Plugin not found', 'error');
     }
 
-    if (!entry.previousVersion || !entry.previousUrl) {
-      return api.notify('No rollback version available', 'warning');
+    const stored = getStoredPluginCode(pluginId);
+    if (!stored || !stored.code) {
+      return api.notify('No rollback code available for this version', 'warning');
     }
 
     try {
       api.notify(`Rolling back ${entry.name || pluginId} to v${entry.previousVersion}...`, 'info');
 
       const currentVersion = entry.version;
-      const currentUrl = entry.url;
+      const blobUrl = createBlobUrl(stored.code);
 
-      entry.url = entry.previousUrl;
+      entry.url = blobUrl;
       entry.version = entry.previousVersion;
+      entry.previousVersion = currentVersion;
 
       api.registry.save([...registry]);
 
       await api.reloadPlugin(pluginId);
-
-      const updatedRegistry = api.registry.getAll();
-      const updatedEntry = updatedRegistry.find(p => p.id === pluginId);
-      if (updatedEntry) {
-        updatedEntry.previousVersion = currentVersion;
-        updatedEntry.previousUrl = currentUrl;
-        updatedEntry.currentVersion = updatedEntry.version;
-        api.registry.save([...updatedRegistry]);
-      }
 
       api.notify(`Rolled back to v${entry.version}`, 'success');
       renderInstalled();
@@ -669,7 +739,7 @@ export function setup(api) {
 
         await api.reloadPlugin(newDef.id);
 
-        saveVersionHistory(newDef.id, null, remoteMeta.version, url);
+        await saveVersionHistory(newDef.id, null, remoteMeta.version);
 
         api.notify('Installed Successfully', 'success');
         overlay.remove();
@@ -771,7 +841,7 @@ export function setup(api) {
         }
       }
 
-      if (p.previousVersion && p.previousUrl) {
+      if (p.previousVersion && getStoredPluginCode(p.id)) {
         rollbackBtn = `<button class="pm-btn pm-btn-secondary" data-rollback="${p.id}" title="Rollback to v${p.previousVersion}">↶ Rollback</button>`;
       }
       
@@ -1003,7 +1073,7 @@ export function setup(api) {
       try {
         cleanupPluginUI(newDef.id);
         await api.reloadPlugin(newDef.id);
-        saveVersionHistory(newDef.id, null, remoteMeta.version, btn.dataset.url);
+        await saveVersionHistory(newDef.id, null, remoteMeta.version);
       } catch {
         api.notify('Install failed', 'error');
       }
@@ -1025,9 +1095,18 @@ export function setup(api) {
 
       try {
         api.notify(`Updating ${updateId}...`, 'info');
+        
+        await fetchAndStoreCode(updateId);
+        
         await api.reloadPlugin(updateId);
         if (remoteVersion) {
-          saveVersionHistory(updateId, previousVersion, remoteVersion, previousUrl);
+          const registry2 = api.registry.getAll();
+          const item2 = registry2.find(entry => entry.id === updateId);
+          if (item2) {
+            item2.previousVersion = previousVersion;
+            item2.currentVersion = remoteVersion;
+            api.registry.save([...registry2]);
+          }
           saveRegistryPluginVersion(updateId, remoteVersion);
           saveRemoteVersion(updateId, remoteVersion);
         }
@@ -1041,15 +1120,16 @@ export function setup(api) {
         api.notify(`Update failed! Rolling back to v${previousVersion}...`, 'error');
 
         try {
-          if (previousUrl) {
+          const stored = getStoredPluginCode(updateId);
+          if (stored && stored.code) {
             const rollbackRegistry = api.registry.getAll();
             const rollbackEntry = rollbackRegistry.find(p => p.id === updateId);
             if (rollbackEntry) {
-              rollbackEntry.url = previousUrl;
+              const blobUrl = createBlobUrl(stored.code);
+              rollbackEntry.url = blobUrl;
               rollbackEntry.version = previousVersion;
               api.registry.save([...rollbackRegistry]);
               await api.reloadPlugin(updateId);
-              saveVersionHistory(updateId, remoteVersion, previousVersion, previousUrl);
               api.notify(`Rolled back to v${previousVersion} after failed update`, 'warning');
             }
           }
