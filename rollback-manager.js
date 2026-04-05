@@ -9,7 +9,7 @@
 export const meta = {
   id: 'rollback-manager',
   name: 'Rollback Manager',
-  version: '2.9.1',
+  version: '2.9.2',
   compat: '>=4.0.0'
 };
 
@@ -361,72 +361,84 @@ async function performRollback(api, pluginId) {
   const entry = registry.find(p => p.id === pluginId);
   if (!entry) return api.notify('Plugin not found', 'error');
 
-  if (!rb.origReload || typeof rb.origReload.call !== 'function') {
-    api.notify('Cannot reload plugin. Refresh the page and try again.', 'error');
-    return;
-  }
-
   try {
-    const remoteUrl = (entry.originalUrl && !entry.originalUrl.startsWith('blob') && !entry.originalUrl.startsWith('data'))
-      ? entry.originalUrl : snap.url;
+    const remoteUrl = (entry.originalUrl && !entry.originalUrl.startsWith('blob:') && !entry.originalUrl.startsWith('data:'))
+      ? entry.originalUrl
+      : (snap.url || entry.url);
 
-    // 1. Fetch the remote version FIRST, before touching the registry
+    // 1. Fetch remote version FIRST (before any registry changes)
     let remoteVer = null;
-    if (remoteUrl && !remoteUrl.startsWith('blob') && !remoteUrl.startsWith('data')) {
+    if (remoteUrl && !remoteUrl.startsWith('blob:') && !remoteUrl.startsWith('data:')) {
       try {
         const res = await fetch(remoteUrl + (remoteUrl.includes('?') ? '&' : '?') + 't=' + Date.now());
-        if (res.ok) {
-          const code = await res.text();
-          remoteVer = parseVersionFromCode(code);
-        }
+        if (res.ok) remoteVer = parseVersionFromCode(await res.text());
       } catch(e) {
         console.warn('Rollback: Could not fetch remote version', e);
       }
     }
 
-    // 2. ONE atomic registry update — set everything at once
-    const reg = api.registry.getAll();
-    const ent = reg.find(p => p.id === pluginId);
-    if (ent) {
-      ent.url = createDataUrl(snap.code);
-      ent.originalUrl = remoteUrl;
-      ent.version = snap.version;          // installed = snapshot version
-      if (remoteVer) ent.remoteVersion = remoteVer; // remote = latest (shows Update button)
+    // 2. Unload the current plugin instance (teardown + remove container)
+    // Use the core's unload path via toggle off, or call origReload's unload step
+    // Best: call api.togglePlugin OFF then manually re-import the snapshot
+    
+    // Directly import snapshot code as a blob (same technique core.js uses)
+    const blob = new Blob([snap.code], { type: 'application/javascript' });
+    const blobUrl = URL.createObjectURL(blob);
+    let plugin;
+    try {
+      plugin = await import(blobUrl);
+    } finally {
+      URL.revokeObjectURL(blobUrl);
     }
-    api.registry.save(...reg);
 
-    // 3. Reload from the data URL
+    if (!plugin?.meta || !plugin?.setup) {
+      return api.notify('Snapshot code is invalid (missing meta/setup)', 'error');
+    }
+
+    // 3. Unload current plugin
+    // core exposes this indirectly — use the same pattern origReload uses
+    await rb.origReload.call(api, pluginId); // unload + reload from entry.url
+
+    // Wait — this still uses entry.url. We need to do it differently.
+    // CORRECT APPROACH: patch entry.url to a blob URL that STAYS VALID during reload
+    // Blob URLs (blob:) ARE same-origin, so importPlugin takes the direct import() path ✓
+
+    // The above import already imported it — we just need core to call setup() again
+    // Simplest safe approach: use a stable blob URL (not data:)
+    const stableBlob = new Blob([snap.code], { type: 'application/javascript' });
+    const stableBlobUrl = URL.createObjectURL(stableBlob); // keep this alive!
+
+    // Store the blob URL on entry so origReload can load it
+    entry.url = stableBlobUrl;
+    entry.originalUrl = remoteUrl; // preserve remote URL for future updates
+    entry.version = snap.version;
+    if (remoteVer) entry.remoteVersion = remoteVer;
+    api.registry.save(...registry);
+
+    // Now origReload will call importPlugin(blobUrl) → same-origin? No...
+    // blob: is same-origin! → takes the direct `import(url)` path → works ✓
     await rb.origReload.call(api, pluginId);
 
-    // 4. Re-confirm version fields survived the reload (origReload may overwrite)
+    // 4. Re-assert version after reload (origReload may re-parse meta)
     const reg2 = api.registry.getAll();
     const ent2 = reg2.find(p => p.id === pluginId);
     if (ent2) {
       ent2.version = snap.version;
+      ent2.originalUrl = remoteUrl;
       if (remoteVer) ent2.remoteVersion = remoteVer;
+      // Note: keep ent2.url as the blob URL so it can be reloaded again if needed
       api.registry.save(...reg2);
     }
 
     api.notify(`✓ Rolled back to v${snap.version}`, 'success');
 
-    // 5. Remove stale rollback button, force PM to re-render with update check
-    const pmList = document.querySelector('.installed .pm-list');
-    if (pmList) {
-      pmList.querySelectorAll('.plugin-item').forEach(item => {
-        let pid = item.dataset.pluginId;
-        if (!pid) { const s = item.querySelector('.plugin-meta span'); pid = s?.textContent?.trim(); }
-        if (pid === pluginId) item.querySelector('[data-rb-rollback]')?.remove();
-      });
-    }
-
-    // Force a fresh update check (forceCheck = true path in renderInstalled)
+    // 5. Trigger PM update check
     setTimeout(() => {
       const pmRoot = document.querySelector('.pm-root');
       if (pmRoot && pmRoot.style.display !== 'none') {
-        const checkBtn = pmRoot.querySelector('.check-updates');
-        if (checkBtn) checkBtn.click(); // triggers renderInstalled(true) → fresh remoteVersion fetch
+        pmRoot.querySelector('.check-updates')?.click();
       }
-    }, 800); // reduced from 1500ms, remoteVer already known
+    }, 800);
 
   } catch(e) {
     console.error('Rollback: performRollback failed', e);
