@@ -9,7 +9,7 @@
 export const meta = {
   id: 'rollback-manager',
   name: 'Rollback Manager',
-  version: '2.9.2',
+  version: '3.0.0',
   compat: '>=4.0.0'
 };
 
@@ -362,6 +362,7 @@ async function performRollback(api, pluginId) {
   if (!entry) return api.notify('Plugin not found', 'error');
 
   try {
+    // Resolve the real remote URL (not blob/data)
     const remoteUrl = (entry.originalUrl && !entry.originalUrl.startsWith('blob:') && !entry.originalUrl.startsWith('data:'))
       ? entry.originalUrl
       : (snap.url || entry.url);
@@ -377,62 +378,34 @@ async function performRollback(api, pluginId) {
       }
     }
 
-    // 2. Unload the current plugin instance (teardown + remove container)
-    // Use the core's unload path via toggle off, or call origReload's unload step
-    // Best: call api.togglePlugin OFF then manually re-import the snapshot
-    
-    // Directly import snapshot code as a blob (same technique core.js uses)
-    const blob = new Blob([snap.code], { type: 'application/javascript' });
-    const blobUrl = URL.createObjectURL(blob);
-    let plugin;
-    try {
-      plugin = await import(blobUrl);
-    } finally {
-      URL.revokeObjectURL(blobUrl);
-    }
-
-    if (!plugin?.meta || !plugin?.setup) {
-      return api.notify('Snapshot code is invalid (missing meta/setup)', 'error');
-    }
-
-    // 3. Unload current plugin
-    // core exposes this indirectly — use the same pattern origReload uses
-    await rb.origReload.call(api, pluginId); // unload + reload from entry.url
-
-    // Wait — this still uses entry.url. We need to do it differently.
-    // CORRECT APPROACH: patch entry.url to a blob URL that STAYS VALID during reload
-    // Blob URLs (blob:) ARE same-origin, so importPlugin takes the direct import() path ✓
-
-    // The above import already imported it — we just need core to call setup() again
-    // Simplest safe approach: use a stable blob URL (not data:)
+    // 2. Create a stable blob URL from the snapshot code
+    //    blob: URLs are same-origin → core.js importPlugin() uses direct import()
     const stableBlob = new Blob([snap.code], { type: 'application/javascript' });
-    const stableBlobUrl = URL.createObjectURL(stableBlob); // keep this alive!
+    const stableBlobUrl = URL.createObjectURL(stableBlob);
 
-    // Store the blob URL on entry so origReload can load it
+    // 3. Patch the registry entry BEFORE reloading
     entry.url = stableBlobUrl;
-    entry.originalUrl = remoteUrl; // preserve remote URL for future updates
+    entry.originalUrl = remoteUrl;
     entry.version = snap.version;
     if (remoteVer) entry.remoteVersion = remoteVer;
-    api.registry.save(...registry);
+    api.registry.save(registry);  // ← pass array, NOT spread
 
-    // Now origReload will call importPlugin(blobUrl) → same-origin? No...
-    // blob: is same-origin! → takes the direct `import(url)` path → works ✓
+    // 4. Single reload — core will unload old + load from the patched blob URL
     await rb.origReload.call(api, pluginId);
 
-    // 4. Re-assert version after reload (origReload may re-parse meta)
+    // 5. Re-assert version fields (origReload may overwrite from meta)
     const reg2 = api.registry.getAll();
     const ent2 = reg2.find(p => p.id === pluginId);
     if (ent2) {
       ent2.version = snap.version;
       ent2.originalUrl = remoteUrl;
       if (remoteVer) ent2.remoteVersion = remoteVer;
-      // Note: keep ent2.url as the blob URL so it can be reloaded again if needed
-      api.registry.save(...reg2);
+      api.registry.save(reg2);  // ← pass array, NOT spread
     }
 
     api.notify(`✓ Rolled back to v${snap.version}`, 'success');
 
-    // 5. Trigger PM update check
+    // 6. Trigger PM update check so the Update button appears
     setTimeout(() => {
       const pmRoot = document.querySelector('.pm-root');
       if (pmRoot && pmRoot.style.display !== 'none') {
