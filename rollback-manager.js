@@ -1,5 +1,5 @@
 // ╔════════════════════════════════════════════════════════════╗
-// ║  ROLLBACK MANAGER  v2.9.0                                  ║
+// ║  ROLLBACK MANAGER  v3.0.1                                  ║
 // ║  • "Manage Snapshots" button in PM sidebar                  ║
 // ║  • Single unified popup: select, regenerate, delete, stop   ║
 // ║  • Snapshots LOCKED — never auto-overwritten                ║
@@ -9,7 +9,7 @@
 export const meta = {
   id: 'rollback-manager',
   name: 'Rollback Manager',
-  version: '3.0.0',
+  version: '3.0.1',
   compat: '>=4.0.0'
 };
 
@@ -378,29 +378,33 @@ async function performRollback(api, pluginId) {
       }
     }
 
-    // 2. Create a stable blob URL from the snapshot code
+    // 2. Create a temporary blob URL from the snapshot code
     //    blob: URLs are same-origin → core.js importPlugin() uses direct import()
-    const stableBlob = new Blob([snap.code], { type: 'application/javascript' });
-    const stableBlobUrl = URL.createObjectURL(stableBlob);
+    const tmpBlob = new Blob([snap.code], { type: 'application/javascript' });
+    const tmpBlobUrl = URL.createObjectURL(tmpBlob);
 
-    // 3. Patch the registry entry BEFORE reloading
-    entry.url = stableBlobUrl;
+    // 3. Temporarily set url to blob so core.reloadPlugin loads the snapshot
+    entry.url = tmpBlobUrl;
     entry.originalUrl = remoteUrl;
     entry.version = snap.version;
     if (remoteVer) entry.remoteVersion = remoteVer;
-    api.registry.save(registry);  // ← pass array, NOT spread
+    api.registry.save(registry);  // core's internal registry now has blob URL
 
-    // 4. Single reload — core will unload old + load from the patched blob URL
+    // 4. Reload — core unloads old plugin + loads from the temporary blob URL
     await rb.origReload.call(api, pluginId);
 
-    // 5. Re-assert version fields (origReload may overwrite from meta)
+    // 5. Revoke the blob URL (no longer needed) and restore the real remote URL
+    //    so that future updates/reloads/page refreshes fetch from the real source
+    URL.revokeObjectURL(tmpBlobUrl);
+
     const reg2 = api.registry.getAll();
     const ent2 = reg2.find(p => p.id === pluginId);
     if (ent2) {
-      ent2.version = snap.version;
+      ent2.url = remoteUrl;           // ← restore real URL for updates & page reload
       ent2.originalUrl = remoteUrl;
+      ent2.version = snap.version;
       if (remoteVer) ent2.remoteVersion = remoteVer;
-      api.registry.save(reg2);  // ← pass array, NOT spread
+      api.registry.save(reg2);
     }
 
     api.notify(`✓ Rolled back to v${snap.version}`, 'success');
