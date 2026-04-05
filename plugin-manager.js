@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '4.0.9',
+  version: '5.0.0',
   compat: '>=3.3.0'
 };
 
@@ -488,7 +488,21 @@ export function setup(api) {
     }
   }
 
+  // Resolve the URL to use for fetching remote meta / checking updates.
+  // If a plugin has been rolled back, entry.url may be a data: URL containing
+  // snapshot code — in that case use entry.originalUrl (the real remote URL).
+  function getRemoteUrl(entry) {
+    if (entry.originalUrl && !entry.originalUrl.startsWith('blob:') && !entry.originalUrl.startsWith('data:')) {
+      return entry.originalUrl;
+    }
+    if (entry.url && !entry.url.startsWith('blob:') && !entry.url.startsWith('data:')) {
+      return entry.url;
+    }
+    return null;
+  }
+
   async function fetchRemoteMeta(url) {
+    if (!url || url.startsWith('blob:') || url.startsWith('data:')) return null;
     try {
       const res = await fetch(url + (url.includes('?') ? '&' : '?') + 't=' + Date.now());
       const code = await res.text();
@@ -652,7 +666,7 @@ export function setup(api) {
 
     if (shouldCheck) {
       const results = await Promise.all(
-        plugins.map(p => p.url ? fetchRemoteMeta(p.url) : Promise.resolve(null))
+        plugins.map(p => fetchRemoteMeta(getRemoteUrl(p)))
       );
 
       results.forEach((meta, i) => {
@@ -953,13 +967,26 @@ export function setup(api) {
       const entry = registry.find(p => p.id === updateId);
       let remoteVersion = null;
 
-      if (entry?.url) {
-        const remoteMeta = await fetchRemoteMeta(entry.url);
+      const updateUrl = getRemoteUrl(entry);
+      if (updateUrl) {
+        const remoteMeta = await fetchRemoteMeta(updateUrl);
         remoteVersion = remoteMeta?.version || null;
       }
 
       try {
         api.notify(`Updating ${updateId}...`, 'info');
+
+        // If the plugin was rolled back, entry.url is a data: URL (snapshot code).
+        // Restore the real remote URL so core loads the latest version.
+        if (updateUrl && entry.url !== updateUrl) {
+          const freshReg = api.registry.getAll();
+          const freshEntry = freshReg.find(p => p.id === updateId);
+          if (freshEntry) {
+            freshEntry.url = updateUrl;
+            api.registry.save(freshReg);
+          }
+        }
+
         await api.reloadPlugin(updateId);
         if (remoteVersion) {
           saveRegistryPluginVersion(updateId, remoteVersion);
