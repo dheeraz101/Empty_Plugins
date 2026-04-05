@@ -1,8 +1,7 @@
 // ╔════════════════════════════════════════════════════════════╗
-// ║  ROLLBACK MANAGER  v3.1.0                                  ║
-// ║  • Survives F5 / hard refresh                               ║
-// ║  • Re-applies pinned rollback on page load                  ║
-// ║  • No blob/data URLs leak into persisted registry           ║
+// ║  ROLLBACK MANAGER  v4.0.0                                  ║
+// ║  • Rollbacks survive F5 / reload / disable-enable           ║
+// ║  • Uses persistent data: URLs (no blob leaks)               ║
 // ║  • "Manage Snapshots" button in PM sidebar                  ║
 // ║  • Per-card: ↩ rollback button (when snapshot < current)    ║
 // ╚════════════════════════════════════════════════════════════╝
@@ -11,7 +10,7 @@
 export const meta = {
   id: 'rollback-manager',
   name: 'Rollback Manager',
-  version: '3.1.0',
+  version: '4.0.1',
   compat: '>=4.0.0'
 };
 
@@ -32,7 +31,6 @@ const rb = window.__rb;
 
 const SNAPSHOT_KEY = 'rb_snapshots';
 const TRACKED_KEY  = 'rb_tracked';
-const PINNED_KEY   = 'rb_pinned';   // { pluginId: snapVersion } — rollbacks to re-apply after F5
 const MAX_TRACKED  = 10;
 
 
@@ -40,8 +38,6 @@ function loadSnapshots() { try { return JSON.parse(localStorage.getItem(SNAPSHOT
 function saveSnapshots(o) { try { localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(o)); } catch(e) { console.error('[Rollback] quota?', e); } }
 function loadTracked() { try { return JSON.parse(localStorage.getItem(TRACKED_KEY) || '[]'); } catch { return []; } }
 function saveTracked(a) { localStorage.setItem(TRACKED_KEY, JSON.stringify(a)); }
-function loadPinned() { try { return JSON.parse(localStorage.getItem(PINNED_KEY) || '{}'); } catch { return {}; } }
-function savePinned(o) { localStorage.setItem(PINNED_KEY, JSON.stringify(o)); }
 
 
 function getSnapshot(id)       { return loadSnapshots()[id] || null; }
@@ -49,11 +45,7 @@ function setSnapshot(id, d)    { const a = loadSnapshots(); a[id] = d; saveSnaps
 function deleteSnapshot(id)    { const a = loadSnapshots(); delete a[id]; saveSnapshots(a); }
 function isTracked(id)         { return loadTracked().includes(id); }
 function addTracked(id)        { const l = loadTracked(); if (!l.includes(id)) { l.push(id); saveTracked(l); } }
-function removeTracked(id)     { saveTracked(loadTracked().filter(x => x !== id)); deleteSnapshot(id); unpinPlugin(id); }
-
-function pinPlugin(id, ver)    { const p = loadPinned(); p[id] = ver; savePinned(p); }
-function unpinPlugin(id)       { const p = loadPinned(); delete p[id]; savePinned(p); }
-function getPinned(id)         { return loadPinned()[id] || null; }
+function removeTracked(id)     { saveTracked(loadTracked().filter(x => x !== id)); deleteSnapshot(id); }
 
 
 function compareVersions(a, b) {
@@ -85,11 +77,27 @@ function parseVersionFromCode(code) {
 }
 
 
+// Get the real remote URL for a registry entry (not blob/data)
+function getRealUrl(entry, snap) {
+  if (entry.originalUrl && !entry.originalUrl.startsWith('blob:') && !entry.originalUrl.startsWith('data:'))
+    return entry.originalUrl;
+  if (entry.url && !entry.url.startsWith('blob:') && !entry.url.startsWith('data:'))
+    return entry.url;
+  if (snap?.url && !snap.url.startsWith('blob:') && !snap.url.startsWith('data:'))
+    return snap.url;
+  return null;
+}
+
+
+function createDataUrl(code) {
+  return 'data:application/javascript;charset=utf-8,' + encodeURIComponent(code);
+}
+
+
 async function captureSnapshot(api, pluginId) {
   const entry = api.registry.getAll().find(p => p.id === pluginId);
   if (!entry) return false;
-  const remoteUrl = (entry.originalUrl && !entry.originalUrl.startsWith('blob:') && !entry.originalUrl.startsWith('data:'))
-    ? entry.originalUrl : entry.url;
+  const remoteUrl = getRealUrl(entry);
   const code = await fetchCode(remoteUrl);
   if (!code) return false;
 
@@ -179,16 +187,9 @@ function buildCSS() {
 
 
 // ── Safely get the ORIGINAL (un-wrapped) reloadPlugin ──
-// During bootstrap, api.reloadPlugin doesn't exist yet (core defines it AFTER
-// all plugins are loaded). We defer capturing it via the bus event, and also
-// do a lazy check at call-time as a safety net.
 function getOrigReload(api) {
   if (rb.origReload && typeof rb.origReload === 'function') return rb.origReload;
-  // Lazy capture: by the time a user clicks rollback, api.reloadPlugin exists.
-  // But it might be OUR wrapped version, so check for the stashed original first.
   if (api._rb_origReload && typeof api._rb_origReload === 'function') return api._rb_origReload;
-  // Last resort: use whatever is on api (could be our wrapper — still works for
-  // non-rollback reloads because the wrapper calls origReload internally)
   if (api.reloadPlugin && typeof api.reloadPlugin === 'function') return api.reloadPlugin;
   return null;
 }
@@ -197,9 +198,8 @@ function getOrigReload(api) {
 export async function setup(api) {
   rb.apiRef = api;
 
-  // ── Capture origReload safely ──
-  // On first load during bootstrap, api.reloadPlugin is undefined.
-  // On re-enable (after disable), it already exists (possibly our wrapped version).
+  // Capture origReload safely.
+  // During bootstrap, api.reloadPlugin is undefined (core defines it after all plugins load).
   if (!rb.origReload && api.reloadPlugin) {
     rb.origReload = api.reloadPlugin;
   }
@@ -207,26 +207,16 @@ export async function setup(api) {
     api._rb_origReload = rb.origReload;
   }
 
-  // Listen for core's "all plugins loaded" event to capture origReload
-  // This fires AFTER core defines api.reloadPlugin, api.registry, etc.
+  // Listen for core's "all plugins loaded" event — fires AFTER api.reloadPlugin exists
   if (!rb.allPluginsLoaded) {
-    api.bus.once('board:allPluginsLoaded', async () => {
+    api.bus.once('board:allPluginsLoaded', () => {
       rb.allPluginsLoaded = true;
-
-      // NOW api.reloadPlugin exists — capture it if we haven't yet
       if (!rb.origReload) {
         rb.origReload = api.reloadPlugin;
         api._rb_origReload = rb.origReload;
       }
-
-      // Wrap reloadPlugin (now that origReload is guaranteed)
       wrapReloadPlugin(api);
-
-      // ── Registry cleanup: fix any stale blob/data URLs ──
       cleanupRegistryUrls(api);
-
-      // ── Re-apply pinned rollbacks after F5 ──
-      await reapplyPinnedRollbacks(api);
     });
   }
 
@@ -271,127 +261,44 @@ export async function setup(api) {
     rb.clickHandlerBound = true;
   }
 
-  console.log('\uD83D\uDD19 Rollback Manager v3.1.0 loaded');
+  console.log('\uD83D\uDD19 Rollback Manager v4.0.0 loaded');
 }
 
 
-// ── Wrap api.reloadPlugin to auto-capture snapshots & clear pins on update ──
+// ── Wrap api.reloadPlugin to auto-capture snapshots on first update ──
 function wrapReloadPlugin(api) {
   const orig = rb.origReload;
   if (!orig) return;
   api.reloadPlugin = async function(id) {
     const entry = api.registry?.getAll?.()?.find(p => p.id === id);
-    const isTempReload = entry?.url?.startsWith('blob:') || entry?.url?.startsWith('data:');
-    if (!isTempReload && isTracked(id) && !getSnapshot(id)) {
+    const isSnapshotUrl = entry?.url?.startsWith('data:');
+    // Auto-capture snapshot before first update (if tracked and no snapshot yet)
+    if (!isSnapshotUrl && isTracked(id) && !getSnapshot(id)) {
       await captureSnapshot(api, id);
-    }
-    // If this is a normal reload/update (not our temp blob reload), clear the pin.
-    // The user is intentionally loading from the remote URL → latest version.
-    if (!isTempReload && getPinned(id)) {
-      unpinPlugin(id);
-      console.log(`[Rollback] Unpinned ${id} (updated/reloaded by user)`);
     }
     return orig.call(api, id);
   };
 }
 
 
-// ── Cleanup: fix stale blob/data URLs in persisted registry ──
+// ── Cleanup: fix stale blob URLs in persisted registry (legacy cleanup) ──
 function cleanupRegistryUrls(api) {
   if (!api.registry) return;
   const registry = api.registry.getAll();
   let changed = false;
   for (const entry of registry) {
-    if (entry.url && (entry.url.startsWith('blob:') || entry.url.startsWith('data:'))) {
-      // Restore from originalUrl or snapshot
+    // Only fix blob: URLs (they die on refresh). Leave data: URLs alone — they are intentional.
+    if (entry.url && entry.url.startsWith('blob:')) {
       const snap = getSnapshot(entry.id);
       const realUrl = entry.originalUrl || snap?.url;
       if (realUrl && !realUrl.startsWith('blob:') && !realUrl.startsWith('data:')) {
-        console.log(`[Rollback] Fixing stale URL for ${entry.id} → ${realUrl}`);
+        console.log(`[Rollback] Fixing stale blob URL for ${entry.id}`);
         entry.url = realUrl;
         changed = true;
       }
     }
   }
   if (changed) api.registry.save(registry);
-}
-
-
-// ── Re-apply pinned rollbacks on page load ──
-// After F5, the plugin loaded from the remote URL (latest version), but the
-// user had rolled it back. We re-apply the rollback from the stored snapshot.
-async function reapplyPinnedRollbacks(api) {
-  const pinned = loadPinned();
-  const ids = Object.keys(pinned);
-  if (ids.length === 0) return;
-
-  const orig = getOrigReload(api);
-  if (!orig) {
-    console.warn('[Rollback] Cannot re-apply pinned rollbacks — reloadPlugin not available');
-    return;
-  }
-
-  for (const pluginId of ids) {
-    const snap = getSnapshot(pluginId);
-    if (!snap?.code) {
-      unpinPlugin(pluginId);
-      continue;
-    }
-
-    const registry = api.registry.getAll();
-    const entry = registry.find(p => p.id === pluginId);
-    if (!entry || !entry.enabled) continue;
-
-    // Check if the currently loaded version already matches the pinned snapshot
-    // (i.e., the remote URL happens to serve the snapshot version)
-    const snapVer = snap.version;
-    if (entry.version === snapVer) continue; // already correct
-
-    console.log(`[Rollback] Re-applying pinned rollback: ${pluginId} → v${snapVer}`);
-
-    try {
-      // Fetch remote version so Update button can appear
-      const realUrl = entry.originalUrl || snap.url || entry.url;
-      let remoteVer = null;
-      if (realUrl && !realUrl.startsWith('blob:') && !realUrl.startsWith('data:')) {
-        try {
-          const res = await fetch(realUrl + (realUrl.includes('?') ? '&' : '?') + 't=' + Date.now());
-          if (res.ok) remoteVer = parseVersionFromCode(await res.text());
-        } catch(e) { /* ignore */ }
-      }
-
-      // Create temporary blob URL for the snapshot code
-      const tmpBlob = new Blob([snap.code], { type: 'application/javascript' });
-      const tmpBlobUrl = URL.createObjectURL(tmpBlob);
-
-      // Patch registry → blob URL temporarily
-      entry.url = tmpBlobUrl;
-      entry.version = snapVer;
-      if (remoteVer) entry.remoteVersion = remoteVer;
-      api.registry.save(registry);
-
-      // Reload from blob
-      await orig.call(api, pluginId);
-
-      // Revoke blob and restore real URL
-      URL.revokeObjectURL(tmpBlobUrl);
-
-      const reg2 = api.registry.getAll();
-      const ent2 = reg2.find(p => p.id === pluginId);
-      if (ent2) {
-        const safeUrl = (realUrl && !realUrl.startsWith('blob:') && !realUrl.startsWith('data:')) ? realUrl : ent2.url;
-        ent2.url = safeUrl;
-        ent2.originalUrl = safeUrl;
-        ent2.version = snapVer;
-        if (remoteVer) ent2.remoteVersion = remoteVer;
-        api.registry.save(reg2);
-      }
-
-      console.log(`[Rollback] Re-applied ${pluginId} v${snapVer} after page reload`);
-    } catch(e) {
-      console.error(`[Rollback] Failed to re-apply ${pluginId}:`, e);
-    }
-  }
 }
 
 
@@ -426,12 +333,12 @@ function openMainPopup(api) {
             ${trackedPlugins.map(p => {
               const snap = getSnapshot(p.id);
               const snapVer = snap?.version || null;
-              const pinnedVer = getPinned(p.id);
+              const isRolledBack = p.url?.startsWith('data:');
               const snapDate = snap?.timestamp ? new Date(snap.timestamp).toLocaleDateString(undefined, {month:'short',day:'numeric',year:'numeric'}) : null;
               return `<div class="rb-row-tracked">
                 <div class="rb-row-tracked-header">
                   <div class="rb-tracked-icon"></div>
-                  <div style="flex:1;min-width:0"><div class="rb-pname">${p.name||p.id}</div><div class="rb-pid">${p.id}${p.version?' \u00B7 v'+p.version:''}${pinnedVer?' \u00B7 pinned':''}</div></div>
+                  <div style="flex:1;min-width:0"><div class="rb-pname">${p.name||p.id}</div><div class="rb-pid">${p.id}${p.version?' \u00B7 v'+p.version:''}${isRolledBack?' \u00B7 rolled back':''}</div></div>
                   ${snap ? `<span class="rb-snap-badge ok">\u2713 v${snapVer||'?'}</span>` : `<span class="rb-snap-badge nil">No snapshot</span>`}
                 </div>
                 <div class="rb-tracked-actions">
@@ -493,17 +400,39 @@ function openMainPopup(api) {
     });
     overlay.querySelectorAll('[data-delsnap]').forEach(btn => {
       btn.addEventListener('click', () => {
-        deleteSnapshot(btn.dataset.delsnap);
-        unpinPlugin(btn.dataset.delsnap);
+        const id = btn.dataset.delsnap;
+        deleteSnapshot(id);
+        // If currently rolled back, restore real URL
+        restoreRealUrl(api, id);
         api.notify('Snapshot deleted.', 'info');
         render();
       });
     });
     overlay.querySelectorAll('[data-stoptrack]').forEach(btn => {
-      btn.addEventListener('click', () => { removeTracked(btn.dataset.stoptrack); api.notify(btn.dataset.stoptrack + ' untracked.', 'info'); render(); });
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.stoptrack;
+        // If currently rolled back, restore real URL
+        restoreRealUrl(api, id);
+        removeTracked(id);
+        api.notify(id + ' untracked.', 'info');
+        render();
+      });
     });
   }
   render();
+}
+
+
+// ── Restore entry.url from originalUrl (undo rollback in registry) ──
+function restoreRealUrl(api, pluginId) {
+  if (!api.registry) return;
+  const registry = api.registry.getAll();
+  const entry = registry.find(p => p.id === pluginId);
+  if (!entry) return;
+  if (entry.url?.startsWith('data:') && entry.originalUrl && !entry.originalUrl.startsWith('data:')) {
+    entry.url = entry.originalUrl;
+    api.registry.save(registry);
+  }
 }
 
 
@@ -548,14 +477,12 @@ async function performRollback(api, pluginId) {
   }
 
   try {
-    // Resolve the real remote URL (not blob/data)
-    const remoteUrl = (entry.originalUrl && !entry.originalUrl.startsWith('blob:') && !entry.originalUrl.startsWith('data:'))
-      ? entry.originalUrl
-      : (snap.url || entry.url);
+    // Resolve the real remote URL
+    const remoteUrl = getRealUrl(entry, snap);
 
-    // 1. Fetch remote version FIRST (before any registry changes)
+    // 1. Fetch remote version so the Update button shows correctly
     let remoteVer = null;
-    if (remoteUrl && !remoteUrl.startsWith('blob:') && !remoteUrl.startsWith('data:')) {
+    if (remoteUrl) {
       try {
         const res = await fetch(remoteUrl + (remoteUrl.includes('?') ? '&' : '?') + 't=' + Date.now());
         if (res.ok) remoteVer = parseVersionFromCode(await res.text());
@@ -564,39 +491,33 @@ async function performRollback(api, pluginId) {
       }
     }
 
-    // 2. Create a temporary blob URL from the snapshot code
-    const tmpBlob = new Blob([snap.code], { type: 'application/javascript' });
-    const tmpBlobUrl = URL.createObjectURL(tmpBlob);
-
-    // 3. Temporarily set url to blob so core.reloadPlugin loads the snapshot
-    entry.url = tmpBlobUrl;
+    // 2. Set entry.url to a data: URL containing the snapshot code.
+    //    data: URLs are persistent (survive F5), self-contained, and
+    //    core.js importPlugin() can fetch() them natively.
+    //    Store the real remote URL in originalUrl for future updates.
+    entry.url = createDataUrl(snap.code);
     entry.originalUrl = remoteUrl;
     entry.version = snap.version;
     if (remoteVer) entry.remoteVersion = remoteVer;
     api.registry.save(registry);
 
-    // 4. Reload — core unloads old plugin + loads from the temporary blob URL
+    // 3. Reload — core unloads old plugin + loads from the data: URL
     await orig.call(api, pluginId);
 
-    // 5. Revoke the blob URL and restore the real remote URL
-    URL.revokeObjectURL(tmpBlobUrl);
-
+    // 4. Re-assert version (origReload may overwrite from loaded meta)
     const reg2 = api.registry.getAll();
     const ent2 = reg2.find(p => p.id === pluginId);
     if (ent2) {
-      ent2.url = remoteUrl;           // restore real URL for updates & page reload
+      // Keep the data: URL (this is the whole point — persistence)
       ent2.originalUrl = remoteUrl;
       ent2.version = snap.version;
       if (remoteVer) ent2.remoteVersion = remoteVer;
       api.registry.save(reg2);
     }
 
-    // 6. Pin this rollback so it survives F5
-    pinPlugin(pluginId, snap.version);
-
     api.notify(`✓ Rolled back to v${snap.version}`, 'success');
 
-    // 7. Trigger PM update check so the Update button appears
+    // 5. Trigger PM update check
     setTimeout(() => {
       const pmRoot = document.querySelector('.pm-root');
       if (pmRoot && pmRoot.style.display !== 'none') {
@@ -653,12 +574,9 @@ function injectCardButtons(api) {
 export function teardown() {
   if (rb.style) { rb.style.remove(); rb.style = null; }
   if (rb.pollInterval) { clearInterval(rb.pollInterval); rb.pollInterval = null; }
-  // Restore original reloadPlugin
   if (rb.apiRef && rb.origReload) { rb.apiRef.reloadPlugin = rb.origReload; }
-  // Clear UI
   document.querySelectorAll('.rb-sidebar-btn').forEach(el => el.remove());
   document.querySelectorAll('[data-rb-rollback]').forEach(el => el.remove());
   document.querySelectorAll('.rb-overlay').forEach(el => el.remove());
   rb.apiRef = null;
-  // NOTE: rb.origReload is intentionally NOT cleared — it must survive re-enable
 }
