@@ -9,7 +9,7 @@
 export const meta = {
   id: 'rollback-manager',
   name: 'Rollback Manager',
-  version: '2.9.0',
+  version: '2.9.1',
   compat: '>=4.0.0'
 };
 
@@ -356,78 +356,81 @@ function openRollbackConfirm(api, pluginId) {
 async function performRollback(api, pluginId) {
   const snap = getSnapshot(pluginId);
   if (!snap?.code) return api.notify('No snapshot to roll back to', 'warning');
+
   const registry = api.registry.getAll();
   const entry = registry.find(p => p.id === pluginId);
   if (!entry) return api.notify('Plugin not found', 'error');
 
   if (!rb.origReload || typeof rb.origReload.call !== 'function') {
-    console.error('[Rollback] Cannot reload — original function missing. Try refreshing the page.');
     api.notify('Cannot reload plugin. Refresh the page and try again.', 'error');
     return;
   }
 
   try {
-    const remoteUrl = (entry.originalUrl && !entry.originalUrl.startsWith('blob:') && !entry.originalUrl.startsWith('data:'))
-      ? entry.originalUrl : (snap.url || entry.url);
+    const remoteUrl = (entry.originalUrl && !entry.originalUrl.startsWith('blob') && !entry.originalUrl.startsWith('data'))
+      ? entry.originalUrl : snap.url;
 
-    // Set plugin to snapshot code
-    entry.url = createDataUrl(snap.code);
-    entry.originalUrl = remoteUrl;
-    entry.version = snap.version;
-    api.registry.save([...registry]);
+    // 1. Fetch the remote version FIRST, before touching the registry
+    let remoteVer = null;
+    if (remoteUrl && !remoteUrl.startsWith('blob') && !remoteUrl.startsWith('data')) {
+      try {
+        const res = await fetch(remoteUrl + (remoteUrl.includes('?') ? '&' : '?') + 't=' + Date.now());
+        if (res.ok) {
+          const code = await res.text();
+          remoteVer = parseVersionFromCode(code);
+        }
+      } catch(e) {
+        console.warn('Rollback: Could not fetch remote version', e);
+      }
+    }
 
-    // Reload plugin
+    // 2. ONE atomic registry update — set everything at once
+    const reg = api.registry.getAll();
+    const ent = reg.find(p => p.id === pluginId);
+    if (ent) {
+      ent.url = createDataUrl(snap.code);
+      ent.originalUrl = remoteUrl;
+      ent.version = snap.version;          // installed = snapshot version
+      if (remoteVer) ent.remoteVersion = remoteVer; // remote = latest (shows Update button)
+    }
+    api.registry.save(...reg);
+
+    // 3. Reload from the data URL
     await rb.origReload.call(api, pluginId);
 
-    // Ensure version sticks after reload
+    // 4. Re-confirm version fields survived the reload (origReload may overwrite)
     const reg2 = api.registry.getAll();
     const ent2 = reg2.find(p => p.id === pluginId);
     if (ent2) {
       ent2.version = snap.version;
-      api.registry.save([...reg2]);
+      if (remoteVer) ent2.remoteVersion = remoteVer;
+      api.registry.save(...reg2);
     }
 
-    // Fetch remote version so PM shows Update button
-    if (remoteUrl && !remoteUrl.startsWith('blob:') && !remoteUrl.startsWith('data:')) {
-      try {
-        const res = await fetch(remoteUrl + (remoteUrl.includes('?')?'&':'?') + 't=' + Date.now());
-        if (res.ok) {
-          const code = await res.text();
-          const rv = parseVersionFromCode(code);
-          if (rv) {
-            const reg3 = api.registry.getAll();
-            const ent3 = reg3.find(p => p.id === pluginId);
-            if (ent3) { ent3.remoteVersion = rv; api.registry.save([...reg3]); }
-          }
-        }
-      } catch(e) { console.warn('[Rollback] Could not fetch remote version:', e); }
-    }
+    api.notify(`✓ Rolled back to v${snap.version}`, 'success');
 
-    api.notify(`\u2713 Rolled back to v${snap.version}`, 'success');
-
-    // Remove rollback button immediately for this plugin
-    const pmList = document.querySelector('#installed .pm-list');
+    // 5. Remove stale rollback button, force PM to re-render with update check
+    const pmList = document.querySelector('.installed .pm-list');
     if (pmList) {
       pmList.querySelectorAll('.plugin-item').forEach(item => {
         let pid = item.dataset.pluginId;
         if (!pid) { const s = item.querySelector('.plugin-meta span'); pid = s?.textContent?.trim(); }
-        if (pid === pluginId) {
-          item.querySelector('[data-rb-rollback]')?.remove();
-        }
+        if (pid === pluginId) item.querySelector('[data-rb-rollback]')?.remove();
       });
     }
 
-    // Trigger PM to re-check updates
+    // Force a fresh update check (forceCheck = true path in renderInstalled)
     setTimeout(() => {
       const pmRoot = document.querySelector('.pm-root');
       if (pmRoot && pmRoot.style.display !== 'none') {
         const checkBtn = pmRoot.querySelector('.check-updates');
-        if (checkBtn) checkBtn.click();
+        if (checkBtn) checkBtn.click(); // triggers renderInstalled(true) → fresh remoteVersion fetch
       }
-    }, 1500);
+    }, 800); // reduced from 1500ms, remoteVer already known
+
   } catch(e) {
-    console.error('[Rollback] performRollback failed', e);
-    api.notify('Rollback failed \u2014 check console', 'error');
+    console.error('Rollback: performRollback failed', e);
+    api.notify('Rollback failed — check console', 'error');
   }
 }
 
