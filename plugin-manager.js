@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '5.0.0',
+  version: '5.1.0',
   compat: '>=3.3.0'
 };
 
@@ -21,6 +21,32 @@ export function setup(api) {
   const CACHE_TIMEOUT = 10 * 60 * 1000;
   let updateCount = 0;
   const reloadCooldowns = new Map();
+
+  // ───────── STATUS HELPERS ─────────
+  // Persistent status/error fields on registry entries.
+  // status: 'active' | 'installing' | 'updating' | 'failed' | 'disabled'
+  // error:  string | null
+  function setPluginStatus(pluginId, status, error) {
+    const registry = api.registry.getAll();
+    const entry = registry.find(p => p.id === pluginId);
+    if (!entry) return;
+    entry.status = status;
+    entry.error = error || null;
+    api.registry.save(registry);
+  }
+
+  function getPluginStatus(entry) {
+    // Derive display status from persisted field + enabled flag
+    if (entry.status === 'installing' || entry.status === 'updating' || entry.status === 'failed') {
+      return entry.status;
+    }
+    return entry.enabled ? 'active' : 'disabled';
+  }
+
+  // Returns true if the plugin is mid-transition (block duplicate actions)
+  function isBusy(entry) {
+    return entry.status === 'installing' || entry.status === 'updating';
+  }
 
   // ───────── STYLE ─────────
   style = document.createElement('style');
@@ -151,7 +177,30 @@ export function setup(api) {
     letter-spacing: 0.5px;
   }
   .badge-enabled { background: rgba(52, 199, 89, 0.15); color: #248a3d; }
+  .badge-disabled { background: rgba(142,142,147,0.15); color: #8e8e93; }
+  .badge-installing { background: rgba(0, 122, 255, 0.15); color: #007aff; }
+  .badge-updating { background: rgba(255, 149, 0, 0.15); color: #cc7700; }
+  .badge-failed { background: rgba(255, 59, 48, 0.15); color: #ff3b30; }
   .badge-update { background: rgba(0, 122, 255, 0.15); color: #007aff; }
+
+  .pm-error-msg {
+    font-size: 12px; color: #ff3b30; margin-top: 4px;
+    max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  .pm-btn-retry {
+    background: rgba(255, 59, 48, 0.1); color: #ff3b30;
+    border: 1px solid rgba(255, 59, 48, 0.2);
+  }
+  .pm-btn-retry:hover { background: rgba(255, 59, 48, 0.18); }
+
+  .pm-btn[disabled] { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
+
+  @keyframes pm-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  .badge-installing, .badge-updating { animation: pm-pulse 1.2s ease-in-out infinite; }
 
   .pm-action-group { display: flex; gap: 8px; align-items: center; }
 
@@ -328,6 +377,12 @@ export function setup(api) {
     .plugin-item:hover { background: rgba(255, 255, 255, 0.08); }
     .plugin-name { color: #f5f5f7; }
     .pm-btn-secondary { background: rgba(255,255,255,0.1); color: #f5f5f7; }
+    .badge-disabled { background: rgba(142,142,147,0.2); color: #98989d; }
+    .badge-installing { background: rgba(0, 122, 255, 0.2); color: #409cff; }
+    .badge-updating { background: rgba(255, 149, 0, 0.2); color: #ffb340; }
+    .badge-failed { background: rgba(255, 59, 48, 0.2); color: #ff6961; }
+    .pm-error-msg { color: #ff6961; }
+    .pm-btn-retry { background: rgba(255, 59, 48, 0.15); color: #ff6961; border-color: rgba(255, 59, 48, 0.25); }
     .pm-modal-content { background: rgba(44, 44, 46, 0.95); color: white; border-color: rgba(255,255,255,0.1); }
     .pm-input { background: rgba(0,0,0,0.2); border-color: rgba(255,255,255,0.1); color: white; }
     .last-checked { color: #6e6e73; }
@@ -578,6 +633,7 @@ export function setup(api) {
     document.documentElement.appendChild(overlay);
 
     overlay.querySelector('#pm-confirm').onclick = async () => {
+      const confirmBtn = overlay.querySelector('#pm-confirm');
       const url = overlay.querySelector('#pm-url').value.trim();
       const inputId = overlay.querySelector('#pm-id').value.trim();
 
@@ -585,24 +641,27 @@ export function setup(api) {
         return api.notify('All fields required', 'error');
       }
 
+      // Lock the button to prevent double-click
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = 'Installing…';
+
       try {
         const remoteMeta = await fetchRemoteMeta(url);
 
         if (!remoteMeta) {
+          confirmBtn.disabled = false; confirmBtn.textContent = 'Install';
           return api.notify('Invalid plugin (meta not found)', 'error');
         }
 
         // 🔴 STRICT VALIDATION
         if (!remoteMeta.id || typeof remoteMeta.id !== 'string') {
+          confirmBtn.disabled = false; confirmBtn.textContent = 'Install';
           return api.notify('Invalid plugin (missing id)', 'error');
         }
 
         if (remoteMeta.id !== inputId) {
-          console.error('ID mismatch:', {
-            inputId,
-            pluginId: remoteMeta.id
-          });
-
+          console.error('ID mismatch:', { inputId, pluginId: remoteMeta.id });
+          confirmBtn.disabled = false; confirmBtn.textContent = 'Install';
           return api.notify(
             `ID mismatch → Expected "${inputId}", got "${remoteMeta.id}"`,
             'error'
@@ -610,33 +669,42 @@ export function setup(api) {
         }
 
         const newDef = {
-          id: remoteMeta.id, // no fallback
+          id: remoteMeta.id,
           url,
           name: remoteMeta.name,
           version: remoteMeta.version,
           icon: remoteMeta.icon,
           enabled: true,
           source: 'registry',
-          remoteVersion: remoteMeta.version
+          remoteVersion: remoteMeta.version,
+          status: 'installing',
+          error: null
         };
 
         const registry = api.registry.getAll();
 
         if (registry.some(p => p.id === newDef.id)) {
+          confirmBtn.disabled = false; confirmBtn.textContent = 'Install';
           return api.notify('Plugin already installed', 'warning');
         }
 
         api.registry.save([...registry, newDef]);
+        renderInstalled(); // show "Installing…" badge immediately
 
         await api.reloadPlugin(newDef.id);
 
+        setPluginStatus(newDef.id, 'active');
         api.notify('Installed Successfully', 'success');
         overlay.remove();
         renderInstalled();
 
       } catch (e) {
         console.error(e);
+        // Mark as failed in registry so user can retry
+        if (inputId) setPluginStatus(inputId, 'failed', e.message || 'Installation failed');
         api.notify('Installation failed', 'error');
+        confirmBtn.disabled = false; confirmBtn.textContent = 'Install';
+        renderInstalled();
       }
     };
 
@@ -733,17 +801,26 @@ export function setup(api) {
         updateBadge = '<span class="plugin-badge badge-update" style="margin-left:6px;">Update Available</span>';
       }
 
-      // 3. Badges
+      // 3. Badges — lifecycle-aware
+      const pStatus = isSelf ? 'active' : getPluginStatus(p);
       let typeBadge = '';
       if (isSelf) {
         typeBadge = '<span class="plugin-badge badge-enabled">System</span>';
-      } else if (p.enabled) {
-        typeBadge = '<span class="plugin-badge badge-enabled">Active</span>';
+      } else if (pStatus === 'installing') {
+        typeBadge = '<span class="plugin-badge badge-installing">Installing…</span>';
+      } else if (pStatus === 'updating') {
+        typeBadge = '<span class="plugin-badge badge-updating">Updating…</span>';
+      } else if (pStatus === 'failed') {
+        typeBadge = '<span class="plugin-badge badge-failed">Failed</span>';
+      } else if (pStatus === 'disabled') {
+        typeBadge = '<span class="plugin-badge badge-disabled">Inactive</span>';
       } else {
-        typeBadge = '<span class="plugin-badge" style="background:rgba(142,142,147,0.15);color:#8e8e93;">Inactive</span>';
+        typeBadge = '<span class="plugin-badge badge-enabled">Active</span>';
       }
 
-    const statusBadges = `<div style="margin-top:4px; display:flex; align-items:center;">${typeBadge}${updateBadge}</div>`;
+      const errorHtml = p.error ? `<div class="pm-error-msg" title="${p.error.replace(/"/g, '&quot;')}">⚠ ${p.error}</div>` : '';
+
+    const statusBadges = `<div style="margin-top:4px; display:flex; align-items:center;">${typeBadge}${updateBadge}</div>${errorHtml}`;
 
       // 4. Icon
       const versionText = installedVer ? `v${installedVer}` : 'Version unknown';
@@ -774,20 +851,26 @@ export function setup(api) {
         }
       }
 
-      const reloadDisabled = !p.enabled && !isSelf;
+      const busy = isBusy(p);
+      const reloadDisabled = (!p.enabled && !isSelf) || busy;
       const reloadBtnHTML = isSelf
         ? '' 
         : `
           <button class="pm-btn pm-btn-secondary reload-btn" 
                   data-act="reload" 
                   data-id="${p.id}"
-                  ${reloadDisabled ? 'disabled style="opacity:0.5; cursor:not-allowed;" title="Enable the plugin first to reload"' : ''}>
+                  ${reloadDisabled ? 'disabled title="' + (busy ? 'Operation in progress' : 'Enable the plugin first to reload') + '"' : ''}>
             Reload
           </button>
         `;
 
+      // Retry button for failed plugins
+      const retryBtn = pStatus === 'failed'
+        ? `<button class="pm-btn pm-btn-retry" data-act="retry" data-id="${p.id}">Retry</button>`
+        : '';
+
       html += `
-        <div class="plugin-item">
+        <div class="plugin-item" data-plugin-id="${p.id}">
           <div class="plugin-icon-box" style="background: ${iconBg};">${iconHtml}</div>
           <div class="plugin-info">
             <span class="plugin-name">${displayName}</span>
@@ -795,10 +878,11 @@ export function setup(api) {
             ${statusBadges}
           </div>
           <div class="pm-action-group">
+            ${retryBtn}
             ${reloadBtnHTML}
-            ${isSelf ? '' : `<button class="pm-btn ${p.enabled ? 'pm-btn-secondary' : 'pm-btn-primary'} toggle-btn" data-act="toggle" data-id="${p.id}">${p.enabled ? 'Disable' : 'Enable'}</button>`}
-            ${isSelf ? '' : `<button class="pm-btn pm-btn-secondary delete-btn" data-act="delete" data-id="${p.id}" style="color:#ff3b30;">Delete</button>`}
-            ${updateBtn}
+            ${isSelf ? '' : `<button class="pm-btn ${p.enabled ? 'pm-btn-secondary' : 'pm-btn-primary'} toggle-btn" data-act="toggle" data-id="${p.id}" ${busy ? 'disabled' : ''}>${p.enabled ? 'Disable' : 'Enable'}</button>`}
+            ${isSelf ? '' : `<button class="pm-btn pm-btn-secondary delete-btn" data-act="delete" data-id="${p.id}" style="color:#ff3b30;" ${busy ? 'disabled' : ''}>Delete</button>`}
+            ${busy ? '' : updateBtn}
           </div>
         </div>
       `;
@@ -872,12 +956,39 @@ export function setup(api) {
 
     const id = btn.dataset.id;
 
+    if (btn.dataset.act === 'retry') {
+      const retryEntry = api.registry.getAll().find(p => p.id === id);
+      if (!retryEntry || isBusy(retryEntry)) return;
+
+      btn.disabled = true;
+      btn.textContent = 'Retrying…';
+      setPluginStatus(id, 'installing');
+      renderInstalled();
+
+      try {
+        await api.reloadPlugin(id);
+        setPluginStatus(id, 'active');
+        api.notify(`${retryEntry.name || id} loaded successfully`, 'success');
+      } catch (e) {
+        setPluginStatus(id, 'failed', e.message || 'Retry failed');
+        api.notify('Retry failed', 'error');
+      }
+      renderInstalled();
+      return;
+    }
+
     if (btn.dataset.act === 'toggle') {
+      const tEntry = api.registry.getAll().find(p => p.id === id);
+      if (tEntry && isBusy(tEntry)) return;
       await api.togglePlugin(id);
       cleanupPluginUI(id);
+      // Sync status field with new enabled state
+      setPluginStatus(id, tEntry?.enabled ? 'active' : 'disabled');
     }
 
     if (btn.dataset.act === 'delete') {
+      const dEntry = api.registry.getAll().find(p => p.id === id);
+      if (dEntry && isBusy(dEntry)) return;
       await api.deletePlugin(id);
       cleanupPluginUI(id);
     }
@@ -888,6 +999,9 @@ export function setup(api) {
           return;
         }
 
+      const rEntry = api.registry.getAll().find(p => p.id === id);
+      if (rEntry && isBusy(rEntry)) return;
+
       const cooldownMs = 30000;
       const lastReload = reloadCooldowns.get(id) || 0;
       const now = Date.now();
@@ -897,14 +1011,19 @@ export function setup(api) {
       }
       reloadCooldowns.set(id, now);
 
-      const plugin = api.registry.getAll().find(p => p.id === id);
-      if (!plugin || (!plugin.enabled && id !== SELF_ID)) {
+      if (!rEntry || (!rEntry.enabled && id !== SELF_ID)) {
         api.notify('Enable the plugin first before reloading', 'warning');
         return;
       }
 
-      setTimeout(() => api.reloadPlugin(id), 0);
-      api.notify(`Reloaded ${id}`, 'success');
+      try {
+        await api.reloadPlugin(id);
+        setPluginStatus(id, 'active');
+        api.notify(`Reloaded ${id}`, 'success');
+      } catch (e) {
+        setPluginStatus(id, 'failed', e.message || 'Reload failed');
+        api.notify('Reload failed', 'error');
+      }
       cleanupPluginUI(id);
 
       renderInstalled();
@@ -912,51 +1031,62 @@ export function setup(api) {
     }
 
     if (btn.dataset.install) {
+      // Prevent double-click
+      btn.disabled = true;
+      btn.textContent = 'Installing…';
+
+      const installId = btn.dataset.install;
+
       const remoteMeta = await fetchRemoteMeta(btn.dataset.url);
 
       if (!remoteMeta) {
+        btn.disabled = false; btn.textContent = 'Install Plugin';
         return api.notify('Invalid plugin (meta not found)', 'error');
       }
 
       if (!remoteMeta.id || typeof remoteMeta.id !== 'string') {
+        btn.disabled = false; btn.textContent = 'Install Plugin';
         return api.notify('Invalid plugin (missing id)', 'error');
       }
 
-      if (remoteMeta.id !== btn.dataset.install) {
-        console.warn('ID mismatch:', {
-          jsonId: btn.dataset.install,
-          pluginId: remoteMeta.id
-        });
-
+      if (remoteMeta.id !== installId) {
+        console.warn('ID mismatch:', { jsonId: installId, pluginId: remoteMeta.id });
+        btn.disabled = false; btn.textContent = 'Install Plugin';
         return api.notify(
-          `Plugin ID mismatch (expected "${btn.dataset.install}", got "${remoteMeta.id}")`,
+          `Plugin ID mismatch (expected "${installId}", got "${remoteMeta.id}")`,
           'error'
         );
       }
 
       const newDef = {
-        id: remoteMeta.id || btn.dataset.install,
+        id: remoteMeta.id || installId,
         url: btn.dataset.url,
         name: remoteMeta.name,
         version: remoteMeta.version,
         icon: remoteMeta.icon || btn.dataset.icon,
         enabled: true,
         source: 'registry',
-        remoteVersion: remoteMeta.version
+        remoteVersion: remoteMeta.version,
+        status: 'installing',
+        error: null
       };
 
       const registry = api.registry.getAll();
 
       if (registry.some(p => p.id === newDef.id)) {
+        btn.disabled = false; btn.textContent = 'Install Plugin';
         return api.notify('Plugin already installed', 'warning');
       }
 
       api.registry.save([...registry, newDef]);
+      renderInstalled(); // show "Installing…" badge
 
       try {
         cleanupPluginUI(newDef.id);
         await api.reloadPlugin(newDef.id);
-      } catch {
+        setPluginStatus(newDef.id, 'active');
+      } catch (e) {
+        setPluginStatus(newDef.id, 'failed', e.message || 'Install failed');
         api.notify('Install failed', 'error');
       }
     }
@@ -965,8 +1095,15 @@ export function setup(api) {
       const updateId = btn.dataset.update;
       const registry = api.registry.getAll();
       const entry = registry.find(p => p.id === updateId);
-      let remoteVersion = null;
 
+      // Block if already busy
+      if (entry && isBusy(entry)) return;
+
+      // Prevent double-click
+      btn.disabled = true;
+      btn.textContent = 'Updating…';
+
+      let remoteVersion = null;
       const updateUrl = getRemoteUrl(entry);
       if (updateUrl) {
         const remoteMeta = await fetchRemoteMeta(updateUrl);
@@ -974,7 +1111,8 @@ export function setup(api) {
       }
 
       try {
-        api.notify(`Updating ${updateId}...`, 'info');
+        setPluginStatus(updateId, 'updating');
+        renderInstalled(); // show "Updating…" badge
 
         // If the plugin was rolled back, entry.url is a data: URL (snapshot code).
         // Restore the real remote URL so core loads the latest version.
@@ -990,14 +1128,16 @@ export function setup(api) {
         await api.reloadPlugin(updateId);
         if (remoteVersion) {
           saveRegistryPluginVersion(updateId, remoteVersion);
-          saveRemoteVersion(updateId, remoteVersion); // 🔥 REQUIRED
+          saveRemoteVersion(updateId, remoteVersion);
         }
+        setPluginStatus(updateId, 'active');
         api.notify(`${updateId} updated successfully!`, 'success');
         if (updateId === SELF_ID) {
           setTimeout(() => window.location.reload(), 200);
           return;
         }
-      } catch {
+      } catch (e) {
+        setPluginStatus(updateId, 'failed', e.message || 'Update failed');
         api.notify('Update failed', 'error');
       }
     }
@@ -1029,7 +1169,7 @@ export function setup(api) {
   };
   api.boardEl.addEventListener('contextmenu', contextMenuHandler);
 
-  console.log('🔥 Plugin Manager v3.7.3 loaded');
+  console.log('🔥 Plugin Manager v5.1.0 loaded');
 }
 
 export function teardown() {
