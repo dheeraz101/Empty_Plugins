@@ -1,7 +1,7 @@
 export const meta = {
   id: 'logger',
   name: 'Logger',
-  version: '1.1.0',
+  version: '1.1.1',
   icon: '📋',
   description: 'Records plugin lifecycle events. Adds a Logs button to Plugin Manager.',
   compat: '>=3.3.0'
@@ -95,7 +95,7 @@ function openLogViewer(api) {
   overlay.style.cssText = `
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
     background: rgba(0,0,0,0.2); backdrop-filter: blur(8px);
-    display: flex; align-items: center; justify-content: center; z-index: 9999;
+    display: flex; align-items: center; justify-content: center; z-index: 2147483647;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   `;
 
