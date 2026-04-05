@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '5.1.0',
+  version: '5.3.0',
   compat: '>=3.3.0'
 };
 
@@ -30,9 +30,11 @@ export function setup(api) {
     const registry = api.registry.getAll();
     const entry = registry.find(p => p.id === pluginId);
     if (!entry) return;
+    const prev = entry.status || 'unknown';
     entry.status = status;
     entry.error = error || null;
     api.registry.save(registry);
+    api.bus.emit('pm:status-change', { id: pluginId, from: prev, to: status, ...(error ? { error } : {}) });
   }
 
   function getPluginStatus(entry) {
@@ -644,6 +646,7 @@ export function setup(api) {
       // Lock the button to prevent double-click
       confirmBtn.disabled = true;
       confirmBtn.textContent = 'Installing…';
+      api.bus.emit('pm:install-start', { id: inputId, url });
 
       try {
         const remoteMeta = await fetchRemoteMeta(url);
@@ -660,7 +663,7 @@ export function setup(api) {
         }
 
         if (remoteMeta.id !== inputId) {
-          console.error('ID mismatch:', { inputId, pluginId: remoteMeta.id });
+          api.bus.emit('pm:install-id-mismatch', { expected: inputId, got: remoteMeta.id });
           confirmBtn.disabled = false; confirmBtn.textContent = 'Install';
           return api.notify(
             `ID mismatch → Expected "${inputId}", got "${remoteMeta.id}"`,
@@ -694,12 +697,13 @@ export function setup(api) {
         await api.reloadPlugin(newDef.id);
 
         setPluginStatus(newDef.id, 'active');
+        api.bus.emit('pm:install-success', { id: newDef.id, version: newDef.version });
         api.notify('Installed Successfully', 'success');
         overlay.remove();
         renderInstalled();
 
       } catch (e) {
-        console.error(e);
+        api.bus.emit('pm:install-fail', { id: inputId, error: e.message });
         // Mark as failed in registry so user can retry
         if (inputId) setPluginStatus(inputId, 'failed', e.message || 'Installation failed');
         api.notify('Installation failed', 'error');
@@ -962,14 +966,17 @@ export function setup(api) {
 
       btn.disabled = true;
       btn.textContent = 'Retrying…';
+      api.bus.emit('pm:retry-start', { id });
       setPluginStatus(id, 'installing');
       renderInstalled();
 
       try {
         await api.reloadPlugin(id);
         setPluginStatus(id, 'active');
+        api.bus.emit('pm:retry-success', { id });
         api.notify(`${retryEntry.name || id} loaded successfully`, 'success');
       } catch (e) {
+        api.bus.emit('pm:retry-fail', { id, error: e.message });
         setPluginStatus(id, 'failed', e.message || 'Retry failed');
         api.notify('Retry failed', 'error');
       }
@@ -980,15 +987,17 @@ export function setup(api) {
     if (btn.dataset.act === 'toggle') {
       const tEntry = api.registry.getAll().find(p => p.id === id);
       if (tEntry && isBusy(tEntry)) return;
+      const newState = tEntry?.enabled ? 'disabled' : 'active';
+      api.bus.emit('pm:toggle', { id, to: newState });
       await api.togglePlugin(id);
       cleanupPluginUI(id);
-      // Sync status field with new enabled state
       setPluginStatus(id, tEntry?.enabled ? 'active' : 'disabled');
     }
 
     if (btn.dataset.act === 'delete') {
       const dEntry = api.registry.getAll().find(p => p.id === id);
       if (dEntry && isBusy(dEntry)) return;
+      api.bus.emit('pm:delete', { id });
       await api.deletePlugin(id);
       cleanupPluginUI(id);
     }
@@ -1016,11 +1025,14 @@ export function setup(api) {
         return;
       }
 
+      api.bus.emit('pm:reload-start', { id });
       try {
         await api.reloadPlugin(id);
         setPluginStatus(id, 'active');
+        api.bus.emit('pm:reload-success', { id });
         api.notify(`Reloaded ${id}`, 'success');
       } catch (e) {
+        api.bus.emit('pm:reload-fail', { id, error: e.message });
         setPluginStatus(id, 'failed', e.message || 'Reload failed');
         api.notify('Reload failed', 'error');
       }
@@ -1036,6 +1048,7 @@ export function setup(api) {
       btn.textContent = 'Installing…';
 
       const installId = btn.dataset.install;
+      api.bus.emit('pm:install-start', { id: installId, url: btn.dataset.url, source: 'community' });
 
       const remoteMeta = await fetchRemoteMeta(btn.dataset.url);
 
@@ -1050,7 +1063,7 @@ export function setup(api) {
       }
 
       if (remoteMeta.id !== installId) {
-        console.warn('ID mismatch:', { jsonId: installId, pluginId: remoteMeta.id });
+        api.bus.emit('pm:install-id-mismatch', { expected: installId, got: remoteMeta.id, source: 'community' });
         btn.disabled = false; btn.textContent = 'Install Plugin';
         return api.notify(
           `Plugin ID mismatch (expected "${installId}", got "${remoteMeta.id}")`,
@@ -1085,7 +1098,9 @@ export function setup(api) {
         cleanupPluginUI(newDef.id);
         await api.reloadPlugin(newDef.id);
         setPluginStatus(newDef.id, 'active');
+        api.bus.emit('pm:install-success', { id: newDef.id, version: newDef.version, source: 'community' });
       } catch (e) {
+        api.bus.emit('pm:install-fail', { id: newDef.id, error: e.message, source: 'community' });
         setPluginStatus(newDef.id, 'failed', e.message || 'Install failed');
         api.notify('Install failed', 'error');
       }
@@ -1102,6 +1117,7 @@ export function setup(api) {
       // Prevent double-click
       btn.disabled = true;
       btn.textContent = 'Updating…';
+      api.bus.emit('pm:update-start', { id: updateId });
 
       let remoteVersion = null;
       const updateUrl = getRemoteUrl(entry);
@@ -1131,12 +1147,14 @@ export function setup(api) {
           saveRemoteVersion(updateId, remoteVersion);
         }
         setPluginStatus(updateId, 'active');
+        api.bus.emit('pm:update-success', { id: updateId, version: remoteVersion });
         api.notify(`${updateId} updated successfully!`, 'success');
         if (updateId === SELF_ID) {
           setTimeout(() => window.location.reload(), 200);
           return;
         }
       } catch (e) {
+        api.bus.emit('pm:update-fail', { id: updateId, error: e.message });
         setPluginStatus(updateId, 'failed', e.message || 'Update failed');
         api.notify('Update failed', 'error');
       }
@@ -1169,7 +1187,7 @@ export function setup(api) {
   };
   api.boardEl.addEventListener('contextmenu', contextMenuHandler);
 
-  console.log('🔥 Plugin Manager v5.1.0 loaded');
+  api.bus.emit('pm:loaded', { version: meta.version });
 }
 
 export function teardown() {
