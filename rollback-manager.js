@@ -10,7 +10,7 @@
 export const meta = {
   id: 'rollback-manager',
   name: 'Rollback Manager',
-  version: '4.0.1',
+  version: '4.0.2',
   compat: '>=4.0.0'
 };
 
@@ -562,8 +562,7 @@ function injectCardButtons(api) {
     rbBtn.className = 'pm-btn pm-btn-rollback';
     rbBtn.dataset.rbRollback = pluginId;
     rbBtn.title = `Revert to v${snap.version}`;
-    rbBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg> v${snap.version}`;
-
+        rbBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>`;
     const updateBtn = actionGroup.querySelector('[data-update]');
     if (updateBtn) actionGroup.insertBefore(rbBtn, updateBtn);
     else actionGroup.appendChild(rbBtn);
