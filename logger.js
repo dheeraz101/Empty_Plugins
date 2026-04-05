@@ -1,7 +1,7 @@
 export const meta = {
   id: 'logger',
   name: 'Logger',
-  version: '1.0.0',
+  version: '1.1.0',
   icon: '📋',
   description: 'Records plugin lifecycle events. Adds a Logs button to Plugin Manager.',
   compat: '>=3.3.0'
@@ -85,15 +85,24 @@ export function teardown() {
 }
 
 // ───────── LOG VIEWER MODAL ─────────
+// ───────── LOG VIEWER MODAL ─────────
 function openLogViewer(api) {
   const logs = getLogs();
   const overlay = document.createElement('div');
+  
+  // Apple-style Overlay Styling
   overlay.className = 'pm-modal-overlay';
+  overlay.style.cssText = `
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.2); backdrop-filter: blur(8px);
+    display: flex; align-items: center; justify-content: center; z-index: 9999;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  `;
 
   const eventColors = {
-    'pm:install-start':       '#007aff',
-    'pm:install-success':     '#34c759',
-    'pm:install-fail':        '#ff3b30',
+    'pm:install-start':      '#007aff',
+    'pm:install-success':    '#34c759',
+    'pm:install-fail':       '#ff3b30',
     'pm:install-id-mismatch': '#ff9500',
     'pm:update-start':        '#ff9500',
     'pm:update-success':      '#34c759',
@@ -112,48 +121,95 @@ function openLogViewer(api) {
   };
 
   const rows = logs.slice().reverse().map(l => {
-    const time  = new Date(l.t).toLocaleTimeString();
-    const date  = new Date(l.t).toLocaleDateString();
+    const time  = new Date(l.t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const date  = new Date(l.t).toLocaleDateString([], { month: 'short', day: 'numeric' });
     const color = eventColors[l.event] || '#8e8e93';
     const { t, event, ...rest } = l;
-    const detail = Object.keys(rest).length ? JSON.stringify(rest) : '';
-    return `<tr>
-      <td style="white-space:nowrap;opacity:0.6;font-size:12px;padding:3px 8px;">${date} ${time}</td>
-      <td style="padding:3px 8px;"><span style="color:${color};font-weight:600;font-size:12px;">${event}</span></td>
-      <td style="font-size:12px;opacity:0.8;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:3px 8px;" title='${detail.replace(/'/g, "&#39;")}'>${detail}</td>
-    </tr>`;
+    const detail = Object.keys(rest).length ? JSON.stringify(rest) : '—';
+    
+    return `
+      <tr style="border-bottom: 1px solid rgba(0,0,0,0.05); transition: background 0.2s;">
+        <td style="padding: 12px 16px; white-space: nowrap; color: #8e8e93; font-size: 12px;">
+          <span style="display:block; font-weight: 500; color: #1d1d1f;">${time}</span>
+          <span style="font-size: 10px; opacity: 0.7;">${date}</span>
+        </td>
+        <td style="padding: 12px 16px;">
+          <span style="
+            display: inline-block; padding: 2px 8px; border-radius: 6px; 
+            background: ${color}15; color: ${color}; 
+            font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px;
+          ">${event.replace('pm:', '')}</span>
+        </td>
+        <td style="padding: 12px 16px; font-family: 'SF Mono', Menlo, monospace; font-size: 12px; color: #424245; word-break: break-all;">
+          ${detail}
+        </td>
+      </tr>`;
   }).join('');
 
   overlay.innerHTML = `
-    <div class="pm-modal-content" style="max-width:560px;max-height:70vh;display:flex;flex-direction:column;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-        <span class="pm-modal-title">Plugin Logs</span>
-        <div style="display:flex;gap:8px;">
-          <button class="pm-btn pm-btn-secondary" id="pm-log-clear" style="font-size:12px;">Clear</button>
-          <button class="pm-btn pm-btn-secondary" id="pm-log-close">Close</button>
+    <div style="
+      background: rgba(255, 255, 255, 0.85); 
+      backdrop-filter: blur(20px) saturate(180%);
+      width: 90%; max-width: 800px; max-height: 85vh;
+      border-radius: 18px; border: 1px solid rgba(255,255,255,0.4);
+      box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+      display: flex; flex-direction: column; overflow: hidden;
+    ">
+      <div style="padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(0,0,0,0.08);">
+        <div>
+          <h2 style="margin: 0; font-size: 19px; font-weight: 700; color: #1d1d1f; letter-spacing: -0.4px;">System Activity</h2>
+          <p style="margin: 2px 0 0; font-size: 13px; color: #86868b;">${logs.length} events recorded</p>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button id="pm-log-clear" style="
+            background: transparent; border: 1px solid rgba(0,0,0,0.1); 
+            padding: 8px 16px; border-radius: 10px; font-size: 13px; font-weight: 500; 
+            cursor: pointer; color: #ff3b30; transition: all 0.2s;
+          ">Clear</button>
+          <button id="pm-log-close" style="
+            background: #1d1d1f; color: #fff; border: none; 
+            padding: 8px 20px; border-radius: 10px; font-size: 13px; font-weight: 500; 
+            cursor: pointer; transition: all 0.2s;
+          ">Done</button>
         </div>
       </div>
-      <div style="overflow-y:auto;flex:1;">
+
+      <div style="overflow-y: auto; flex: 1; background: rgba(255,255,255,0.3);">
         ${logs.length === 0
-          ? '<div style="text-align:center;padding:32px 0;opacity:0.5;">No logs yet</div>'
-          : `<table style="width:100%;border-collapse:collapse;">
-              <thead><tr style="text-align:left;opacity:0.5;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">
-                <th style="padding:3px 8px;">Time</th><th style="padding:3px 8px;">Event</th><th style="padding:3px 8px;">Detail</th>
-              </tr></thead>
+          ? '<div style="text-align:center; padding: 60px 0; color: #86868b; font-size: 15px;">No activity logged yet.</div>'
+          : `<table style="width: 100%; border-collapse: collapse; text-align: left;">
+              <thead style="position: sticky; top: 0; background: rgba(255,255,255,0.9); z-index: 1;">
+                <tr>
+                  <th style="padding: 12px 16px; font-size: 11px; font-weight: 600; color: #86868b; text-transform: uppercase;">Timestamp</th>
+                  <th style="padding: 12px 16px; font-size: 11px; font-weight: 600; color: #86868b; text-transform: uppercase;">Type</th>
+                  <th style="padding: 12px 16px; font-size: 11px; font-weight: 600; color: #86868b; text-transform: uppercase;">Payload Data</th>
+                </tr>
+              </thead>
               <tbody>${rows}</tbody>
             </table>`
         }
       </div>
-      <div style="margin-top:8px;font-size:11px;opacity:0.4;text-align:right;">${logs.length} / ${LOG_MAX} entries</div>
+
+      <div style="padding: 12px 24px; background: rgba(0,0,0,0.02); border-top: 1px solid rgba(0,0,0,0.05); font-size: 11px; color: #86868b; text-align: center;">
+        Storage utilization: <b>${Math.round((logs.length / LOG_MAX) * 100)}%</b> — Showing last ${LOG_MAX} events.
+      </div>
     </div>
   `;
 
   document.documentElement.appendChild(overlay);
-  overlay.querySelector('#pm-log-close').onclick = () => overlay.remove();
+
+  // Smooth interaction logic
+  const close = () => {
+    overlay.style.opacity = '0';
+    overlay.style.transition = 'opacity 0.2s ease';
+    setTimeout(() => overlay.remove(), 200);
+  };
+
+  overlay.querySelector('#pm-log-close').onclick = close;
   overlay.querySelector('#pm-log-clear').onclick = () => {
     clearLogs();
-    overlay.remove();
-    api.notify('Logs cleared', 'success');
+    close();
+    api.notify('Activity logs cleared', 'success');
   };
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
 }
