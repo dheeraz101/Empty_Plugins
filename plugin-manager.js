@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '5.3.0',
+  version: '5.3.1',
   compat: '>=3.3.0'
 };
 
@@ -53,7 +53,7 @@ export function setup(api) {
   // ───────── STYLE ─────────
   style = document.createElement('style');
   style.textContent = `
-  :root {
+  .pm-root {
     --pm-bg: rgba(255,255,255,0.96); 
     --pm-card: rgba(255,255,255,0.82); 
     --apple-red: #ff3b30;
@@ -367,7 +367,7 @@ export function setup(api) {
   }
 
   @media (prefers-color-scheme: dark) {
-    :root {
+    .pm-root {
     --pm-bg: rgba(28,28,30,0.75);
     --pm-card: rgba(255,255,255,0.05);
     }
