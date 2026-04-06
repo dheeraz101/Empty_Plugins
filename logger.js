@@ -1,7 +1,7 @@
 export const meta = {
   id: 'logger',
   name: 'Logger',
-  version: '1.1.3',
+  version: '1.2.3',
   icon: '📋',
   description: 'Records plugin lifecycle events. Adds a Logs button to Plugin Manager.',
   compat: '>=3.3.0'
