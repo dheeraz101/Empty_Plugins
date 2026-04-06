@@ -1,9 +1,9 @@
 export const meta = {
   id: 'logger',
   name: 'Logger',
-  version: '1.1.1',
+  version: '1.2.0',
   icon: '📋',
-  description: 'Records plugin lifecycle events. Adds a Logs button to Plugin Manager.',
+  description: 'Records plugin lifecycle events. Adds Logs & Theme toggle to Plugin Manager.',
   compat: '>=3.3.0'
 };
 
@@ -13,6 +13,7 @@ let apiRef = null;
 // ───────── CONSTANTS ─────────
 const LOG_KEY  = 'pm_logs';
 const LOG_MAX  = 100;
+const THEME_KEY = 'bb_theme';
 
 // ───────── STORAGE ─────────
 function pushLog(event, detail) {
@@ -36,7 +37,6 @@ function clearLogs() {
 }
 
 // ───────── EVENT WIRING ─────────
-// Every pm:* event on the bus gets recorded.
 const PM_EVENTS = [
   'pm:loaded',
   'pm:install-start',   'pm:install-success',   'pm:install-fail', 'pm:install-id-mismatch',
@@ -60,21 +60,65 @@ export function setup(api) {
   // Log own startup
   pushLog('logger:loaded', { version: meta.version });
 
-  // ───────── UI: Logs button in PM header ─────────
+  // ───────── UI INJECTION ─────────
   if (typeof api.registerUI === 'function') {
-    const btn = document.createElement('button');
-    btn.className = 'pm-btn pm-btn-secondary';
-    btn.innerHTML = `
+    
+    // 1. Theme Toggle Button
+    const themeBtn = document.createElement('button');
+    themeBtn.className = 'pm-btn pm-btn-secondary';
+    themeBtn.style.padding = '8px 12px'; // slightly adjusted for icon centering
+    
+    const sunIcon = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>`;
+    const moonIcon = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`;
+
+    // Initialize state from local storage or OS preference
+    let isDark = localStorage.getItem(THEME_KEY) === 'dark' || 
+                 (!localStorage.getItem(THEME_KEY) && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+    const applyTheme = () => {
+      if (isDark) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        themeBtn.innerHTML = sunIcon;
+        themeBtn.title = "Switch to Light Mode";
+      } else {
+        document.documentElement.setAttribute('data-theme', 'light');
+        themeBtn.innerHTML = moonIcon;
+        themeBtn.title = "Switch to Dark Mode";
+      }
+    };
+
+    // Apply on load
+    applyTheme();
+
+    themeBtn.onclick = () => {
+      isDark = !isDark;
+      localStorage.setItem(THEME_KEY, isDark ? 'dark' : 'light');
+      applyTheme();
+      api.bus.emit('theme:changed', { dark: isDark });
+      pushLog('theme:toggled', { mode: isDark ? 'dark' : 'light' });
+    };
+
+    // 2. Logs Button
+    const logBtn = document.createElement('button');
+    logBtn.className = 'pm-btn pm-btn-secondary';
+    logBtn.innerHTML = `
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
       Logs
     `;
-    btn.onclick = () => openLogViewer(api);
-    api.registerUI('header-actions', btn, 'logger-btn');
+    logBtn.onclick = () => openLogViewer(api);
+
+    // Create a container to sit them side-by-side cleanly
+    const container = document.createElement('div');
+    container.style.display = 'flex';
+    container.style.gap = '8px';
+    container.appendChild(themeBtn);
+    container.appendChild(logBtn);
+
+    api.registerUI('header-actions', container, 'logger-controls');
   }
 }
 
 export function teardown() {
-  // Unsubscribe from all events
   if (apiRef) {
     for (const { evt, handler } of listeners) {
       apiRef.bus.off(evt, handler);
@@ -84,7 +128,6 @@ export function teardown() {
   apiRef = null;
 }
 
-// ───────── LOG VIEWER MODAL ─────────
 // ───────── LOG VIEWER MODAL ─────────
 function openLogViewer(api) {
   const logs = getLogs();
@@ -117,7 +160,8 @@ function openLogViewer(api) {
     'pm:delete':              '#ff3b30',
     'pm:status-change':       '#5856d6',
     'pm:loaded':              '#007aff',
-    'logger:loaded':          '#5856d6'
+    'logger:loaded':          '#5856d6',
+    'theme:toggled':          '#ff9500'
   };
 
   const rows = logs.slice().reverse().map(l => {
