@@ -85,5 +85,5 @@
   {"id":"dark-theme","name":"Dark Theme","url":"https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/dark-theme.js","author":"Dheeraz","description":"Apply a sleek dark theme to the entire board with subtle grid lines.","icon":"🌙"},
   {"id":"rollback-manager","name":"Rollback Manager","url":"https://raw.githubusercontent.com/dheeraz101/Empty_Plugins/refs/heads/main/rollback-manager.js","author":"Dheeraz","description":"Version rollback for plugins with confirmation dialog. Injects rollback buttons into Plugin Manager.","icon":"↩️"},
   {"id":"logger","name":"Logger","url":"https://raw.githubusercontent.com/dheeraz101/Empty_Plugins/refs/heads/main/logger.js","author":"Dheeraz","description":"Records plugin lifecycle events. Adds a Logs button to Plugin Manager.","icon":"📋"},
-  {"id":"focus","name":"Focus","url":"https://raw.githubusercontent.com/dheeraz101/Empty_Plugins/refs/heads/main/focus.js","author":"Dheeraz","description":"Focuses on the current plugin. Adds a Focus button to Plugin Manager.","icon":"🔍"}
+  {"id":"focus","name":"Focus","url":"https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/focus.js","author":"Dheeraz","description":"Focuses on the current plugin. Adds a Focus button to Plugin Manager.","icon":"🔍"}
 ]
