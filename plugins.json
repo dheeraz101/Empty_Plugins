@@ -5,7 +5,8 @@
     "url": "https://raw.githubusercontent.com/dheeraz101/Empty_Plugins/refs/heads/main/About.js",
     "author": "Empty",
     "description": "A friendly about widget to get you started with Blank Board.",
-    "icon": "👋"
+    "icon": "👋",
+    "date": "2024-01-01"
   },
   {
     "id": "layout-engine",
@@ -13,7 +14,8 @@
     "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/layout.js",
     "author": "Dheeraz",
     "description": "Advanced layout engine with column presets, resizers, and drag-to-zone support.",
-    "icon": "📐"
+    "icon": "📐",
+    "date": "2024-02-15"
   },
   {
     "id": "clock-widget",
@@ -21,7 +23,8 @@
     "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/clock-widget.js",
     "author": "Dheeraz",
     "description": "Beautiful analog & digital clock widget with multiple styles.",
-    "icon": "⏰"
+    "icon": "⏰",
+    "date": "2024-02-20"
   },
   {
     "id": "notes-widget",
@@ -29,7 +32,8 @@
     "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/notes-widget.js",
     "author": "Dheeraz",
     "description": "Quick sticky notes with auto-save and rich text support.",
-    "icon": "📝"
+    "icon": "📝",
+    "date": "2024-03-01"
   },
   {
     "id": "sample-theme",
@@ -37,7 +41,8 @@
     "url": "https://raw.githubusercontent.com/dheeraz101/Empty_Plugins/refs/heads/main/Sample-theme.js",
     "author": "Dheeraz",
     "description": "A sample theme plugin to demonstrate how to create and apply custom themes in Blank Board.",
-    "icon": "🎨"
+    "icon": "🎨",
+    "date": "2024-03-10"
   },
   {
     "id": "music-player",
@@ -45,7 +50,8 @@
     "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/music-player.js",
     "author": "Dheeraz",
     "description": "A music player plugin with playlist support.",
-    "icon": "🎵"
+    "icon": "🎵",
+    "date": "2024-03-15"
   },
   {
     "id": "plugin-builder",
@@ -53,37 +59,227 @@
     "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/plugin-builder.js",
     "author": "Dheeraz",
     "description": "A plugin builder to help you create your own plugins for Blank Board.",
-    "icon": "🔨"
+    "icon": "🔨",
+    "category": "system",
+    "date": "2024-03-20"
   },
   {
-  "id": "pm-enhancer",
-  "name": "Plugin Manager Enhancer",
-  "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/plugin-manager-enhancer.js",
-  "author": "Dheeraz",
-  "description": "Advanced plugin manager with grid/list views, search, active/paused categories, and polished community store.",
-  "icon": "⚡"
-  }, 
-  {"id":"pomodoro-timer","name":"Pomodoro Timer","url":"https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/pomodoro-timer.js","author":"Dheeraz","description":"Focus timer with 25-min work sessions and 5-min breaks. Tracks completed sessions.","icon":"🍅"},
-  {"id":"calculator","name":"Calculator","url":"https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/calculator.js","author":"Dheeraz","description":"A sleek calculator with basic arithmetic operations and expression display.","icon":"🔢"},
-  {"id":"todo-list","name":"Todo List","url":"https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/todo-list.js","author":"Dheeraz","description":"Manage tasks with auto-save, completion tracking, and event bus integration.","icon":"✅"},
-  {"id":"color-picker","name":"Color Picker","url":"https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/color-picker.js","author":"Dheeraz","description":"Pick colors with RGB sliders and copy hex values to clipboard.","icon":"🎨"},
-  {"id":"stopwatch","name":"Stopwatch","url":"https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/stopwatch.js","author":"Dheeraz","description":"Precision stopwatch with start/stop, lap tracking, and centisecond display.","icon":"⏱️"},
-  {"id":"dice-roller","name":"Dice Roller","url":"https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/dice-roller.js","author":"Dheeraz","description":"Roll polyhedral dice (d4-d100) with roll history tracking.","icon":"🎲"},
-  {"id":"countdown-timer","name":"Countdown Timer","url":"https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/countdown-timer.js","author":"Dheeraz","description":"Set custom countdowns with hours, minutes, and seconds. Notifies when done.","icon":"⏳"},
-  {"id":"random-quote","name":"Random Quotes","url":"https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/random-quote.js","author":"Dheeraz","description":"Get inspired with random quotes from famous thinkers and developers.","icon":"💬"},
-  {"id":"unit-converter","name":"Unit Converter","url":"https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/unit-converter.js","author":"Dheeraz","description":"Convert between length, weight, temperature, and speed units.","icon":"🔄"},
-  {"id":"markdown-previewer","name":"Markdown Previewer","url":"https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/markdown-previewer.js","author":"Dheeraz","description":"Write and preview Markdown with split-view editing and syntax highlighting.","icon":"📄"},
-  {"id":"json-formatter","name":"JSON Formatter","url":"https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/json-formatter.js","author":"Dheeraz","description":"Format, validate, and syntax-highlight JSON with minify and copy support.","icon":"📋"},
-  {"id":"base64-tool","name":"Base64 Encoder","url":"https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/base64-tool.js","author":"Dheeraz","description":"Encode and decode Base64 strings with a clean split-panel interface.","icon":"🔐"},
-  {"id":"password-generator","name":"Password Generator","url":"https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/password-generator.js","author":"Dheeraz","description":"Generate secure passwords with customizable length, character types, and strength meter.","icon":"🔑"},
-  {"id":"text-counter","name":"Text Counter","url":"https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/text-counter.js","author":"Dheeraz","description":"Count words, characters, lines, sentences, and estimate reading time.","icon":"📊"},
-  {"id":"emoji-keyboard","name":"Emoji Keyboard","url":"https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/emoji-keyboard.js","author":"Dheeraz","description":"Browse and copy emojis by category with a searchable grid interface.","icon":"😀"},
-  {"id":"drawing-canvas","name":"Drawing Canvas","url":"https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/drawing-canvas.js","author":"Dheeraz","description":"Freehand drawing with pen/eraser, color palette, and adjustable brush size.","icon":"🖌️"},
-  {"id":"kanban-board","name":"Kanban Board","url":"https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/kanban-board.js","author":"Dheeraz","description":"Drag-and-drop task management with To Do, In Progress, and Done columns.","icon":"📌"},
-  {"id":"daily-planner","name":"Daily Planner","url":"https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/daily-planner.js","author":"Dheeraz","description":"Plan your day hour by hour with event creation and current-time highlighting.","icon":"📅"},
-  {"id":"world-clock","name":"World Clock","url":"https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/world-clock.js","author":"Dheeraz","description":"View live times across multiple cities and timezones with auto-refresh.","icon":"🌍"},
-  {"id":"dark-theme","name":"Dark Theme","url":"https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/dark-theme.js","author":"Dheeraz","description":"Apply a sleek dark theme to the entire board with subtle grid lines.","icon":"🌙"},
-  {"id":"rollback-manager","name":"Rollback Manager","url":"https://raw.githubusercontent.com/dheeraz101/Empty_Plugins/refs/heads/main/rollback-manager.js","author":"Dheeraz","description":"Version rollback for plugins with confirmation dialog. Injects rollback buttons into Plugin Manager.","icon":"↩️"},
-  {"id":"logger","name":"Logger","url":"https://raw.githubusercontent.com/dheeraz101/Empty_Plugins/refs/heads/main/logger.js","author":"Dheeraz","description":"Records plugin lifecycle events. Adds a Logs button to Plugin Manager.","icon":"📋"},
-  {"id":"focus","name":"Focus","url":"https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/focus.js","author":"Dheeraz","description":"Focuses on the current plugin. Adds a Focus button to Plugin Manager.","icon":"🔍"}
+    "id": "pm-enhancer",
+    "name": "Plugin Manager Enhancer",
+    "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/plugin-manager-enhancer.js",
+    "author": "Dheeraz",
+    "description": "Advanced plugin manager with grid/list views, search, active/paused categories, and polished community store.",
+    "icon": "⚡",
+    "category": "system",
+    "date": "2024-03-25"
+  },
+  {
+    "id": "pomodoro-timer",
+    "name": "Pomodoro Timer",
+    "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/pomodoro-timer.js",
+    "author": "Dheeraz",
+    "description": "Focus timer with 25-min work sessions and 5-min breaks. Tracks completed sessions.",
+    "icon": "🍅",
+    "date": "2024-04-01"
+  },
+  {
+    "id": "calculator",
+    "name": "Calculator",
+    "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/calculator.js",
+    "author": "Dheeraz",
+    "description": "A sleek calculator with basic arithmetic operations and expression display.",
+    "icon": "🔢",
+    "date": "2024-04-05"
+  },
+  {
+    "id": "todo-list",
+    "name": "Todo List",
+    "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/todo-list.js",
+    "author": "Dheeraz",
+    "description": "Manage tasks with auto-save, completion tracking, and event bus integration.",
+    "icon": "✅",
+    "date": "2024-04-10"
+  },
+  {
+    "id": "color-picker",
+    "name": "Color Picker",
+    "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/color-picker.js",
+    "author": "Dheeraz",
+    "description": "Pick colors with RGB sliders and copy hex values to clipboard.",
+    "icon": "🎨",
+    "date": "2024-04-15"
+  },
+  {
+    "id": "stopwatch",
+    "name": "Stopwatch",
+    "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/stopwatch.js",
+    "author": "Dheeraz",
+    "description": "Precision stopwatch with start/stop, lap tracking, and centisecond display.",
+    "icon": "⏱️",
+    "date": "2024-04-20"
+  },
+  {
+    "id": "dice-roller",
+    "name": "Dice Roller",
+    "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/dice-roller.js",
+    "author": "Dheeraz",
+    "description": "Roll polyhedral dice (d4-d100) with roll history tracking.",
+    "icon": "🎲",
+    "date": "2024-04-25"
+  },
+  {
+    "id": "countdown-timer",
+    "name": "Countdown Timer",
+    "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/countdown-timer.js",
+    "author": "Dheeraz",
+    "description": "Set custom countdowns with hours, minutes, and seconds. Notifies when done.",
+    "icon": "⏳",
+    "date": "2024-05-01"
+  },
+  {
+    "id": "random-quote",
+    "name": "Random Quotes",
+    "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/random-quote.js",
+    "author": "Dheeraz",
+    "description": "Get inspired with random quotes from famous thinkers and developers.",
+    "icon": "💬",
+    "date": "2024-05-05"
+  },
+  {
+    "id": "unit-converter",
+    "name": "Unit Converter",
+    "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/unit-converter.js",
+    "author": "Dheeraz",
+    "description": "Convert between length, weight, temperature, and speed units.",
+    "icon": "🔄",
+    "date": "2024-05-10"
+  },
+  {
+    "id": "markdown-previewer",
+    "name": "Markdown Previewer",
+    "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/markdown-previewer.js",
+    "author": "Dheeraz",
+    "description": "Write and preview Markdown with split-view editing and syntax highlighting.",
+    "icon": "📄",
+    "date": "2024-05-15"
+  },
+  {
+    "id": "json-formatter",
+    "name": "JSON Formatter",
+    "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/json-formatter.js",
+    "author": "Dheeraz",
+    "description": "Format, validate, and syntax-highlight JSON with minify and copy support.",
+    "icon": "📋",
+    "date": "2024-05-20"
+  },
+  {
+    "id": "base64-tool",
+    "name": "Base64 Encoder",
+    "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/base64-tool.js",
+    "author": "Dheeraz",
+    "description": "Encode and decode Base64 strings with a clean split-panel interface.",
+    "icon": "🔐",
+    "date": "2024-05-25"
+  },
+  {
+    "id": "password-generator",
+    "name": "Password Generator",
+    "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/password-generator.js",
+    "author": "Dheeraz",
+    "description": "Generate secure passwords with customizable length, character types, and strength meter.",
+    "icon": "🔑",
+    "date": "2024-06-01"
+  },
+  {
+    "id": "text-counter",
+    "name": "Text Counter",
+    "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/text-counter.js",
+    "author": "Dheeraz",
+    "description": "Count words, characters, lines, sentences, and estimate reading time.",
+    "icon": "📊",
+    "date": "2024-06-05"
+  },
+  {
+    "id": "emoji-keyboard",
+    "name": "Emoji Keyboard",
+    "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/emoji-keyboard.js",
+    "author": "Dheeraz",
+    "description": "Browse and copy emojis by category with a searchable grid interface.",
+    "icon": "😀",
+    "date": "2024-06-10"
+  },
+  {
+    "id": "drawing-canvas",
+    "name": "Drawing Canvas",
+    "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/drawing-canvas.js",
+    "author": "Dheeraz",
+    "description": "Freehand drawing with pen/eraser, color palette, and adjustable brush size.",
+    "icon": "🖌️",
+    "date": "2024-06-15"
+  },
+  {
+    "id": "kanban-board",
+    "name": "Kanban Board",
+    "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/kanban-board.js",
+    "author": "Dheeraz",
+    "description": "Drag-and-drop task management with To Do, In Progress, and Done columns.",
+    "icon": "📌",
+    "date": "2024-06-20"
+  },
+  {
+    "id": "daily-planner",
+    "name": "Daily Planner",
+    "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/daily-planner.js",
+    "author": "Dheeraz",
+    "description": "Plan your day hour by hour with event creation and current-time highlighting.",
+    "icon": "📅",
+    "date": "2024-06-25"
+  },
+  {
+    "id": "world-clock",
+    "name": "World Clock",
+    "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/world-clock.js",
+    "author": "Dheeraz",
+    "description": "View live times across multiple cities and timezones with auto-refresh.",
+    "icon": "🌍",
+    "date": "2024-07-01"
+  },
+  {
+    "id": "dark-theme",
+    "name": "Dark Theme",
+    "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/dark-theme.js",
+    "author": "Dheeraz",
+    "description": "Apply a sleek dark theme to the entire board with subtle grid lines.",
+    "icon": "🌙",
+    "date": "2024-07-05"
+  },
+  {
+    "id": "rollback-manager",
+    "name": "Rollback Manager",
+    "url": "https://raw.githubusercontent.com/dheeraz101/Empty_Plugins/refs/heads/main/rollback-manager.js",
+    "author": "Dheeraz",
+    "description": "Version rollback for plugins with confirmation dialog. Injects rollback buttons into Plugin Manager.",
+    "icon": "↩️",
+    "category": "system",
+    "date": "2024-07-10"
+  },
+  {
+    "id": "logger",
+    "name": "Logger",
+    "url": "https://raw.githubusercontent.com/dheeraz101/Empty_Plugins/refs/heads/main/logger.js",
+    "author": "Dheeraz",
+    "description": "Records plugin lifecycle events. Adds a Logs button to Plugin Manager.",
+    "icon": "📋",
+    "category": "system",
+    "date": "2024-07-15"
+  },
+  {
+    "id": "focus",
+    "name": "Focus",
+    "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/focus.js",
+    "author": "Dheeraz",
+    "description": "Focuses on the current plugin. Adds a Focus button to Plugin Manager.",
+    "icon": "🔍",
+    "date": "2024-07-20"
+  }
 ]

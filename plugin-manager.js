@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '5.3.1',
+  version: '5.3.2',
   compat: '>=3.3.0'
 };
 
@@ -21,6 +21,8 @@ export function setup(api) {
   const CACHE_TIMEOUT = 10 * 60 * 1000;
   let updateCount = 0;
   const reloadCooldowns = new Map();
+  let installedFilter = 'all';
+  let communityFilter = 'all';
 
   // ───────── STATUS HELPERS ─────────
   // Persistent status/error fields on registry entries.
@@ -184,6 +186,29 @@ export function setup(api) {
   .badge-updating { background: rgba(255, 149, 0, 0.15); color: #cc7700; }
   .badge-failed { background: rgba(255, 59, 48, 0.15); color: #ff3b30; }
   .badge-update { background: rgba(0, 122, 255, 0.15); color: #007aff; }
+  .badge-system { background: rgba(88, 86, 214, 0.15); color: #5856d6; }
+  .badge-new { background: rgba(255, 149, 0, 0.15); color: #cc7700; }
+
+  .pm-filter-bar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  .pm-filter-btn {
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    background: rgba(0, 0, 0, 0.04);
+    color: #424245;
+    transition: all 0.15s ease;
+  }
+
+  .pm-filter-btn:hover { background: rgba(0, 0, 0, 0.08); }
+  .pm-filter-btn.active { background: #0071e3; color: white; }
 
   .pm-error-msg {
     font-size: 12px; color: #ff3b30; margin-top: 4px;
@@ -404,6 +429,9 @@ export function setup(api) {
     .pm-content {
       scrollbar-color: rgba(255,255,255,0.3) transparent;
     }
+    .pm-filter-btn { background: rgba(255,255,255,0.08); color: #a1a1a6; }
+    .pm-filter-btn:hover { background: rgba(255,255,255,0.15); }
+    .pm-filter-btn.active { background: #0071e3; color: white; }
   }
 `;
   document.head.appendChild(style);
@@ -448,11 +476,20 @@ export function setup(api) {
     <div id="installed">
       <h1 class="pm-view-title">Installed Plugins</h1>
       <p class="pm-view-subtitle">Manage and configure your active workspace tools.</p>
+      <div class="pm-filter-bar">
+        <button class="pm-filter-btn active" data-filter-installed="all">All</button>
+        <button class="pm-filter-btn" data-filter-installed="system">System</button>
+      </div>
       <div class="pm-list"></div>
     </div>
     <div id="community" style="display:none;">
       <h1 class="pm-view-title">Discovery</h1>
       <p class="pm-view-subtitle">Explore new extensions built by the community.</p>
+      <div class="pm-filter-bar">
+        <button class="pm-filter-btn active" data-filter-community="all">All</button>
+        <button class="pm-filter-btn" data-filter-community="system">System</button>
+        <button class="pm-filter-btn" data-filter-community="new">New</button>
+      </div>
       <div class="pm-list"></div>
     </div>
   </div>
@@ -718,6 +755,18 @@ export function setup(api) {
 
   let remoteMetaCache = new Map();
 
+  function isPluginNew(pluginDate) {
+    if (!pluginDate) return false;
+    const now = Date.now();
+    const published = new Date(pluginDate).getTime();
+    const sixDays = 6 * 24 * 60 * 60 * 1000;
+    return (now - published) < sixDays;
+  }
+
+  function isSystemPlugin(plugin) {
+    return plugin.category === 'system' || plugin.id === SELF_ID;
+  }
+
 // ───────── RENDER INSTALLED (With Persistence Fix) ─────────
   async function renderInstalled(forceCheck = false) {
     if (!root || !document.body.contains(root)) return;
@@ -754,37 +803,66 @@ export function setup(api) {
     let registryChanged = false;
     const registryCopy = [...plugins];
 
-    let html = '';
-    let availableUpdates = 0;
+    // Separate system and normal plugins
+    const systemPlugins = [];
+    const normalPlugins = [];
 
     for (let i = 0; i < plugins.length; i++) {
       const p = plugins[i];
+      const remoteMeta = shouldCheck ? remoteMetas[i] : null;
+      
+      // Check if it's a system plugin via category or id
+      const isSystem = isSystemPlugin(p);
+      
+      // Update remote version
+      if (remoteMeta?.version) {
+        const entry = registryCopy.find(e => e.id === p.id);
+        if (entry && entry.remoteVersion !== remoteMeta.version) {
+          entry.remoteVersion = remoteMeta.version;
+          registryChanged = true;
+        }
+      }
+      
+      const pluginData = { ...p, remoteMeta, index: i };
+      if (isSystem) {
+        systemPlugins.push(pluginData);
+      } else {
+        normalPlugins.push(pluginData);
+      }
+    }
+
+    // Apply filter
+    let displaySystemPlugins = systemPlugins;
+    let displayNormalPlugins = normalPlugins;
+    
+    if (installedFilter === 'system') {
+      displaySystemPlugins = systemPlugins;
+      displayNormalPlugins = [];
+    } else if (installedFilter === 'all') {
+      displaySystemPlugins = systemPlugins;
+      displayNormalPlugins = normalPlugins;
+    }
+
+    let html = '';
+    let availableUpdates = 0;
+
+    // Render system plugins first
+    for (const pData of displaySystemPlugins) {
+      const p = plugins[pData.index];
+      const remoteMeta = pData.remoteMeta;
       const isSelf = p.id === SELF_ID;
+      const isSystem = true;
 
       let installedVer = p.version || null;
-      let remoteVer = p.remoteVersion || null; // use cached first
+      let remoteVer = p.remoteVersion || null;
 
-      // fetch latest
-      const remoteMeta = shouldCheck ? remoteMetas[i] : null;
-        if (remoteMeta?.version) {
-          remoteVer = remoteMeta.version;
+      if (remoteMeta?.version) {
+        remoteVer = remoteMeta.version;
+      }
 
-          const entry = registryCopy.find(e => e.id === p.id);
-          if (entry && entry.remoteVersion !== remoteVer) {
-            entry.remoteVersion = remoteVer;
-            registryChanged = true;
-          }
-        }
-
-      // 2. Resolve Name & Version
       const displayName = remoteMeta?.name || p.name || p.id;
 
       if (!installedVer && remoteVer) {
-        const entry = registryCopy.find(e => e.id === p.id);
-        if (entry && entry.version !== remoteVer) {
-          entry.version = remoteVer;
-          registryChanged = true;
-        }
         installedVer = remoteVer;
       }
 
@@ -805,11 +883,112 @@ export function setup(api) {
         updateBadge = '<span class="plugin-badge badge-update" style="margin-left:6px;">Update Available</span>';
       }
 
-      // 3. Badges — lifecycle-aware
       const pStatus = isSelf ? 'active' : getPluginStatus(p);
       let typeBadge = '';
       if (isSelf) {
-        typeBadge = '<span class="plugin-badge badge-enabled">System</span>';
+        typeBadge = '<span class="plugin-badge badge-system">System</span>';
+      } else if (pStatus === 'installing') {
+        typeBadge = '<span class="plugin-badge badge-installing">Installing…</span>';
+      } else if (pStatus === 'updating') {
+        typeBadge = '<span class="plugin-badge badge-updating">Updating…</span>';
+      } else if (pStatus === 'failed') {
+        typeBadge = '<span class="plugin-badge badge-failed">Failed</span>';
+      } else if (pStatus === 'disabled') {
+        typeBadge = '<span class="plugin-badge badge-disabled">Inactive</span>';
+      } else {
+        typeBadge = '<span class="plugin-badge badge-system">System</span>';
+      }
+
+      const errorHtml = p.error ? `<div class="pm-error-msg" title="${p.error.replace(/"/g, '&quot;')}">⚠ ${p.error}</div>` : '';
+      const statusBadges = `<div style="margin-top:4px; display:flex; align-items:center;">${typeBadge}${updateBadge}</div>${errorHtml}`;
+
+      const versionText = installedVer ? `v${installedVer}` : 'Version unknown';
+      const colors = ['#007AFF', '#5856D6', '#AF52DE', '#FF2D55', '#FF9500'];
+      const iconBg = colors[p.id.length % colors.length];
+      const iconContent = p.icon || remoteMeta?.icon || getCommunityIcon(p.id) || '📦';
+      const iconHtml = (typeof iconContent === 'string' && (iconContent.startsWith('http://') || iconContent.startsWith('https://')))
+        ? `<img src="${iconContent}" alt="${displayName}" style="width:100%;height:100%;border-radius:10px;object-fit:cover;" />`
+        : iconContent;
+
+      const busy = isBusy(p);
+      const reloadDisabled = (!p.enabled && !isSelf) || busy;
+      const reloadBtnHTML = isSelf ? '' : `
+        <button class="pm-btn pm-btn-secondary reload-btn" 
+                data-act="reload" 
+                data-id="${p.id}"
+                ${reloadDisabled ? 'disabled title="' + (busy ? 'Operation in progress' : 'Enable the plugin first to reload') + '"' : ''}>
+          Reload
+        </button>
+      `;
+
+      const retryBtn = pStatus === 'failed'
+        ? `<button class="pm-btn pm-btn-retry" data-act="retry" data-id="${p.id}">Retry</button>`
+        : '';
+
+      html += `
+        <div class="plugin-item" data-plugin-id="${p.id}">
+          <div class="plugin-icon-box" style="background: ${iconBg};">${iconHtml}</div>
+          <div class="plugin-info">
+            <span class="plugin-name">${displayName}</span>
+            <div class="plugin-meta">${versionText} • <span style="opacity: 0.7">${p.id}</span></div>
+            ${statusBadges}
+          </div>
+          <div class="pm-action-group">
+            ${retryBtn}
+            ${reloadBtnHTML}
+            ${isSelf ? '' : `<button class="pm-btn ${p.enabled ? 'pm-btn-secondary' : 'pm-btn-primary'} toggle-btn" data-act="toggle" data-id="${p.id}" ${busy ? 'disabled' : ''}>${p.enabled ? 'Disable' : 'Enable'}</button>`}
+            ${isSelf ? '' : `<button class="pm-btn pm-btn-secondary delete-btn" data-act="delete" data-id="${p.id}" style="color:#ff3b30;" ${busy ? 'disabled' : ''}>Delete</button>`}
+            ${busy ? '' : updateBtn}
+          </div>
+        </div>
+      `;
+    }
+
+    // Add divider if there are both system and normal plugins
+    if (displaySystemPlugins.length > 0 && displayNormalPlugins.length > 0) {
+      html += `<div style="height: 1px; background: rgba(0,0,0,0.1); margin: 12px 0;"></div>`;
+    }
+
+    // Render normal plugins
+    for (const pData of displayNormalPlugins) {
+      const p = plugins[pData.index];
+      const remoteMeta = pData.remoteMeta;
+      const isSelf = p.id === SELF_ID;
+
+      let installedVer = p.version || null;
+      let remoteVer = p.remoteVersion || null;
+
+      if (remoteMeta?.version) {
+        remoteVer = remoteMeta.version;
+      }
+
+      const displayName = remoteMeta?.name || p.name || p.id;
+
+      if (!installedVer && remoteVer) {
+        installedVer = remoteVer;
+      }
+
+      let hasUpdate = false;
+      let updateBadge = '';
+      let updateBtn = '';
+
+      if (installedVer && remoteVer) {
+        const cmp = compareVersions(remoteVer, installedVer);
+        if (cmp > 0) {
+          hasUpdate = true;
+          availableUpdates++;
+          updateBtn = `<button class="pm-btn pm-btn-primary" data-update="${p.id}">Update</button>`;
+        }
+      }
+      
+      if (hasUpdate) {
+        updateBadge = '<span class="plugin-badge badge-update" style="margin-left:6px;">Update Available</span>';
+      }
+
+      const pStatus = isSelf ? 'active' : getPluginStatus(p);
+      let typeBadge = '';
+      if (isSelf) {
+        typeBadge = '<span class="plugin-badge badge-system">System</span>';
       } else if (pStatus === 'installing') {
         typeBadge = '<span class="plugin-badge badge-installing">Installing…</span>';
       } else if (pStatus === 'updating') {
@@ -823,10 +1002,8 @@ export function setup(api) {
       }
 
       const errorHtml = p.error ? `<div class="pm-error-msg" title="${p.error.replace(/"/g, '&quot;')}">⚠ ${p.error}</div>` : '';
+      const statusBadges = `<div style="margin-top:4px; display:flex; align-items:center;">${typeBadge}${updateBadge}</div>${errorHtml}`;
 
-    const statusBadges = `<div style="margin-top:4px; display:flex; align-items:center;">${typeBadge}${updateBadge}</div>${errorHtml}`;
-
-      // 4. Icon
       const versionText = installedVer ? `v${installedVer}` : 'Version unknown';
       const colors = ['#007AFF', '#5856D6', '#AF52DE', '#FF2D55', '#FF9500'];
       const iconBg = colors[p.id.length % colors.length];
@@ -835,40 +1012,17 @@ export function setup(api) {
         ? `<img src="${iconContent}" alt="${displayName}" style="width:100%;height:100%;border-radius:10px;object-fit:cover;" />`
         : iconContent;
 
-      // 5. Persistence fix (name + icon)
-      if ((remoteMeta?.name && p.name !== remoteMeta.name) || (!p.icon && iconContent && iconContent !== '📦')) {
-        const reg = api.registry.getAll();
-        const entry = registryCopy.find(item => item.id === p.id);
-        if (entry) {
-          let updated = false;
-          if (remoteMeta?.name && entry.name !== remoteMeta.name) {
-            entry.name = remoteMeta.name;
-            updated = true;
-          }
-          if (iconContent && iconContent !== '📦' && entry.icon !== iconContent) {
-            entry.icon = iconContent;
-            updated = true;
-          }
-          if (updated) registryChanged = true;
-          p.name = entry.name;
-          p.icon = entry.icon;
-        }
-      }
-
       const busy = isBusy(p);
       const reloadDisabled = (!p.enabled && !isSelf) || busy;
-      const reloadBtnHTML = isSelf
-        ? '' 
-        : `
-          <button class="pm-btn pm-btn-secondary reload-btn" 
-                  data-act="reload" 
-                  data-id="${p.id}"
-                  ${reloadDisabled ? 'disabled title="' + (busy ? 'Operation in progress' : 'Enable the plugin first to reload') + '"' : ''}>
-            Reload
-          </button>
-        `;
+      const reloadBtnHTML = isSelf ? '' : `
+        <button class="pm-btn pm-btn-secondary reload-btn" 
+                data-act="reload" 
+                data-id="${p.id}"
+                ${reloadDisabled ? 'disabled title="' + (busy ? 'Operation in progress' : 'Enable the plugin first to reload') + '"' : ''}>
+          Reload
+        </button>
+      `;
 
-      // Retry button for failed plugins
       const retryBtn = pStatus === 'failed'
         ? `<button class="pm-btn pm-btn-retry" data-act="retry" data-id="${p.id}">Retry</button>`
         : '';
@@ -905,7 +1059,7 @@ export function setup(api) {
     updateBadge(availableUpdates);
   }
 
-  // ───────── RENDER COMMUNITY (unchanged) ─────────
+  // ───────── RENDER COMMUNITY (with filters) ─────────
   let communityCache = [];
   async function renderCommunity() {
     if (!root || !document.body.contains(root)) return;
@@ -927,11 +1081,29 @@ export function setup(api) {
       return acc;
     }, {});
 
-    el.innerHTML = communityCache.map(p => {
+    // Filter plugins based on communityFilter
+    let filteredPlugins = communityCache;
+    if (communityFilter === 'system') {
+      filteredPlugins = communityCache.filter(p => p.category === 'system');
+    } else if (communityFilter === 'new') {
+      filteredPlugins = communityCache.filter(p => isPluginNew(p.date));
+    }
+
+    el.innerHTML = filteredPlugins.map(p => {
       const displayVersion = p.version || installedVersions[p.id];
       const colors = ['#007AFF', '#5856D6', '#AF52DE', '#FF2D55', '#FF9500'];
       const iconBg = colors[p.id.length % colors.length];
       const isInstalled = installed.has(p.id);
+      const isNew = isPluginNew(p.date);
+      const isSystem = p.category === 'system';
+
+      let badges = '';
+      if (isSystem) {
+        badges += '<span class="plugin-badge badge-system" style="margin-right: 4px;">System</span>';
+      }
+      if (isNew) {
+        badges += '<span class="plugin-badge badge-new">New</span>';
+      }
 
       return `
       <div class="plugin-item">
@@ -939,7 +1111,8 @@ export function setup(api) {
         <div class="plugin-info">
           <span class="plugin-name">${p.name}</span>
           <div class="plugin-meta">${displayVersion ? `v${displayVersion} • ` : ''}${p.author || 'Unknown'}</div>
-          <div class="plugin-meta" style="margin-top: 10px; color: #8e8e93;">${p.description || ''}</div>
+          <div style="margin-top: 4px; display: flex; align-items: center; gap: 6px;">${badges}</div>
+          <div class="plugin-meta" style="margin-top: 6px; color: #8e8e93;">${p.description || ''}</div>
         </div>
         <div class="pm-action-group" style="min-width: 110px;">
           ${
@@ -1176,6 +1349,23 @@ export function setup(api) {
 
       if (tab.dataset.tab === 'installed') renderInstalled();
       if (tab.dataset.tab === 'community') renderCommunity();
+    };
+  });
+
+  // Filter button handlers
+  root.querySelectorAll('.pm-filter-btn').forEach(btn => {
+    btn.onclick = () => {
+      const container = btn.closest('.pm-filter-bar');
+      container.querySelectorAll('.pm-filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      if (btn.dataset.filterInstalled) {
+        installedFilter = btn.dataset.filterInstalled;
+        renderInstalled();
+      } else if (btn.dataset.filterCommunity) {
+        communityFilter = btn.dataset.filterCommunity;
+        renderCommunity();
+      }
     };
   });
 
