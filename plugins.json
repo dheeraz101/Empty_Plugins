@@ -6,7 +6,7 @@
     "author": "Empty",
     "description": "A friendly about widget to get you started with Blank Board.",
     "icon": "👋",
-    "date": "2024-01-01"
+    "date": "2026-04-05"
   },
   {
     "id": "layout-engine",
@@ -271,7 +271,7 @@
     "description": "Records plugin lifecycle events. Adds a Logs button to Plugin Manager.",
     "icon": "📋",
     "category": "system",
-    "date": "2024-07-15"
+    "date": "2026-04-06"
   },
   {
     "id": "focus",
