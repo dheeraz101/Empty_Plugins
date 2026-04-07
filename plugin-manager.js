@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '5.3.3',
+  version: '5.3.4',
   compat: '>=3.3.0'
 };
 
@@ -23,8 +23,7 @@ export function setup(api) {
   const reloadCooldowns = new Map();
   let installedFilter = 'all';
   let communityFilter = 'all';
-  let installedSearch = '';
-  let communitySearch = '';
+  let globalSearch = '';
   let activeTab = 'installed';
 
   // ───────── STATUS HELPERS ─────────
@@ -123,6 +122,60 @@ export function setup(api) {
 
   .pm-tab.active { background: rgba(0, 0, 0, 0.06); color: #000; font-weight: 600; }
   .pm-tab:hover:not(.active) { background: rgba(0, 0, 0, 0.03); }
+
+  .pm-search-sidebar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    margin: 8px 0;
+    background: rgba(0, 0, 0, 0.04);
+    border-radius: 10px;
+    position: relative;
+  }
+
+  .pm-search-sidebar .pm-search-input {
+    width: 100%;
+    padding: 6px 8px 6px 24px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    font-size: 13px;
+    color: #424245;
+    outline: none;
+  }
+
+  .pm-search-sidebar .pm-search-input::placeholder {
+    color: #86868b;
+  }
+
+  .pm-search-sidebar .pm-search-icon {
+    position: absolute;
+    left: 18px;
+    color: #86868b;
+    pointer-events: none;
+  }
+
+  .pm-search-sidebar .pm-search-clear {
+    position: absolute;
+    right: 16px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.15);
+    border: none;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    color: #424245;
+    font-size: 12px;
+    line-height: 1;
+  }
+
+  .pm-search-sidebar .pm-search-clear.visible {
+    display: flex;
+  }
 
   .pm-content {
     flex: 1;
@@ -517,12 +570,12 @@ export function setup(api) {
     .pm-filter-btn { background: rgba(255,255,255,0.08); color: #a1a1a6; }
     .pm-filter-btn:hover { background: rgba(255,255,255,0.15); }
     .pm-filter-btn.active { background: #0071e3; color: white; }
-    .pm-search-input { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.1); color: #f5f5f7; }
-    .pm-search-input::placeholder { color: #6e6e73; }
-    .pm-search-input:focus { background: rgba(255,255,255,0.12); }
-    .pm-search-icon { color: #6e6e73; }
-    .pm-search-clear { background: rgba(255,255,255,0.2); color: #f5f5f7; }
-    .pm-search-clear:hover { background: rgba(255,255,255,0.3); color: #fff; }
+    .pm-search-sidebar { background: rgba(255,255,255,0.08); }
+    .pm-search-sidebar .pm-search-input { color: #f5f5f7; }
+    .pm-search-sidebar .pm-search-input::placeholder { color: #6e6e73; }
+    .pm-search-sidebar .pm-search-icon { color: #6e6e73; }
+    .pm-search-sidebar .pm-search-clear { background: rgba(255,255,255,0.2); color: #f5f5f7; }
+    .pm-search-sidebar .pm-search-clear:hover { background: rgba(255,255,255,0.3); color: #fff; }
   }
 `;
   document.head.appendChild(style);
@@ -550,6 +603,11 @@ export function setup(api) {
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
       Community
     </div>
+    <div class="pm-search-sidebar">
+      <svg class="pm-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
+      <input type="text" class="pm-search-input" id="pm-search" placeholder="Search...">
+      <button class="pm-search-clear" id="pm-search-clear">&times;</button>
+    </div>
     <div id="pm-actions" style="padding: 14px; display: flex; flex-direction: column; gap: 10px;"></div>
     <div class="pm-sidebar-footer">
       <a href="${DOCS_URL}" target="_blank" class="docs-link">
@@ -567,11 +625,6 @@ export function setup(api) {
     <div id="installed">
       <h1 class="pm-view-title">Installed Plugins</h1>
       <p class="pm-view-subtitle">Manage and configure your active workspace tools.</p>
-      <div class="pm-search-container">
-        <svg class="pm-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
-        <input type="text" class="pm-search-input" id="pm-search-installed" placeholder="Search installed plugins...">
-        <button class="pm-search-clear" data-search="installed">&times;</button>
-      </div>
       <div class="pm-filter-bar">
         <button class="pm-filter-btn active" data-filter-installed="all">All</button>
         <button class="pm-filter-btn" data-filter-installed="system">System</button>
@@ -581,11 +634,6 @@ export function setup(api) {
     <div id="community" style="display:none;">
       <h1 class="pm-view-title">Discovery</h1>
       <p class="pm-view-subtitle">Explore new extensions built by the community.</p>
-      <div class="pm-search-container">
-        <svg class="pm-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
-        <input type="text" class="pm-search-input" id="pm-search-community" placeholder="Search community plugins...">
-        <button class="pm-search-clear" data-search="community">&times;</button>
-      </div>
       <div class="pm-filter-bar">
         <button class="pm-filter-btn active" data-filter-community="all">All</button>
         <button class="pm-filter-btn" data-filter-community="system">System</button>
@@ -865,7 +913,12 @@ export function setup(api) {
   }
 
   function isSystemPlugin(plugin) {
-    return plugin.category === 'system' || plugin.id === SELF_ID;
+    if (plugin.id === SELF_ID) return true;
+    if (plugin.category === 'system') return true;
+    // Also check community cache for system status
+    const communityPlugin = communityCache.find(c => c.id === plugin.id);
+    if (communityPlugin && communityPlugin.category === 'system') return true;
+    return false;
   }
 
 // ───────── RENDER INSTALLED (With Persistence Fix) ─────────
@@ -945,8 +998,8 @@ export function setup(api) {
     }
 
     // Apply search filter
-    if (installedSearch.trim()) {
-      const searchTerm = installedSearch.toLowerCase().trim();
+    if (globalSearch.trim()) {
+      const searchTerm = globalSearch.toLowerCase().trim();
       displaySystemPlugins = displaySystemPlugins.filter(p => {
         const pItem = plugins[p.index];
         return (pItem.name || pItem.id).toLowerCase().includes(searchTerm);
@@ -963,12 +1016,12 @@ export function setup(api) {
     // Update clear button visibility
     const installedClear = root.querySelector('.pm-search-clear[data-search="installed"]');
     if (installedClear) {
-      installedClear.classList.toggle('visible', installedSearch.length > 0);
+      installedClear.classList.toggle('visible', globalSearch.length > 0);
     }
 
     // Show no results message
     if (displaySystemPlugins.length === 0 && displayNormalPlugins.length === 0) {
-      el.innerHTML = `<div class="pm-no-results">No plugins found${installedSearch ? ` matching "${installedSearch}"` : ''}</div>`;
+      el.innerHTML = `<div class="pm-no-results">No plugins found${globalSearch ? ` matching "${globalSearch}"` : ''}</div>`;
       updateBadge(0);
       return;
     }
@@ -1217,8 +1270,8 @@ export function setup(api) {
     }
 
     // Apply search filter
-    if (communitySearch.trim()) {
-      const searchTerm = communitySearch.toLowerCase().trim();
+    if (globalSearch.trim()) {
+      const searchTerm = globalSearch.toLowerCase().trim();
       filteredPlugins = filteredPlugins.filter(p => 
         (p.name || p.id).toLowerCase().includes(searchTerm) ||
         (p.description || '').toLowerCase().includes(searchTerm) ||
@@ -1229,12 +1282,12 @@ export function setup(api) {
     // Update clear button visibility
     const communityClear = root.querySelector('.pm-search-clear[data-search="community"]');
     if (communityClear) {
-      communityClear.classList.toggle('visible', communitySearch.length > 0);
+      communityClear.classList.toggle('visible', globalSearch.length > 0);
     }
 
     // Show no results message
     if (filteredPlugins.length === 0) {
-      el.innerHTML = `<div class="pm-no-results">No plugins found${communitySearch ? ` matching "${communitySearch}"` : ''}</div>`;
+      el.innerHTML = `<div class="pm-no-results">No plugins found${globalSearch ? ` matching "${globalSearch}"` : ''}</div>`;
       return;
     }
 
@@ -1521,39 +1574,27 @@ export function setup(api) {
   });
 
   // Search input handlers
-  const installedSearchInput = root.querySelector('#pm-search-installed');
-  const communitySearchInput = root.querySelector('#pm-search-community');
+  const globalSearchInput = root.querySelector('#pm-search');
 
-  if (installedSearchInput) {
-    installedSearchInput.addEventListener('input', (e) => {
-      installedSearch = e.target.value;
+  if (globalSearchInput) {
+    globalSearchInput.addEventListener('input', (e) => {
+      globalSearch = e.target.value;
       renderInstalled();
-    });
-  }
-
-  if (communitySearchInput) {
-    communitySearchInput.addEventListener('input', (e) => {
-      communitySearch = e.target.value;
       renderCommunity();
     });
   }
 
   // Search clear button handlers
-  root.querySelectorAll('.pm-search-clear').forEach(btn => {
-    btn.onclick = () => {
-      const searchType = btn.dataset.search;
-      if (searchType === 'installed') {
-        installedSearch = '';
-        if (installedSearchInput) installedSearchInput.value = '';
-      } else if (searchType === 'community') {
-        communitySearch = '';
-        if (communitySearchInput) communitySearchInput.value = '';
-      }
-      btn.classList.remove('visible');
-      if (searchType === 'installed') renderInstalled();
-      else renderCommunity();
+  const globalSearchClear = root.querySelector('#pm-search-clear');
+  if (globalSearchClear) {
+    globalSearchClear.onclick = () => {
+      globalSearch = '';
+      if (globalSearchInput) globalSearchInput.value = '';
+      globalSearchClear.classList.remove('visible');
+      renderInstalled();
+      renderCommunity();
     };
-  });
+  }
 
   contextMenuHandler = (e) => {
     if (e.target.closest('.pm-root')) return;
