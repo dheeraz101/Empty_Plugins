@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '5.3.2',
+  version: '5.3.3',
   compat: '>=3.3.0'
 };
 
@@ -23,6 +23,9 @@ export function setup(api) {
   const reloadCooldowns = new Map();
   let installedFilter = 'all';
   let communityFilter = 'all';
+  let installedSearch = '';
+  let communitySearch = '';
+  let activeTab = 'installed';
 
   // ───────── STATUS HELPERS ─────────
   // Persistent status/error fields on registry entries.
@@ -209,6 +212,87 @@ export function setup(api) {
 
   .pm-filter-btn:hover { background: rgba(0, 0, 0, 0.08); }
   .pm-filter-btn.active { background: #0071e3; color: white; }
+
+  .pm-divider {
+    height: 1px;
+    background: rgba(0, 0, 0, 0.1);
+    margin: 16px 0;
+    border-radius: 1px;
+  }
+
+  .pm-search-container {
+    position: relative;
+    margin-bottom: 20px;
+  }
+
+  .pm-search-input {
+    width: 100%;
+    padding: 10px 16px 10px 38px;
+    border-radius: 12px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    background: rgba(0, 0, 0, 0.04);
+    font-size: 14px;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+    color: #1d1d1f;
+    outline: none;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+  }
+
+  .pm-search-input::placeholder {
+    color: #86868b;
+  }
+
+  .pm-search-input:focus {
+    background: rgba(255, 255, 255, 0.8);
+    border-color: #0071e3;
+    box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.1);
+  }
+
+  .pm-search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #86868b;
+    pointer-events: none;
+  }
+
+  .pm-search-clear {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.15);
+    border: none;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    color: #424245;
+    font-size: 14px;
+    line-height: 1;
+    transition: all 0.15s ease;
+  }
+
+  .pm-search-clear:hover {
+    background: rgba(0, 0, 0, 0.25);
+    color: #1d1d1f;
+  }
+
+  .pm-search-clear.visible {
+    display: flex;
+  }
+
+  .pm-no-results {
+    text-align: center;
+    padding: 40px 20px;
+    color: #86868b;
+    font-size: 14px;
+  }
 
   .pm-error-msg {
     font-size: 12px; color: #ff3b30; margin-top: 4px;
@@ -429,9 +513,16 @@ export function setup(api) {
     .pm-content {
       scrollbar-color: rgba(255,255,255,0.3) transparent;
     }
+    .pm-divider { background: rgba(255, 255, 255, 0.15); }
     .pm-filter-btn { background: rgba(255,255,255,0.08); color: #a1a1a6; }
     .pm-filter-btn:hover { background: rgba(255,255,255,0.15); }
     .pm-filter-btn.active { background: #0071e3; color: white; }
+    .pm-search-input { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.1); color: #f5f5f7; }
+    .pm-search-input::placeholder { color: #6e6e73; }
+    .pm-search-input:focus { background: rgba(255,255,255,0.12); }
+    .pm-search-icon { color: #6e6e73; }
+    .pm-search-clear { background: rgba(255,255,255,0.2); color: #f5f5f7; }
+    .pm-search-clear:hover { background: rgba(255,255,255,0.3); color: #fff; }
   }
 `;
   document.head.appendChild(style);
@@ -476,6 +567,11 @@ export function setup(api) {
     <div id="installed">
       <h1 class="pm-view-title">Installed Plugins</h1>
       <p class="pm-view-subtitle">Manage and configure your active workspace tools.</p>
+      <div class="pm-search-container">
+        <svg class="pm-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
+        <input type="text" class="pm-search-input" id="pm-search-installed" placeholder="Search installed plugins...">
+        <button class="pm-search-clear" data-search="installed">&times;</button>
+      </div>
       <div class="pm-filter-bar">
         <button class="pm-filter-btn active" data-filter-installed="all">All</button>
         <button class="pm-filter-btn" data-filter-installed="system">System</button>
@@ -485,6 +581,11 @@ export function setup(api) {
     <div id="community" style="display:none;">
       <h1 class="pm-view-title">Discovery</h1>
       <p class="pm-view-subtitle">Explore new extensions built by the community.</p>
+      <div class="pm-search-container">
+        <svg class="pm-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
+        <input type="text" class="pm-search-input" id="pm-search-community" placeholder="Search community plugins...">
+        <button class="pm-search-clear" data-search="community">&times;</button>
+      </div>
       <div class="pm-filter-bar">
         <button class="pm-filter-btn active" data-filter-community="all">All</button>
         <button class="pm-filter-btn" data-filter-community="system">System</button>
@@ -843,8 +944,34 @@ export function setup(api) {
       displayNormalPlugins = normalPlugins;
     }
 
+    // Apply search filter
+    if (installedSearch.trim()) {
+      const searchTerm = installedSearch.toLowerCase().trim();
+      displaySystemPlugins = displaySystemPlugins.filter(p => {
+        const pItem = plugins[p.index];
+        return (pItem.name || pItem.id).toLowerCase().includes(searchTerm);
+      });
+      displayNormalPlugins = displayNormalPlugins.filter(p => {
+        const pItem = plugins[p.index];
+        return (pItem.name || pItem.id).toLowerCase().includes(searchTerm);
+      });
+    }
+
     let html = '';
     let availableUpdates = 0;
+
+    // Update clear button visibility
+    const installedClear = root.querySelector('.pm-search-clear[data-search="installed"]');
+    if (installedClear) {
+      installedClear.classList.toggle('visible', installedSearch.length > 0);
+    }
+
+    // Show no results message
+    if (displaySystemPlugins.length === 0 && displayNormalPlugins.length === 0) {
+      el.innerHTML = `<div class="pm-no-results">No plugins found${installedSearch ? ` matching "${installedSearch}"` : ''}</div>`;
+      updateBadge(0);
+      return;
+    }
 
     // Render system plugins first
     for (const pData of displaySystemPlugins) {
@@ -946,7 +1073,7 @@ export function setup(api) {
 
     // Add divider if there are both system and normal plugins
     if (displaySystemPlugins.length > 0 && displayNormalPlugins.length > 0) {
-      html += `<div style="height: 1px; background: rgba(0,0,0,0.1); margin: 12px 0;"></div>`;
+      html += `<div class="pm-divider"></div>`;
     }
 
     // Render normal plugins
@@ -1087,6 +1214,28 @@ export function setup(api) {
       filteredPlugins = communityCache.filter(p => p.category === 'system');
     } else if (communityFilter === 'new') {
       filteredPlugins = communityCache.filter(p => isPluginNew(p.date));
+    }
+
+    // Apply search filter
+    if (communitySearch.trim()) {
+      const searchTerm = communitySearch.toLowerCase().trim();
+      filteredPlugins = filteredPlugins.filter(p => 
+        (p.name || p.id).toLowerCase().includes(searchTerm) ||
+        (p.description || '').toLowerCase().includes(searchTerm) ||
+        (p.author || '').toLowerCase().includes(searchTerm)
+      );
+    }
+
+    // Update clear button visibility
+    const communityClear = root.querySelector('.pm-search-clear[data-search="community"]');
+    if (communityClear) {
+      communityClear.classList.toggle('visible', communitySearch.length > 0);
+    }
+
+    // Show no results message
+    if (filteredPlugins.length === 0) {
+      el.innerHTML = `<div class="pm-no-results">No plugins found${communitySearch ? ` matching "${communitySearch}"` : ''}</div>`;
+      return;
     }
 
     el.innerHTML = filteredPlugins.map(p => {
@@ -1347,6 +1496,8 @@ export function setup(api) {
 
       root.querySelector('#' + tab.dataset.tab).style.display = 'block';
 
+      activeTab = tab.dataset.tab;
+
       if (tab.dataset.tab === 'installed') renderInstalled();
       if (tab.dataset.tab === 'community') renderCommunity();
     };
@@ -1366,6 +1517,41 @@ export function setup(api) {
         communityFilter = btn.dataset.filterCommunity;
         renderCommunity();
       }
+    };
+  });
+
+  // Search input handlers
+  const installedSearchInput = root.querySelector('#pm-search-installed');
+  const communitySearchInput = root.querySelector('#pm-search-community');
+
+  if (installedSearchInput) {
+    installedSearchInput.addEventListener('input', (e) => {
+      installedSearch = e.target.value;
+      renderInstalled();
+    });
+  }
+
+  if (communitySearchInput) {
+    communitySearchInput.addEventListener('input', (e) => {
+      communitySearch = e.target.value;
+      renderCommunity();
+    });
+  }
+
+  // Search clear button handlers
+  root.querySelectorAll('.pm-search-clear').forEach(btn => {
+    btn.onclick = () => {
+      const searchType = btn.dataset.search;
+      if (searchType === 'installed') {
+        installedSearch = '';
+        if (installedSearchInput) installedSearchInput.value = '';
+      } else if (searchType === 'community') {
+        communitySearch = '';
+        if (communitySearchInput) communitySearchInput.value = '';
+      }
+      btn.classList.remove('visible');
+      if (searchType === 'installed') renderInstalled();
+      else renderCommunity();
     };
   });
 
