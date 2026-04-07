@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '5.3.5',
+  version: '5.3.6',
   compat: '>=3.3.0'
 };
 
@@ -124,16 +124,17 @@ export function setup(api) {
   .pm-tab:hover:not(.active) { background: rgba(0, 0, 0, 0.03); }
 
   .pm-search-sidebar {
-    padding: 8px 12px;
+    padding: 0px 0px;
     margin-bottom: 2px;
     position: relative;
   }
 
   .pm-search-sidebar .pm-search-input {
+    height: 30px;
     width: 100%;
     padding: 0;
-    padding-left: 22px;
-    padding-right: 18px;
+    padding-left: 40px;
+    padding-right: 35px;
     border: none;
     border-radius: 0;
     background: transparent;
