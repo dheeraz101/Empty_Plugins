@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '5.3.4',
+  version: '5.3.5',
   compat: '>=3.3.0'
 };
 
@@ -124,23 +124,21 @@ export function setup(api) {
   .pm-tab:hover:not(.active) { background: rgba(0, 0, 0, 0.03); }
 
   .pm-search-sidebar {
-    display: flex;
-    align-items: center;
-    gap: 8px;
     padding: 8px 12px;
-    margin: 8px 0;
-    background: rgba(0, 0, 0, 0.04);
-    border-radius: 10px;
+    margin-bottom: 2px;
     position: relative;
   }
 
   .pm-search-sidebar .pm-search-input {
     width: 100%;
-    padding: 6px 8px 6px 24px;
-    border-radius: 8px;
+    padding: 0;
+    padding-left: 22px;
+    padding-right: 18px;
     border: none;
+    border-radius: 0;
     background: transparent;
-    font-size: 13px;
+    font-size: 13.5px;
+    font-weight: 500;
     color: #424245;
     outline: none;
   }
@@ -149,18 +147,26 @@ export function setup(api) {
     color: #86868b;
   }
 
+  .pm-search-sidebar .pm-search-input:focus {
+    outline: none;
+  }
+
   .pm-search-sidebar .pm-search-icon {
     position: absolute;
-    left: 18px;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
     color: #86868b;
     pointer-events: none;
   }
 
   .pm-search-sidebar .pm-search-clear {
     position: absolute;
-    right: 16px;
-    width: 18px;
-    height: 18px;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 16px;
     border-radius: 50%;
     background: rgba(0, 0, 0, 0.15);
     border: none;
@@ -169,8 +175,18 @@ export function setup(api) {
     align-items: center;
     justify-content: center;
     color: #424245;
-    font-size: 12px;
+    font-size: 11px;
     line-height: 1;
+    font-weight: 600;
+  }
+
+  .pm-search-sidebar .pm-search-clear:hover {
+    background: rgba(0, 0, 0, 0.25);
+  }
+
+  .pm-search-sidebar .pm-search-clear.visible {
+    display: flex;
+  }
   }
 
   .pm-search-sidebar .pm-search-clear.visible {
@@ -570,12 +586,11 @@ export function setup(api) {
     .pm-filter-btn { background: rgba(255,255,255,0.08); color: #a1a1a6; }
     .pm-filter-btn:hover { background: rgba(255,255,255,0.15); }
     .pm-filter-btn.active { background: #0071e3; color: white; }
-    .pm-search-sidebar { background: rgba(255,255,255,0.08); }
     .pm-search-sidebar .pm-search-input { color: #f5f5f7; }
     .pm-search-sidebar .pm-search-input::placeholder { color: #6e6e73; }
-    .pm-search-sidebar .pm-search-icon { color: #6e6e73; }
-    .pm-search-sidebar .pm-search-clear { background: rgba(255,255,255,0.2); color: #f5f5f7; }
-    .pm-search-sidebar .pm-search-clear:hover { background: rgba(255,255,255,0.3); color: #fff; }
+    .pm-search-sidebar .pm-search-icon { color: #a1a1a6; }
+    .pm-search-sidebar .pm-search-clear { background: rgba(255,255,255,0.15); color: #a1a1a6; }
+    .pm-search-sidebar .pm-search-clear:hover { background: rgba(255,255,255,0.25); color: #fff; }
   }
 `;
   document.head.appendChild(style);
@@ -603,7 +618,7 @@ export function setup(api) {
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
       Community
     </div>
-    <div class="pm-search-sidebar">
+    <div class="pm-search-sidebar" style="margin-top: 6px;">
       <svg class="pm-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
       <input type="text" class="pm-search-input" id="pm-search" placeholder="Search...">
       <button class="pm-search-clear" id="pm-search-clear">&times;</button>
@@ -1014,9 +1029,9 @@ export function setup(api) {
     let availableUpdates = 0;
 
     // Update clear button visibility
-    const installedClear = root.querySelector('.pm-search-clear[data-search="installed"]');
-    if (installedClear) {
-      installedClear.classList.toggle('visible', globalSearch.length > 0);
+    const globalClear = root.querySelector('#pm-search-clear');
+    if (globalClear) {
+      globalClear.classList.toggle('visible', globalSearch.length > 0);
     }
 
     // Show no results message
@@ -1277,12 +1292,6 @@ export function setup(api) {
         (p.description || '').toLowerCase().includes(searchTerm) ||
         (p.author || '').toLowerCase().includes(searchTerm)
       );
-    }
-
-    // Update clear button visibility
-    const communityClear = root.querySelector('.pm-search-clear[data-search="community"]');
-    if (communityClear) {
-      communityClear.classList.toggle('visible', globalSearch.length > 0);
     }
 
     // Show no results message
