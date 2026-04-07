@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '5.3.6',
+  version: '5.3.7',
   compat: '>=3.3.0'
 };
 
@@ -315,8 +315,7 @@ export function setup(api) {
 
   .pm-search-input:focus {
     background: rgba(255, 255, 255, 0.8);
-    border-color: #0071e3;
-    box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.1);
+    border-color: #5e5e60;
   }
 
   .pm-search-icon {
