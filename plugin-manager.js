@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '5.5.3',
+  version: '5.5.4',
   compat: '>=3.3.0'
 };
 
@@ -402,6 +402,32 @@ export function setup(api) {
     padding: 40px 20px;
     color: #86868b;
     font-size: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+  }
+
+  .empty-icon {
+    font-size: 32px;
+    margin-bottom: 12px;
+    opacity: 0.3;
+  }
+
+  .pm-no-results button {
+    margin-top: 15px;
+    background: #eee;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .pm-no-results button:hover {
+    background: #e0e0e0;
   }
 
   .pm-error-msg {
@@ -1102,7 +1128,11 @@ export function setup(api) {
 
     // Show no results message
     if (displaySystemPlugins.length === 0 && displayNormalPlugins.length === 0) {
-      el.innerHTML = `<div class="pm-no-results">No plugins found${globalSearch ? ` matching "${globalSearch}"` : ''}</div>`;
+      el.innerHTML = `
+      <div class="empty-icon">󰍉</div>
+      <div class="pm-no-results">No plugins found${globalSearch ? ` matching "${globalSearch}"` : ''}</div>
+      <button onclick="document.querySelector('#pm-search-clear').click()">Clear Filters</button>
+      `;
       updateBadge(0);
       return;
     }
