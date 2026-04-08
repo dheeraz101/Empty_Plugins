@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '5.4.0',
+  version: '5.4.1',
   compat: '>=3.3.0'
 };
 
@@ -602,7 +602,7 @@ export function setup(api) {
     .pm-content {
       scrollbar-color: rgba(255,255,255,0.3) transparent;
     }
-    .pm-divider { background: rgba(255, 255, 255, 0.15); }
+
     .pm-divider::before,
     .pm-divider::after {
       border-bottom-color: rgba(255, 255, 255, 0.1);
