@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '5.3.8',
+  version: '5.3.9',
   compat: '>=3.3.0'
 };
 
@@ -284,10 +284,30 @@ export function setup(api) {
   .pm-filter-btn.active { background: #0071e3; color: white; }
 
   .pm-divider {
-    height: 1px;
-    background: rgba(0, 0, 0, 0.1);
-    margin: 16px 0;
-    border-radius: 1px;
+    display: flex;
+    align-items: center;
+    text-align: center;
+    margin: 24px 0;
+    color: #86868b;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .pm-divider::before,
+  .pm-divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  }
+
+  .pm-divider:not(:empty)::before {
+    margin-right: 15px;
+  }
+
+  .pm-divider:not(:empty)::after {
+    margin-left: 15px;
   }
 
   .pm-search-container {
@@ -583,6 +603,10 @@ export function setup(api) {
       scrollbar-color: rgba(255,255,255,0.3) transparent;
     }
     .pm-divider { background: rgba(255, 255, 255, 0.15); }
+    .pm-divider::before,
+    .pm-divider::after {
+      border-bottom-color: rgba(255, 255, 255, 0.1);
+    }
     .pm-filter-btn { background: rgba(255,255,255,0.08); color: #a1a1a6; }
     .pm-filter-btn:hover { background: rgba(255,255,255,0.15); }
     .pm-filter-btn.active { background: #0071e3; color: white; }
@@ -640,10 +664,6 @@ export function setup(api) {
     <div id="installed">
       <h1 class="pm-view-title">Installed Plugins</h1>
       <p class="pm-view-subtitle">Manage and configure your active workspace tools.</p>
-      <div class="pm-filter-bar">
-        <button class="pm-filter-btn active" data-filter-installed="all">All</button>
-        <button class="pm-filter-btn" data-filter-installed="system">System</button>
-      </div>
       <div class="pm-list"></div>
     </div>
     <div id="community" style="display:none;">
@@ -1141,7 +1161,7 @@ export function setup(api) {
 
     // Add divider if there are both system and normal plugins
     if (displaySystemPlugins.length > 0 && displayNormalPlugins.length > 0) {
-      html += `<div class="pm-divider"></div>`;
+      html += '<div class="pm-divider">Standard Extensions</div>';
     }
 
     // Render normal plugins
