@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '5.4.3',
+  version: '5.4.4',
   compat: '>=3.3.0'
 };
 
@@ -1006,7 +1006,9 @@ export function setup(api) {
       // Update remote version
       if (remoteMeta?.version) {
         const entry = registryCopy.find(e => e.id === p.id);
-        if (entry && entry.remoteVersion !== remoteMeta.version) {
+
+        // ❗ CRITICAL FIX: don't overwrite self plugin remote version during check
+        if (entry && entry.id !== SELF_ID && entry.remoteVersion !== remoteMeta.version) {
           entry.remoteVersion = remoteMeta.version;
           registryChanged = true;
         }
