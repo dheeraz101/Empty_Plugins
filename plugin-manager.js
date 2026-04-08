@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '5.4.9',
+  version: '5.5.1',
   compat: '>=3.3.0'
 };
 
@@ -788,7 +788,8 @@ export function setup(api) {
       if (!metaMatch) return null;
       return new Function(`return ${metaMatch[1]}`)();
     } catch (e) {
-      return null;
+      console.error('Fetch failed for:', url, e);
+      return { __error: true };
     }
   }
 
@@ -999,6 +1000,10 @@ export function setup(api) {
     for (let i = 0; i < plugins.length; i++) {
       const p = plugins[i];
       const remoteMeta = shouldCheck ? remoteMetas[i] : null;
+
+      if (remoteMeta?.__error) {
+        console.warn('Update check failed for:', p.id);
+      }
       
       // Check if it's a system plugin via category or id
       const isSystem = isSystemPlugin(p);
