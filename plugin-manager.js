@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '5.5.5',
+  version: '5.5.6',
   compat: '>=3.3.0'
 };
 
@@ -397,69 +397,11 @@ export function setup(api) {
     display: flex;
   }
 
-  .empty-icon {
-    font-size: 32px;
-    margin-bottom: 12px;
-    opacity: 0.3;
-  }
-
-  /* Container: Centered with plenty of whitespace */
   .pm-no-results {
-    display: flex !important;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 60px 20px;
     text-align: center;
-    animation: pmFadeIn 0.4s ease-out;
-  }
-
-  /* The Icon: Large, thin, and subtle color */
-  .pm-no-results i, 
-  .pm-no-results .empty-icon {
-    font-size: 48px;
-    color: #d1d1d6; /* Apple Grey */
-    margin-bottom: 16px;
-    display: block;
-  }
-
-  /* The Text: Small, semi-bold, and elegant */
-  .pm-no-results p {
+    padding: 40px 20px;
+    color: #86868b;
     font-size: 14px;
-    font-weight: 500;
-    color: #8e8e93;
-    margin: 0 0 20px 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica;
-  }
-
-  /* The Button: Minimalist, light grey pill */
-  .pm-no-results button {
-    background-color: #f2f2f7; /* Very light Apple background */
-    color: #007aff; /* Apple Blue for action */
-    border: none;
-    padding: 8px 16px;
-    border-radius: 18px; /* High pill radius */
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    border: 1px solid transparent;
-  }
-
-  .pm-no-results button:hover {
-    background-color: #e5e5ea;
-    transform: scale(1.02);
-  }
-
-  .pm-no-results button:active {
-    transform: scale(0.96);
-    opacity: 0.8;
-  }
-
-  /* Smooth Fade In animation */
-  @keyframes pmFadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
   }
 
   .pm-error-msg {
@@ -1160,11 +1102,7 @@ export function setup(api) {
 
     // Show no results message
     if (displaySystemPlugins.length === 0 && displayNormalPlugins.length === 0) {
-      el.innerHTML = `
-      <div class="empty-icon">󰍉</div>
-      <div class="pm-no-results">No plugins found${globalSearch ? ` matching "${globalSearch}"` : ''}</div>
-      <button onclick="document.querySelector('#pm-search-clear').click()">Clear Filters</button>
-      `;
+      el.innerHTML = `<div class="pm-no-results">No plugins found${globalSearch ? ` matching "${globalSearch}"` : ''}</div>`;
       updateBadge(0);
       return;
     }
