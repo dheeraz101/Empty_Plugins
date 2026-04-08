@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '5.5.2',
+  version: '5.5.3',
   compat: '>=3.3.0'
 };
 
@@ -313,6 +313,27 @@ export function setup(api) {
   .pm-search-container {
     position: relative;
     margin-bottom: 20px;
+  }
+
+  .pm-search-hint {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 10px;
+    color: #888;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+
+  #pm-search:focus + .pm-search-hint,
+  #pm-search:not(:placeholder-shown) + .pm-search-hint {
+    opacity: 0;
   }
 
   .pm-search-input {
@@ -710,6 +731,25 @@ export function setup(api) {
   root.querySelector('#close-pm').onclick = () => {
     root.style.display = 'none';
   };
+
+  const handleKeyDown = (e) => {
+  const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+  const modifier = isMac ? e.metaKey : e.ctrlKey;
+  
+  if (modifier && e.key === 'f') {
+      const searchInput = document.querySelector('#pm-search');
+      const root = document.querySelector('.pm-root');
+      
+      // Only trigger if PM is actually visible
+      if (searchInput && root && root.style.display !== 'none') {
+        e.preventDefault();
+        searchInput.focus();
+        searchInput.select();
+      }
+    }
+  };
+
+  window.addEventListener('keydown', handleKeyDown);
 
   // ───────── FIX: ESC KEY CLOSE ─────────
   escHandler = (e) => {
