@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '5.5.7',
+  version: '5.5.8',
   compat: '>=3.3.0'
 };
 
@@ -490,7 +490,7 @@ export function setup(api) {
   .spinning svg { animation: spin 0.8s cubic-bezier(0.4, 0, 0.2, 1); }
 
   .sidebar-footer-text {
-    font-size: 11px;
+    font-size: 12.8px;
     color: #86868b;
     line-height: 1.4;
     padding: 0 14px;
