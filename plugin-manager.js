@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '5.7.0-v4',
+  version: '5.7.1-v4',
   compat: '>=4.0.0',
   permissions: [
     'ui',
@@ -32,6 +32,7 @@ export function setup(api) {
   const CACHE_TIMEOUT = 10 * 60 * 1000;
   const COMMUNITY_CACHE_KEY = 'pm:community-cache:v2';
   const LOG_KEY = 'pm:logs:v1';
+  const SAFE_MODE_KEY = 'pm:safe-mode:v1';
 
   let lastCheckedTime = 0;
   let updateCount = 0;
@@ -354,16 +355,16 @@ export function setup(api) {
   .pm-btn:hover { transform: translateY(-0.5px); }
   .pm-btn[disabled] { opacity: 0.45; cursor: not-allowed; pointer-events: none; transform: none; }
 
-  .pm-btn-primary { background: var(--pm-blue); color: white; }
+  .pm-btn-primary { background: var(--pm-blue, #0071e3); color: white; }
   .pm-btn-primary:hover { background: #0077ed; }
-  .pm-btn-danger { background: var(--pm-red); color: white; }
+  .pm-btn-danger { background: var(--pm-red, #ff3b30); color: white; }
   .pm-btn-danger:hover { background: #ff453a; }
   .pm-btn-secondary {
-    background: color-mix(in srgb, var(--pm-card) 70%, black);
+    background: color-mix(in srgb, var(--pm-card, rgba(255,255,255,0.82)) 70%, black);
     border: 1px solid rgba(0,0,0,0.08);
-    color: var(--pm-text);
+    color: var(--pm-text, #1d1d1f);
   }
-  .pm-btn-secondary:hover { background: color-mix(in srgb, var(--pm-card) 80%, black); }
+  .pm-btn-secondary:hover { background: color-mix(in srgb, var(--pm-card, rgba(255,255,255,0.82)) 80%, black); }
 
   .pm-icon-btn {
     width: 32px;
@@ -397,8 +398,8 @@ export function setup(api) {
   .pm-action-menu {
     position: fixed;
     min-width: 190px;
-    background: var(--pm-card-strong);
-    border: 1px solid var(--pm-border);
+    background: var(--pm-card-strong, rgba(255,255,255,0.94));
+    border: 1px solid var(--pm-border, rgba(0,0,0,0.1));
     box-shadow: 0 18px 44px rgba(0,0,0,0.18);
     border-radius: 14px;
     padding: 6px;
@@ -412,7 +413,7 @@ export function setup(api) {
     text-align: left;
     border: none;
     background: transparent;
-    color: var(--pm-text);
+    color: var(--pm-text, #1d1d1f);
     border-radius: 10px;
     padding: 9px 10px;
     font-size: 13.5px;
@@ -421,7 +422,13 @@ export function setup(api) {
     font-family: inherit;
   }
   .pm-menu-item:hover { background: rgba(0,0,0,0.055); }
-  .pm-menu-item.danger { color: var(--pm-red); }
+  .pm-menu-item { display:flex; align-items:center; gap:10px; }
+  .pm-menu-icon { width:18px; display:inline-flex; align-items:center; justify-content:center; opacity:0.82; flex-shrink:0; }
+  .pm-menu-label { flex:1; }
+  .pm-btn-safe-active { background: rgba(52,199,89,0.16) !important; color: #1f8f3a !important; border-color: rgba(52,199,89,0.28) !important; }
+  .pm-btn-safe-active::before { content: ""; width:7px; height:7px; border-radius:50%; background:#34c759; box-shadow:0 0 0 3px rgba(52,199,89,0.14); }
+  .check-updates.spinning svg { animation: spin 0.8s linear infinite; }
+  .pm-menu-item.danger { color: var(--pm-red, #ff3b30); }
   .pm-menu-separator { height:1px; background: rgba(128,128,128,0.18); margin:5px 4px; }
 
   .pm-divider {
@@ -547,6 +554,22 @@ export function setup(api) {
   .sidebar-footer-text {
     font-size: 12.8px; color: var(--pm-soft-muted); line-height: 1.42; padding: 0 12px; margin: 0 0 2px 0; font-weight: 400;
   }
+  .pm-modal-checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 4px 0 18px 0;
+    font-size: 13.5px;
+    line-height: 1.35;
+    color: #6e6e73;
+    user-select: none;
+  }
+
+  .pm-modal-checkbox-row input {
+    width: 15px;
+    height: 15px;
+    accent-color: #0071e3;
+  }
 
   .pm-content::-webkit-scrollbar { width: 12px; }
   .pm-content::-webkit-scrollbar-track { background: transparent; }
@@ -562,6 +585,7 @@ export function setup(api) {
   .pm-content { scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.1) transparent; }
 
   @keyframes pm-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
   @keyframes pm-shimmer { 100% { transform:translateX(100%); } }
 
   @media (prefers-reduced-motion: reduce) {
@@ -628,8 +652,27 @@ export function setup(api) {
     .pm-search-clear { background: rgba(255,255,255,0.14); color: rgba(245,245,247,0.72); }
     .pm-search-clear:hover { background: rgba(255,255,255,0.24); color: #fff; }
 
-    .pm-modal-content { background: rgba(34,34,36,0.96); color: var(--pm-text); border-color: rgba(255,255,255,0.12); }
-    .pm-modal-title { color: var(--pm-text); }
+    .pm-action-menu {
+      background: rgba(38,38,40,0.96);
+      border-color: rgba(255,255,255,0.12);
+      box-shadow: 0 18px 46px rgba(0,0,0,0.42);
+    }
+    .pm-menu-item { color: #f5f5f7; }
+    .pm-menu-item:hover { background: rgba(255,255,255,0.09); }
+    .pm-menu-item.danger { color: #ff6961; }
+    .pm-menu-separator { background: rgba(255,255,255,0.1); }
+
+    .pm-modal-checkbox-row {
+      color: #a1a1a6;
+    }
+
+    .pm-modal-content { background: rgba(34,34,36,0.96); color: #f5f5f7; border-color: rgba(255,255,255,0.12); }
+    .pm-modal-overlay .pm-btn-secondary { background: rgba(255,255,255,0.11); color: #f5f5f7; border-color: rgba(255,255,255,0.12); }
+    .pm-modal-overlay .pm-btn-secondary:hover { background: rgba(255,255,255,0.16); }
+    .pm-modal-overlay .pm-btn-primary { background: #0a84ff; color: white; }
+    .pm-modal-overlay .pm-btn-danger { background: #ff453a; color: white; }
+    .pm-modal-overlay .pm-checkbox-row { color: #a1a1a6; }
+    .pm-modal-title { color: #f5f5f7; }
     .pm-modal-title::after { background: rgba(255,255,255,0.08); }
     .pm-modal-message { color: var(--pm-muted); }
     .pm-modal-warning-box { background: rgba(255,69,58,0.12); border-color: rgba(255,69,58,0.22); color: #ffb4ab; }
@@ -840,9 +883,46 @@ export function setup(api) {
     checkUpdatesBtn.className = 'pm-btn pm-btn-secondary check-updates';
     checkUpdatesBtn.innerHTML = `${iconRefresh(14)} Check Updates`;
     checkUpdatesBtn.onclick = async () => {
-      setButtonBusy(checkUpdatesBtn, 'Checking…');
+      const originalHTML = checkUpdatesBtn.innerHTML;
+
+      checkUpdatesBtn.disabled = true;
+      checkUpdatesBtn.classList.add('spinning');
+      checkUpdatesBtn.innerHTML = `
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+        Checking…
+      `;
+
+      const startedAt = Date.now();
+
       await renderInstalled(true);
-      resetButton(checkUpdatesBtn, `${iconRefresh(14)} Check Updates`);
+
+      const elapsed = Date.now() - startedAt;
+      const wait = Math.max(0, 2000 - elapsed);
+
+      setTimeout(() => {
+        checkUpdatesBtn.classList.remove('spinning');
+
+        if (updateCount > 0) {
+          checkUpdatesBtn.innerHTML = `
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+            ${updateCount} Update${updateCount === 1 ? '' : 's'}
+          `;
+        } else {
+          checkUpdatesBtn.innerHTML = `
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+            You're up to date
+          `;
+
+          setTimeout(() => {
+            checkUpdatesBtn.innerHTML = originalHTML;
+            checkUpdatesBtn.disabled = false;
+          }, 1800);
+
+          return;
+        }
+
+        checkUpdatesBtn.disabled = false;
+      }, wait);
     };
     actions.appendChild(checkUpdatesBtn);
 
@@ -853,9 +933,10 @@ export function setup(api) {
     actions.appendChild(installBtn);
 
     const safeBtn = document.createElement('button');
-    safeBtn.className = 'pm-btn pm-btn-secondary';
-    safeBtn.textContent = 'Safe Mode';
-    safeBtn.onclick = enableSafeMode;
+    safeBtn.className = `pm-btn pm-btn-secondary ${isSafeModeOn() ? 'pm-btn-safe-active' : ''}`;
+    safeBtn.textContent = isSafeModeOn() ? 'Safe Mode On' : 'Safe Mode';
+    safeBtn.title = isSafeModeOn() ? 'Safe Mode is active. Click to turn it off.' : 'Disable all non-system plugins.';
+    safeBtn.onclick = isSafeModeOn() ? disableSafeMode : enableSafeMode;
     actions.appendChild(safeBtn);
   }
 
@@ -1223,6 +1304,7 @@ export function setup(api) {
 
   async function handleMenuAction(action, id) {
     if (action === 'details') return showPluginDetails(id);
+    if (action === 'whats-new') return showWhatsNewModal(id);
     if (action === 'reload') return reloadPlugin(id);
     if (action === 'delete') return deletePluginWithConfirmation(id);
     if (action === 'logs') return showLogsModal();
@@ -1234,10 +1316,23 @@ export function setup(api) {
     const entry = api.registry.getAll().find(p => p.id === id);
     if (!entry || isBusy(entry)) return;
 
+    if (isSafeModeOn() && !entry.enabled && !isSystemPlugin(entry)) {
+      await showConfirmModal({
+        title: 'Safe Mode Is On',
+        message: `Turn off Safe Mode before enabling “${entry.name || id}”.`,
+        warning: 'Safe Mode keeps non-system plugins disabled so a broken plugin cannot keep damaging the board.',
+        confirmText: 'OK',
+        cancelText: 'Close',
+        danger: false
+      });
+      return;
+    }
+
     setButtonBusy(btn, '');
     try {
       log('pm:toggle', { id, to: entry.enabled ? 'disabled' : 'active' });
-      await api.togglePlugin(id);
+      const ok = await api.togglePlugin(id);
+      if (!ok) throw new Error(readPluginError(id) || 'Plugin toggle failed');
       cleanupPluginUI(id);
       setPluginStatus(id, entry.enabled ? 'disabled' : 'active');
     } catch (err) {
@@ -1269,7 +1364,8 @@ export function setup(api) {
 
     try {
       log('pm:reload-start', { id });
-      await api.reloadPlugin(id);
+      const ok = await api.reloadPlugin(id);
+      if (!ok) throw new Error(readPluginError(id) || 'Plugin reload failed');
       setPluginStatus(id, 'active');
       incrementCrash(id, false);
       api.notify(`Reloaded ${entry.name || id}`, 'success');
@@ -1351,7 +1447,8 @@ export function setup(api) {
     try {
       api.registry.save([...api.registry.getAll(), pluginDef]);
       renderInstalled();
-      await api.reloadPlugin(pluginDef.id);
+      const ok = await api.reloadPlugin(pluginDef.id);
+      if (!ok) throw new Error(readPluginError(pluginDef.id) || 'Plugin failed to load');
       setPluginStatus(pluginDef.id, 'active');
       incrementCrash(pluginDef.id, false);
       api.notify(`${pluginDef.name || pluginDef.id} installed`, 'success');
@@ -1423,7 +1520,8 @@ export function setup(api) {
       }
       api.registry.save(reg);
 
-      await api.reloadPlugin(id);
+      const ok = await api.reloadPlugin(id);
+      if (!ok) throw new Error(readPluginError(id) || 'Plugin update failed while reloading');
       setPluginStatus(id, 'active');
       incrementCrash(id, false);
       api.notify(`${entry.name || id} updated`, 'success');
@@ -1504,6 +1602,7 @@ export function setup(api) {
 
     if (!confirmed.confirmed) return;
 
+    localStorage.setItem(SAFE_MODE_KEY, '1');
     const registry = api.registry.getAll();
     const targets = registry.filter(p => p.enabled && !isSystemPlugin(p));
 
@@ -1518,6 +1617,24 @@ export function setup(api) {
 
     api.notify(`Safe Mode enabled (${targets.length} plugin${targets.length === 1 ? '' : 's'} disabled)`, 'success');
     log('pm:safe-mode', { disabled: targets.map(p => p.id) });
+    registerCoreUI();
+    renderInstalled();
+  }
+
+  async function disableSafeMode() {
+    const result = await showConfirmModal({
+      title: 'Turn Off Safe Mode?',
+      message: 'You will be able to enable plugins again.',
+      warning: 'Only turn this off when you trust the plugins you are enabling.',
+      confirmText: 'Turn Off',
+      cancelText: 'Keep On',
+      danger: false
+    });
+    if (!result.confirmed) return;
+    localStorage.removeItem(SAFE_MODE_KEY);
+    api.notify('Safe Mode turned off', 'success');
+    log('pm:safe-mode-off', {});
+    registerCoreUI();
     renderInstalled();
   }
 
@@ -1612,38 +1729,43 @@ export function setup(api) {
     confirmText = 'Confirm',
     cancelText = 'Cancel',
     danger = false,
-    checkbox = null
+    checkbox = null,
+    returnDetails = false
   } = {}) {
     return new Promise((resolve) => {
       const overlay = document.createElement('div');
       overlay.className = 'pm-modal-overlay';
-
-      const messageHTML = message
-        ? `<p class="pm-modal-message">${escapeHTML(message).replaceAll('\n', '<br>')}</p>`
-        : '';
-
-      const checkboxHTML = checkbox
-        ? `<label class="pm-checkbox-row"><input type="checkbox" ${checkbox.checked ? 'checked' : ''}> <span>${escapeHTML(checkbox.label || '')}</span></label>`
-        : '';
+      overlay.style.zIndex = '2147483647';
 
       overlay.innerHTML = `
         <div class="pm-modal-content">
           <h3 class="pm-modal-title">${escapeHTML(title)}</h3>
-          ${messageHTML}
+          ${message ? `<p class="pm-modal-message">${escapeHTML(message)}</p>` : ''}
           ${warning ? `<div class="pm-modal-warning-box">${escapeHTML(warning)}</div>` : ''}
-          ${checkboxHTML}
-          <div style="display:flex; gap:10px; margin-top:14px;">
+          ${checkbox ? `
+            <label class="pm-modal-checkbox-row">
+              <input type="checkbox" data-confirm-checkbox>
+              <span>${escapeHTML(checkbox.label || '')}</span>
+            </label>
+          ` : ''}
+          <div style="display:flex; gap:10px; margin-top:8px;">
             <button class="pm-btn pm-btn-secondary" data-confirm-action="cancel" style="flex:1">${escapeHTML(cancelText)}</button>
             <button class="pm-btn ${danger ? 'pm-btn-danger' : 'pm-btn-primary'}" data-confirm-action="confirm" style="flex:1">${escapeHTML(confirmText)}</button>
           </div>
         </div>
       `;
 
-      function close(confirmed) {
-        const checked = Boolean(overlay.querySelector('input[type="checkbox"]')?.checked);
+      function close(value) {
+        const checked = Boolean(overlay.querySelector('[data-confirm-checkbox]')?.checked);
+
         overlay.remove();
         document.removeEventListener('keydown', onKeyDown);
-        resolve({ confirmed, checked });
+
+        if (returnDetails) {
+          resolve({ confirmed: value, checked });
+        } else {
+          resolve(value);
+        }
       }
 
       function onKeyDown(e) {
@@ -1652,14 +1774,51 @@ export function setup(api) {
       }
 
       overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) return close(false);
+        if (e.target === overlay) {
+          close(false);
+          return;
+        }
+
         const btn = e.target.closest('[data-confirm-action]');
         if (!btn) return;
+
         close(btn.dataset.confirmAction === 'confirm');
       });
 
       document.addEventListener('keydown', onKeyDown);
       document.documentElement.appendChild(overlay);
+    });
+  }
+
+
+  function showWhatsNewModal(id) {
+    const registry = api.registry.getAll();
+    const entry = registry.find(p => p.id === id);
+    const community = communityCache.find(p => p.id === id) || {};
+    const remoteMeta = remoteMetaCache.get(id) || {};
+    const p = { ...community, ...entry, ...remoteMeta };
+    if (!p.id && !id) return;
+
+    const raw = p.whatsNew || p.whatNew || p.releaseNotes || p.changelogText || null;
+    const rows = [];
+    if (Array.isArray(raw)) {
+      raw.forEach((item, i) => {
+        if (typeof item === 'string') rows.push([`Update ${i + 1}`, item]);
+        else rows.push([item.version || item.title || `Update ${i + 1}`, item.text || item.description || JSON.stringify(item)]);
+      });
+    } else if (typeof raw === 'string' && raw.trim()) {
+      rows.push(['What’s New', raw.trim()]);
+    }
+
+    if (p.version || p.remoteVersion) rows.unshift(['Version', p.remoteVersion || p.version]);
+    if (p.changelog || remoteMeta.changelog) rows.push(['Changelog Link', p.changelog || remoteMeta.changelog]);
+    if (!rows.length) rows.push(['No release notes', 'This plugin has not provided What’s New notes yet.']);
+
+    showInfoModal({
+      title: `What’s New in ${p.name || id}`,
+      subtitle: 'Release notes provided by the plugin metadata.',
+      rows,
+      actions: '<button class="pm-btn pm-btn-primary" data-confirm-action="cancel">Done</button>'
     });
   }
 
@@ -1691,9 +1850,12 @@ export function setup(api) {
       subtitle: p.description || 'Plugin details and safety information.',
       rows: details,
       actions: `
-        ${p.changelog ? `<a class="pm-btn pm-btn-secondary" href="${escapeAttr(p.changelog)}" target="_blank" style="text-decoration:none;">What’s New</a>` : ''}
+        <button class="pm-btn pm-btn-secondary" data-confirm-action="whats-new">What’s New</button>
         <button class="pm-btn pm-btn-secondary" data-confirm-action="cancel">Close</button>
-      `
+      `,
+      onAction: async (action) => {
+        if (action === 'whats-new') showWhatsNewModal(id);
+      }
     });
   }
 
@@ -1716,11 +1878,12 @@ export function setup(api) {
       subtitle: p.description || 'Community plugin.',
       rows: details,
       actions: `
-        ${p.changelog ? `<a class="pm-btn pm-btn-secondary" href="${escapeAttr(p.changelog)}" target="_blank" style="text-decoration:none;">What’s New</a>` : ''}
+        <button class="pm-btn pm-btn-secondary" data-confirm-action="whats-new-community">What’s New</button>
         <button class="pm-btn pm-btn-secondary" data-confirm-action="cancel">Close</button>
         <button class="pm-btn pm-btn-primary" data-confirm-action="install">Install</button>
       `,
       onAction: async (action) => {
+        if (action === 'whats-new-community') showWhatsNewModal(p.id);
         if (action === 'install') await installCommunityPlugin(p.id, p.url, null);
       }
     });
@@ -1798,15 +1961,22 @@ export function setup(api) {
 
     activeMenu = document.createElement('div');
     activeMenu.className = 'pm-action-menu';
-    activeMenu.innerHTML = `
-      <button class="pm-menu-item" data-menu-action="details" data-id="${escapeAttr(id)}">View Details</button>
-      <button class="pm-menu-item" data-menu-action="check-update" data-id="${escapeAttr(id)}">Check for Update</button>
-      ${canReload ? `<button class="pm-menu-item" data-menu-action="reload" data-id="${escapeAttr(id)}">Reload</button>` : ''}
+    const remoteMeta = remoteMetaCache.get(id) || {};
+    const hasWhatsNew = Boolean(entry.whatsNew || entry.changelog || remoteMeta.whatsNew || remoteMeta.changelog || remoteMeta.version);
+    const systemMenu = isSelf ? `
       <div class="pm-menu-separator"></div>
-      <button class="pm-menu-item" data-menu-action="logs" data-id="${escapeAttr(id)}">View Logs</button>
-      <button class="pm-menu-item" data-menu-action="reset-layout" data-id="${escapeAttr(id)}">Reset Manager Layout</button>
+      <button class="pm-menu-item" data-menu-action="logs" data-id="${escapeAttr(id)}">${menuIcon('logs')}<span class="pm-menu-label">View Logs</span></button>
+      <button class="pm-menu-item" data-menu-action="reset-layout" data-id="${escapeAttr(id)}">${menuIcon('reset')}<span class="pm-menu-label">Reset Manager Layout</span></button>
+    ` : '';
+
+    activeMenu.innerHTML = `
+      <button class="pm-menu-item" data-menu-action="details" data-id="${escapeAttr(id)}">${menuIcon('details')}<span class="pm-menu-label">View Details</span></button>
+      ${hasWhatsNew ? `<button class="pm-menu-item" data-menu-action="whats-new" data-id="${escapeAttr(id)}">${menuIcon('sparkle')}<span class="pm-menu-label">What’s New</span></button>` : ''}
+      <button class="pm-menu-item" data-menu-action="check-update" data-id="${escapeAttr(id)}">${menuIcon('update')}<span class="pm-menu-label">Check for Update</span></button>
+      ${canReload ? `<button class="pm-menu-item" data-menu-action="reload" data-id="${escapeAttr(id)}">${menuIcon('reload')}<span class="pm-menu-label">Reload</span></button>` : ''}
+      ${systemMenu}
       ${isSelf ? '' : '<div class="pm-menu-separator"></div>'}
-      ${isSelf ? '' : `<button class="pm-menu-item danger" data-menu-action="delete" data-id="${escapeAttr(id)}">Delete Plugin</button>`}
+      ${isSelf ? '' : `<button class="pm-menu-item danger" data-menu-action="delete" data-id="${escapeAttr(id)}">${menuIcon('delete')}<span class="pm-menu-label">Delete Plugin</span></button>`}
     `;
 
     document.documentElement.appendChild(activeMenu);
@@ -2162,7 +2332,7 @@ export function setup(api) {
     if (!btn) return;
     btn.dataset.prevHtml = btn.innerHTML;
     btn.disabled = true;
-    if (text) btn.textContent = text;
+    if (text) btn.innerHTML = text;
   }
 
   function resetButton(btn, html = null) {
@@ -2226,6 +2396,37 @@ export function setup(api) {
 
   function escapeAttr(value = '') {
     return escapeHTML(value).replaceAll('`', '&#096;');
+  }
+
+
+  function isSafeModeOn() {
+    return localStorage.getItem(SAFE_MODE_KEY) === '1';
+  }
+
+  function wait(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  function readPluginError(id) {
+    try {
+      const entry = api.registry.get(id) || api.registry.getAll().find(p => p.id === id);
+      return entry?.error || null;
+    } catch {
+      return null;
+    }
+  }
+
+  function menuIcon(type) {
+    const icons = {
+      details: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>',
+      sparkle: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.7 5.2L19 10l-5.3 1.8L12 17l-1.7-5.2L5 10l5.3-1.8L12 3z"></path></svg>',
+      update: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6"></path><path d="M2.5 22v-6h6"></path><path d="M2 11.5a10 10 0 0 1 18.8-4.3"></path><path d="M22 12.5a10 10 0 0 1-18.8 4.2"></path></svg>',
+      reload: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 15.5-6.2"></path><path d="M18.5 3.8V9H13"></path><path d="M21 12a9 9 0 0 1-15.5 6.2"></path><path d="M5.5 20.2V15H11"></path></svg>',
+      logs: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13"></path><path d="M8 12h13"></path><path d="M8 18h13"></path><path d="M3 6h.01"></path><path d="M3 12h.01"></path><path d="M3 18h.01"></path></svg>',
+      reset: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"></path><path d="M3 4v6h6"></path></svg>',
+      delete: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path></svg>'
+    };
+    return `<span class="pm-menu-icon">${icons[type] || ''}</span>`;
   }
 
   // ─────────────────────────────────────────────
