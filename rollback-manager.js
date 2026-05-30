@@ -10,9 +10,9 @@
 export const meta = {
   id: 'rollback-manager',
   name: 'Rollback Manager',
-  version: '4.1.2',
+  version: '4.1.3',
   compat: '>=4.0.0',
-  coreVersion: '4.1.2',
+  coreVersion: '4.1.3',
   icon: '↩️',
   author: 'Dheeraz',
   description: 'Creates plugin snapshots and lets you roll back plugins safely.',
@@ -21,8 +21,8 @@ export const meta = {
   permissions: ['ui', 'storage', 'bus', 'network', 'registry', 'system'],
   whatsNew: [
     {
-      version: '4.1.2',
-      title: 'Core v4.1 support',
+      version: '4.1.3',
+      title: 'Core v4.1.3 support',
       text: 'Updated for the latest Blank Board core and Plugin Manager extension slots.'
     },
     {
@@ -140,7 +140,7 @@ function buildCSS() {
     .pm-btn-rollback:hover { background:rgba(255,149,0,0.18); color:#b45309; border-color:rgba(255,149,0,0.25); }
     .rb-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.22); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); z-index:2147483647; display:flex; align-items:center; justify-content:center; animation:rb-fi 0.18s ease; }
     @keyframes rb-fi { from{opacity:0} to{opacity:1} }
-    .rb-modal { background:rgba(255,255,255,0.97); border-radius:22px; padding:28px; box-shadow:0 24px 60px rgba(0,0,0,0.13); border:1px solid rgba(0,0,0,0.08); font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",Helvetica Neue,sans-serif; width:500px; max-width:calc(100vw - 40px); max-height:82vh; display:flex; flex-direction:column; animation:rb-su 0.2s cubic-bezier(0.16,1,0.3,1); }
+    .rb-modal { background:rgba(255,255,255,0.97); border-radius:22px; padding:28px; box-shadow:0 24px 60px rgba(0,0,0,0.13); border:1px solid rgba(0,0,0,0.08); font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",Helvetica Neue,sans-serif; width:560px; max-width:calc(100vw - 40px); max-height:82vh; display:flex; flex-direction:column; animation:rb-su 0.2s cubic-bezier(0.16,1,0.3,1); }
     @keyframes rb-su { from{transform:translateY(10px);opacity:0} to{transform:none;opacity:1} }
     .rb-title { font-size:20px; font-weight:700; color:#1d1d1f; margin:0 0 3px; letter-spacing:-0.3px; flex-shrink:0; }
     .rb-sub { font-size:13px; color:#8e8e93; margin:0 0 18px; flex-shrink:0; }
@@ -155,18 +155,74 @@ function buildCSS() {
     .rb-dot { width:8px; height:8px; border-radius:50%; background:white; opacity:0; transition:opacity 0.14s; }
     .rb-row-untracked.rb-sel .rb-dot { opacity:1; }
     .rb-row-tracked { border:1.5px solid rgba(0,122,255,0.2); border-radius:13px; background:rgba(0,122,255,0.03); overflow:hidden; }
-    .rb-row-tracked-header { display:flex; align-items:center; gap:12px; padding:11px 14px; }
+    .rb-row-tracked-header {
+      display:flex;
+      align-items:center;
+      gap:12px;
+      padding:12px 14px 10px 14px;
+    }
     .rb-tracked-icon { width:8px; height:8px; border-radius:50%; background:#007AFF; flex-shrink:0; }
-    .rb-tracked-actions { display:flex; gap:7px; padding:0 14px 11px 34px; }
-    .rb-tracked-actions button { padding:5px 12px; border-radius:999px; font-size:12px; font-weight:600; border:none; cursor:pointer; transition:all 0.15s; display:flex; align-items:center; gap:5px; }
+    .rb-tracked-actions {
+      display: grid;
+      grid-template-columns: 1.25fr 0.8fr 1fr;
+      gap: 8px;
+      padding: 0 14px 12px 34px;
+    }
+
+    .rb-tracked-actions button {
+      min-width: 0;
+      height: 32px;
+      padding: 0 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 650;
+      border: none;
+      cursor: pointer;
+      transition: background 0.15s ease, transform 0.15s ease, opacity 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      letter-spacing: -0.01em;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    .rb-tracked-actions button:hover {
+      transform: translateY(-0.5px);
+    }
+
+    .rb-tracked-actions button svg {
+      width: 13.5px;
+      height: 13.5px;
+      flex: 0 0 13.5px;
+      stroke-width: 2.25;
+    }
     .rb-act-regen { background:rgba(0,122,255,0.1); color:#0071e3; }
     .rb-act-regen:hover { background:rgba(0,122,255,0.18); }
     .rb-act-del { background:rgba(0,0,0,0.05); color:#6e6e73; }
     .rb-act-del:hover { background:rgba(0,0,0,0.09); }
     .rb-act-stop { background:rgba(255,59,48,0.08); color:#ff3b30; }
     .rb-act-stop:hover { background:rgba(255,59,48,0.15); }
-    .rb-pname { font-size:14px; font-weight:600; color:#1d1d1f; }
-    .rb-pid { font-size:12px; color:#8e8e93; }
+    .rb-pname {
+      font-size: 14px;
+      font-weight: 650;
+      color: #1d1d1f;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .rb-pid {
+      font-size: 12px;
+      color: #8e8e93;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     .rb-snap-badge { margin-left:auto; font-size:11px; font-weight:600; padding:2px 8px; border-radius:999px; white-space:nowrap; }
     .rb-snap-badge.ok { background:rgba(52,199,89,0.15); color:#248a3d; }
     .rb-snap-badge.nil { background:rgba(142,142,147,0.15); color:#8e8e93; }
@@ -294,13 +350,7 @@ function registerRollbackMenuAction(api) {
     owner: meta.id,
     pluginId: '*',
     label: 'Rollback to Snapshot',
-    icon: `
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M4 9h10a6 6 0 1 1 0 12h-4"></path>
-        <path d="M4 9l5-5"></path>
-        <path d="M4 9l5 5"></path>
-      </svg>
-    `,
+    icon: iconRollbackArrow(),
     showWhen: ({ pluginId, entry }) => {
       if (!pluginId || pluginId === 'plugin-manager' || pluginId === meta.id) return false;
       if (!isTracked(pluginId)) return false;
@@ -337,14 +387,7 @@ function registerRollbackSidebarButton(api) {
   btn.dataset.pluginOwner = meta.id;
   btn.dataset.pluginId = meta.id;
 
-  btn.innerHTML = `
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M4 7v5h5"></path>
-      <path d="M20 17a8 8 0 0 0-13.7-5.7L4 13"></path>
-      <path d="M20 17v-5h-5"></path>
-      <path d="M4 7a8 8 0 0 1 13.7 5.7L20 11"></path>
-    </svg>
-  `;
+  btn.innerHTML = iconSnapshots();
 
   btn.onclick = (e) => {
     e.preventDefault();
@@ -421,9 +464,20 @@ function openMainPopup(api) {
                   ${snap ? `<span class="rb-snap-badge ok">\u2713 v${snapVer||'?'}</span>` : `<span class="rb-snap-badge nil">No snapshot</span>`}
                 </div>
                 <div class="rb-tracked-actions">
-                  <button class="rb-act-regen" data-regen="${p.id}"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg> Regenerate${snapDate?' \u00B7 '+snapDate:''}</button>
-                  <button class="rb-act-del" data-delsnap="${p.id}" ${!snap?'disabled style="opacity:0.38"':''}><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg> Delete</button>
-                  <button class="rb-act-stop" data-stoptrack="${p.id}"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Stop Tracking</button>
+                <button class="rb-act-regen" data-regen="${p.id}" title="Regenerate snapshot${snapDate ? ' · ' + snapDate : ''}">
+                  ${iconSnapshotRefresh()}
+                  <span>Regenerate${snapDate ? ' · ' + snapDate : ''}</span>
+                </button>
+
+                <button class="rb-act-del" data-delsnap="${p.id}" ${!snap ? 'disabled style="opacity:0.38"' : ''} title="Delete snapshot">
+                  ${iconTrashMini()}
+                  <span>Delete</span>
+                </button>
+
+                <button class="rb-act-stop" data-stoptrack="${p.id}" title="Stop tracking this plugin">
+                  ${iconStopTracking()}
+                  <span>Stop Tracking</span>
+                </button>                
                 </div></div>`;
             }).join('')}` : ''}
           ${untrackedPlugins.length > 0 ? `
@@ -448,7 +502,7 @@ function openMainPopup(api) {
     const saveBtn = overlay.querySelector('#rb-main-save');
     if (saveBtn) {
       saveBtn.onclick = async () => {
-        saveBtn.innerHTML = '<span class="rb-spin"></span> Capturing\u2026';
+        saveBtn.innerHTML = '<span class="rb-spin"></span><span>Capturing…</span>';
         saveBtn.disabled = true;
         let captured = 0;
         for (const id of newlySelected) {
@@ -471,7 +525,8 @@ function openMainPopup(api) {
     });
     overlay.querySelectorAll('[data-regen]').forEach(btn => {
       btn.addEventListener('click', async () => {
-        btn.innerHTML = '<span class="rb-spin dark"></span> Fetching\u2026'; btn.disabled = true;
+        btn.innerHTML = '<span class="rb-spin dark"></span><span>Fetching…</span>';
+        btn.disabled = true;
         const ok = await captureSnapshot(api, btn.dataset.regen);
         api.notify(ok ? `\u2713 Snapshot regenerated` : 'Could not fetch source.', ok ? 'success' : 'error');
         render();
@@ -648,6 +703,60 @@ function injectCardButtons(api) {
   });
 }
 
+function iconSnapshots(size = 16) {
+  return `
+    <svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="5" y="6" width="14" height="12" rx="3"></rect>
+      <path d="M8 6V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1"></path>
+      <path d="M9 12h6"></path>
+      <path d="M12 9v6"></path>
+    </svg>
+  `;
+}
+
+function iconSnapshotRefresh(size = 14) {
+  return `
+    <svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="5" y="5" width="14" height="14" rx="3"></rect>
+      <path d="M8.5 12a3.5 3.5 0 0 1 6-2.45"></path>
+      <path d="M15.5 8.5v3h-3"></path>
+      <path d="M15.5 12a3.5 3.5 0 0 1-6 2.45"></path>
+      <path d="M8.5 15.5v-3h3"></path>
+    </svg>
+  `;
+}
+
+function iconTrashMini(size = 14) {
+  return `
+    <svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 7h16"></path>
+      <path d="M10 11v6"></path>
+      <path d="M14 11v6"></path>
+      <path d="M6.5 7l.8 13h9.4l.8-13"></path>
+      <path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7"></path>
+    </svg>
+  `;
+}
+
+function iconStopTracking(size = 14) {
+  return `
+    <svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="7"></circle>
+      <path d="M8.5 8.5l7 7"></path>
+    </svg>
+  `;
+}
+
+function iconRollbackArrow(size = 16) {
+  return `
+    <svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M9 8H5V4"></path>
+      <path d="M5.5 8.5A8 8 0 1 1 4 13"></path>
+      <path d="M11 12h5"></path>
+      <path d="M13.5 9.5 16 12l-2.5 2.5"></path>
+    </svg>
+  `;
+}
 
 export function teardown() {
   if (rb.style) { rb.style.remove(); rb.style = null; }
