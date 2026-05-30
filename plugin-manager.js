@@ -1,14 +1,24 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '5.5.8',
-  compat: '>=3.3.0'
+  version: '5.5.9-v4',
+  compat: '>=4.0.0',
+  permissions: [
+    'ui',
+    'storage',
+    'network',
+    'registry',
+    'system',
+    'global-css'
+  ]
 };
 
 let root = null;
 let style = null;
 let escHandler = null;
 let contextMenuHandler = null;
+let keydownHandler = null;
+let pmRegisterUiHandler = null;
 let apiRef = null;
 
 export function setup(api) {
@@ -183,11 +193,6 @@ export function setup(api) {
 
   .pm-search-sidebar .pm-search-clear:hover {
     background: rgba(0, 0, 0, 0.25);
-  }
-
-  .pm-search-sidebar .pm-search-clear.visible {
-    display: flex;
-  }
   }
 
   .pm-search-sidebar .pm-search-clear.visible {
@@ -707,40 +712,74 @@ export function setup(api) {
   const slots = { 'header-actions': root.querySelector('#pm-actions') };
   const slotRegistry = new Map();
 
-  api.registerUI = (slot, el, id) => {
-    const pluginId = api.getPluginId();
-    if (!pluginId || !slots[slot]) return;
+  function registerPluginManagerUI(slot, el, id, owner = SELF_ID) {
+    if (!slot || !slots[slot] || !(el instanceof HTMLElement)) return false;
 
-    if (id) el.dataset.uiId = id;
-    el.dataset.owner = pluginId;
+    if (id) el.dataset.uiId = String(id);
+    el.dataset.owner = String(owner);
 
     slots[slot].appendChild(el);
 
-    if (!slotRegistry.has(pluginId)) slotRegistry.set(pluginId, []);
-    slotRegistry.get(pluginId).push(el);
-  };
+    if (!slotRegistry.has(owner)) slotRegistry.set(owner, []);
+    slotRegistry.get(owner).push(el);
+
+    return true;
+  }
 
   function cleanupPluginUI(pluginId) {
     const items = slotRegistry.get(pluginId);
     if (!items) return;
-    items.forEach(el => el.remove());
+
+    items.forEach(el => {
+      try {
+        el.remove();
+      } catch {}
+    });
+
     slotRegistry.delete(pluginId);
   }
+
+  // v4-safe extension point.
+  // Other trusted/system plugins can ask Plugin Manager to add UI by emitting:
+  // api.bus.emit('pm:register-ui', { slot: 'header-actions', element, id: 'my-button', owner: 'my-plugin' })
+  pmRegisterUiHandler = (payload = {}) => {
+    try {
+      const slot = payload.slot;
+      const el = payload.element || payload.el;
+      const id = payload.id;
+      const owner = payload.owner || payload.pluginId || 'external';
+
+      const ok = registerPluginManagerUI(slot, el, id, owner);
+
+      if (!ok) {
+        api.bus.emit('pm:register-ui-failed', {
+          reason: 'Invalid slot or element',
+          slot,
+          owner
+        });
+      }
+    } catch (err) {
+      console.error('[Plugin Manager] register-ui failed:', err);
+      api.bus.emit('pm:register-ui-failed', {
+        reason: err.message || 'Unknown error'
+      });
+    }
+  };
+
+  api.bus.on('pm:register-ui', pmRegisterUiHandler);
 
   // ───────── FIX: CLOSE BUTTON ─────────
   root.querySelector('#close-pm').onclick = () => {
     root.style.display = 'none';
   };
 
-  const handleKeyDown = (e) => {
-  const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-  const modifier = isMac ? e.metaKey : e.ctrlKey;
-  
-  if (modifier && e.key === 'f') {
-      const searchInput = document.querySelector('#pm-search');
-      const root = document.querySelector('.pm-root');
-      
-      // Only trigger if PM is actually visible
+  keydownHandler = (e) => {
+    const isMac = navigator.platform.toUpperCase().includes('MAC');
+    const modifier = isMac ? e.metaKey : e.ctrlKey;
+
+    if (modifier && e.key.toLowerCase() === 'f') {
+      const searchInput = root?.querySelector('#pm-search');
+
       if (searchInput && root && root.style.display !== 'none') {
         e.preventDefault();
         searchInput.focus();
@@ -749,7 +788,7 @@ export function setup(api) {
     }
   };
 
-  window.addEventListener('keydown', handleKeyDown);
+  window.addEventListener('keydown', keydownHandler);
 
   // ───────── FIX: ESC KEY CLOSE ─────────
   escHandler = (e) => {
@@ -1698,9 +1737,19 @@ export function teardown() {
     escHandler = null;
   }
 
+  if (keydownHandler) {
+    window.removeEventListener('keydown', keydownHandler);
+    keydownHandler = null;
+  }
+
   if (contextMenuHandler && apiRef?.boardEl) {
     apiRef.boardEl.removeEventListener('contextmenu', contextMenuHandler);
     contextMenuHandler = null;
+  }
+
+  if (pmRegisterUiHandler && apiRef?.bus) {
+    apiRef.bus.off('pm:register-ui', pmRegisterUiHandler);
+    pmRegisterUiHandler = null;
   }
 
   apiRef = null;
