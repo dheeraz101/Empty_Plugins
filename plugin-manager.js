@@ -36,6 +36,35 @@ export function setup(api) {
   let globalSearch = '';
   let activeTab = 'installed';
 
+  function switchTab(tabName) {
+  if (!root) return;
+
+  const installedView = root.querySelector('#installed');
+  const communityView = root.querySelector('#community');
+
+  if (!installedView || !communityView) {
+    console.error('[Plugin Manager] Missing tab views');
+    return;
+  }
+
+  root.querySelectorAll('.pm-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.tab === tabName);
+  });
+
+  installedView.style.display = tabName === 'installed' ? 'block' : 'none';
+  communityView.style.display = tabName === 'community' ? 'block' : 'none';
+
+  activeTab = tabName;
+
+  if (tabName === 'installed') {
+    renderInstalled();
+  }
+
+  if (tabName === 'community') {
+    renderCommunity();
+  }
+}
+
   // ───────── STATUS HELPERS ─────────
   // Persistent status/error fields on registry entries.
   // status: 'active' | 'installing' | 'updating' | 'failed' | 'disabled'
@@ -706,8 +735,12 @@ export function setup(api) {
 `;
 
   api.boardEl.appendChild(root);
-  api.makeDraggable(root);
-  api.makeResizable(root);
+
+  // Do not make the whole Plugin Manager draggable.
+  // Full-root dragging can swallow clicks on tabs/buttons in v4.
+  if (typeof api.makeResizable === 'function') {
+    api.makeResizable(root);
+  }
 
   const slots = { 'header-actions': root.querySelector('#pm-actions') };
   const slotRegistry = new Map();
@@ -1443,9 +1476,24 @@ export function setup(api) {
   }
 
   // ───────── CLICK HANDLER ─────────
-  root.onclick = async (e) => {
+  root.addEventListener('click', async (e) => {
+    const tab = e.target.closest('.pm-tab');
+
+    if (tab && root.contains(tab)) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const tabName = tab.dataset.tab;
+
+      if (tabName === 'installed' || tabName === 'community') {
+        switchTab(tabName);
+      }
+
+      return;
+    }
+
     const btn = e.target.closest('button');
-    if (!btn) return;
+    if (!btn || !root.contains(btn)) return;
 
     const id = btn.dataset.id;
 
@@ -1651,23 +1699,6 @@ export function setup(api) {
 
     renderInstalled();
     renderCommunity();
-  };
-
-  root.querySelectorAll('.pm-tab').forEach(tab => {
-    tab.onclick = () => {
-      root.querySelectorAll('.pm-tab').forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
-
-      root.querySelector('#installed').style.display = 'none';
-      root.querySelector('#community').style.display = 'none';
-
-      root.querySelector('#' + tab.dataset.tab).style.display = 'block';
-
-      activeTab = tab.dataset.tab;
-
-      if (tab.dataset.tab === 'installed') renderInstalled();
-      if (tab.dataset.tab === 'community') renderCommunity();
-    };
   });
 
   // Filter button handlers
