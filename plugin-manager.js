@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '5.7.2-v4',
+  version: '5.7.3-v4',
   compat: '>=4.0.0',
   permissions: [
     'ui',
@@ -197,9 +197,12 @@ export function setup(api) {
   }
 
   #pm-actions .pm-btn span {
-    flex: 1;
-    text-align: center;
-    margin-right: 24px;
+    flex: 1 1 auto;
+    min-width: 0;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   #close-pm:hover {
@@ -510,8 +513,12 @@ export function setup(api) {
     background: rgba(255,255,255,0.1);
     margin: 6px 4px;
   }
-  .pm-btn-safe-active { background: rgba(52,199,89,0.16) !important; color: #1f8f3a !important; border-color: rgba(52,199,89,0.28) !important; }
-  .pm-btn-safe-active::before { content: ""; width:7px; height:7px; border-radius:50%; background:#34c759; box-shadow:0 0 0 3px rgba(52,199,89,0.14); }
+  .pm-btn-safe-active {
+    background: rgba(52,199,89,0.16) !important;
+    color: #34c759 !important;
+    border-color: rgba(52,199,89,0.28) !important;
+    box-shadow: inset 0 0 0 1px rgba(52,199,89,0.18);
+  }
   .check-updates.spinning svg { animation: spin 0.8s linear infinite; }
 
   .pm-divider {
@@ -656,21 +663,46 @@ export function setup(api) {
   .pm-detail-value { color: var(--pm-text); overflow-wrap:anywhere; }
 
   .pm-toast {
-    position: fixed; right: 20px; bottom: 20px;
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
     z-index: 2147483647;
-    background: rgba(32,32,34,0.94);
-    color: #fff;
+    background: rgba(32, 32, 34, 0.94);
+    color: #f5f5f7;
     border: 1px solid rgba(255,255,255,0.12);
-    box-shadow: 0 16px 40px rgba(0,0,0,0.18);
+    box-shadow: 0 16px 40px rgba(0,0,0,0.22);
     border-radius: 999px;
-    padding: 10px 12px 10px 16px;
-    display: flex; align-items: center; gap: 12px;
-    font-size: 13.5px; font-weight: 600;
-    backdrop-filter: blur(20px);
+    padding: 9px 10px 9px 15px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13.2px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
   }
+
+  .pm-toast span {
+    white-space: nowrap;
+  }
+
   .pm-toast button {
-    border: none; background: rgba(255,255,255,0.16); color:white; border-radius:999px;
-    padding: 6px 12px; font-weight:700; cursor:pointer;
+    border: none;
+    background: rgba(255,255,255,0.14);
+    color: #fff;
+    border-radius: 999px;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  .pm-toast button:hover {
+    background: rgba(255,255,255,0.22);
   }
 
   .pm-skeleton-card {
@@ -1548,6 +1580,17 @@ export function setup(api) {
   }
 
   async function installCommunityPlugin(id, url, btn) {
+    if (isSafeModeOn()) {
+      await showConfirmModal({
+        title: 'Safe Mode Is On',
+        message: 'Turn off Safe Mode before installing plugins.',
+        warning: 'Safe Mode is designed to keep your board stable by blocking non-system plugin installs and enables.',
+        confirmText: 'OK',
+        cancelText: 'Close',
+        danger: false
+      });
+      return;
+    }
     const community = communityCache.find(p => p.id === id) || {};
     const isManualInstall = !community.id;
     const remoteMeta = await fetchRemoteMeta(url);
@@ -1807,6 +1850,18 @@ export function setup(api) {
   // ─────────────────────────────────────────────
 
   function openInstallModal() {
+
+    if (isSafeModeOn()) {
+      showConfirmModal({
+        title: 'Safe Mode Is On',
+        message: 'Turn off Safe Mode before installing new plugins.',
+        warning: 'Safe Mode blocks new plugin installs so a broken or unsafe plugin cannot be added while recovery mode is active.',
+        confirmText: 'OK',
+        cancelText: 'Close',
+        danger: false
+      });
+      return;
+    }
     const overlay = document.createElement('div');
     overlay.className = 'pm-modal-overlay';
 
@@ -2415,7 +2470,7 @@ export function setup(api) {
     if (status === 'failed') return '<span class="plugin-badge badge-failed">Failed</span>';
     if (status === 'blocked') return '<span class="plugin-badge badge-blocked">Blocked</span>';
     if (status === 'disabled') return '<span class="plugin-badge badge-disabled">Inactive</span>';
-    return `<span class="plugin-badge ${isSystem ? 'badge-system' : 'badge-enabled'}">${isSystem ? 'System' : 'Active'}</span>`;
+    return '<span class="plugin-badge badge-enabled">Active</span>';
   }
 
   function getTrustLabel(p = {}) {
@@ -2642,7 +2697,15 @@ export function setup(api) {
   }
 
   function iconReset(size = 16) {
-    return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v6h6"/></svg>`;
+    return `
+      <svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="4" y="5" width="16" height="14" rx="3"></rect>
+        <path d="M8 9h8"></path>
+        <path d="M8 13h4"></path>
+        <path d="M17.5 15.5a3.5 3.5 0 1 1-1-2.45"></path>
+        <path d="M17.5 12v3.5H14"></path>
+      </svg>
+    `;
   }
 
   function iconEllipsis(size = 16) {
