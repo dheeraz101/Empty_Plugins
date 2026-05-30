@@ -10,8 +10,28 @@
 export const meta = {
   id: 'rollback-manager',
   name: 'Rollback Manager',
-  version: '4.0.2',
-  compat: '>=4.0.0'
+  version: '4.1.0',
+  compat: '>=4.0.0',
+  coreVersion: '4.1.0',
+  icon: '↩️',
+  author: 'Dheeraz',
+  description: 'Creates plugin snapshots and lets you roll back plugins safely.',
+  category: 'system',
+  trust: 'official',
+  permissions: ['ui', 'storage', 'bus', 'network', 'registry', 'system'],
+  whatsNew: [
+    {
+      version: '4.1.0',
+      title: 'Core v4.1 support',
+      text: 'Updated for the latest Blank Board core and Plugin Manager extension slots.'
+    },
+    {
+      version: '4.1.0',
+      title: 'Cleaner Plugin Manager integration',
+      text: 'Manage Snapshots now appears as an icon-only sidebar button, and rollback actions move into each plugin’s three-dot menu.'
+    }
+  ],
+  changelogText: 'v4.1.0 updates Rollback Manager for Blank Board Core v4.1.0 and Plugin Manager v5.7.x.'
 };
 
 
@@ -232,13 +252,7 @@ export async function setup(api) {
   }
 
   function tryInjectSidebarButton() {
-    const pmActions = document.querySelector('#pm-actions');
-    if (!pmActions || pmActions.querySelector('.rb-sidebar-btn')) return;
-    const btn = document.createElement('button');
-    btn.className = 'rb-sidebar-btn';
-    btn.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg> Manage Snapshots`;
-    btn.onclick = (e) => { e.stopPropagation(); openMainPopup(rb.apiRef); };
-    pmActions.appendChild(btn);
+    registerRollbackSidebarButton(api);
   }
 
   if (rb.pollInterval) clearInterval(rb.pollInterval);
@@ -246,8 +260,9 @@ export async function setup(api) {
     const pmRoot = document.querySelector('.pm-root');
     if (!pmRoot || pmRoot.style.display === 'none') return;
     tryInjectSidebarButton();
-    injectCardButtons(rb.apiRef);
   }, 600);
+
+  registerRollbackMenuAction(api);
 
   if (!rb.clickHandlerBound) {
     document.addEventListener('click', (e) => {
@@ -262,6 +277,72 @@ export async function setup(api) {
   }
 
   console.log('\uD83D\uDD19 Rollback Manager v4.0.0 loaded');
+}
+
+function registerRollbackMenuAction(api) {
+  if (!api?.bus) return;
+
+  api.bus.emit('pm:register-menu-action', {
+    id: 'rollback-to-snapshot',
+    owner: meta.id,
+    pluginId: '*',
+    label: 'Rollback to Snapshot',
+    icon: `
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 9h10a6 6 0 1 1 0 12h-4"></path>
+        <path d="M4 9l5-5"></path>
+        <path d="M4 9l5 5"></path>
+      </svg>
+    `,
+    showWhen: ({ pluginId, entry }) => {
+      if (!pluginId || pluginId === 'plugin-manager' || pluginId === meta.id) return false;
+      if (!isTracked(pluginId)) return false;
+
+      const snap = getSnapshot(pluginId);
+      if (!snap?.code || !snap.version) return false;
+
+      const currentVer = entry?.version || entry?.remoteVersion;
+      if (!currentVer) return false;
+
+      return compareVersions(snap.version, currentVer) < 0;
+    },
+    handler: ({ pluginId }) => {
+      openRollbackConfirm(api, pluginId);
+    }
+  });
+}
+
+function registerRollbackSidebarButton(api) {
+  if (!api?.bus) return;
+
+  const btn = document.createElement('button');
+  btn.className = 'pm-plugin-mini-btn';
+  btn.title = 'Manage Snapshots';
+  btn.setAttribute('aria-label', 'Manage Snapshots');
+  btn.dataset.pluginOwner = meta.id;
+  btn.dataset.pluginId = meta.id;
+
+  btn.innerHTML = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 7v5h5"></path>
+      <path d="M20 17a8 8 0 0 0-13.7-5.7L4 13"></path>
+      <path d="M20 17v-5h-5"></path>
+      <path d="M4 7a8 8 0 0 1 13.7 5.7L20 11"></path>
+    </svg>
+  `;
+
+  btn.onclick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openMainPopup(api);
+  };
+
+  api.bus.emit('pm:register-ui', {
+    slot: 'sidebar-icons',
+    element: btn,
+    id: 'rollback-sidebar-icon',
+    owner: meta.id
+  });
 }
 
 
@@ -576,6 +657,7 @@ export function teardown() {
   if (rb.apiRef && rb.origReload) { rb.apiRef.reloadPlugin = rb.origReload; }
   document.querySelectorAll('.rb-sidebar-btn').forEach(el => el.remove());
   document.querySelectorAll('[data-rb-rollback]').forEach(el => el.remove());
+  document.querySelectorAll('[data-plugin-owner="rollback-manager"]').forEach(el => el.remove());
   document.querySelectorAll('.rb-overlay').forEach(el => el.remove());
   rb.apiRef = null;
 }

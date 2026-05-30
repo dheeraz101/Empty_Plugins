@@ -1,10 +1,27 @@
 export const meta = {
   id: 'logger',
   name: 'Logger',
-  version: '1.2.5',
+  version: '1.3.0',
   icon: '📋',
-  description: 'Records plugin lifecycle events. Adds a Logs button to Plugin Manager.',
-  compat: '>=3.3.0'
+  description: 'Records plugin lifecycle events and shows activity logs from Plugin Manager.',
+  compat: '>=4.0.0',
+  coreVersion: '4.1.0',
+  category: 'system',
+  trust: 'official',
+  permissions: ['ui', 'storage', 'bus'],
+  whatsNew: [
+    {
+      version: '1.3.0',
+      title: 'Core v4.1 support',
+      text: 'Updated for the latest Blank Board plugin API and Plugin Manager sidebar icon slots.'
+    },
+    {
+      version: '1.3.0',
+      title: 'Cleaner Plugin Manager integration',
+      text: 'The Logs action now appears as an icon-only sidebar button instead of a full text button.'
+    }
+  ],
+  changelogText: 'v1.3.0 updates Logger for Blank Board Core v4.1.0 and Plugin Manager v5.7.x.'
 };
 
 let listeners = [];
@@ -89,21 +106,40 @@ export function setup(api) {
 
   pushLog('logger:loaded', { version: meta.version });
 
-  if (typeof api.registerUI === 'function') {
-    const btn = document.createElement('button');
-    btn.className = 'pm-btn pm-btn-secondary';
-    btn.innerHTML = `
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-        <polyline points="14 2 14 8 20 8"></polyline>
-        <line x1="16" y1="13" x2="8" y2="13"></line>
-        <line x1="16" y1="17" x2="8" y2="17"></line>
-      </svg>
-      Logs
-    `;
-    btn.onclick = () => openLogViewer(api);
-    api.registerUI('header-actions', btn, 'logger-btn');
-  }
+  registerLoggerButton(api);
+}
+
+function registerLoggerButton(api) {
+  const btn = document.createElement('button');
+  btn.className = 'pm-plugin-mini-btn';
+  btn.title = 'View Logs';
+  btn.setAttribute('aria-label', 'View Logs');
+  btn.dataset.pluginOwner = meta.id;
+  btn.dataset.pluginId = meta.id;
+
+  btn.innerHTML = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M8 6h11"></path>
+      <path d="M8 12h11"></path>
+      <path d="M8 18h11"></path>
+      <path d="M4 6h.01"></path>
+      <path d="M4 12h.01"></path>
+      <path d="M4 18h.01"></path>
+    </svg>
+  `;
+
+  btn.onclick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openLogViewer(api);
+  };
+
+  api.bus.emit('pm:register-ui', {
+    slot: 'sidebar-icons',
+    element: btn,
+    id: 'logger-sidebar-icon',
+    owner: meta.id
+  });
 }
 
 export function teardown() {

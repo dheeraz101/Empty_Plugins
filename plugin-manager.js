@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '5.7.3-v4',
+  version: '5.7.4-v4',
   compat: '>=4.0.0',
   permissions: [
     'ui',
@@ -22,6 +22,8 @@ let pmRegisterUiHandler = null;
 let apiRef = null;
 let activeMenu = null;
 let documentClickHandler = null;
+let pmRegisterMenuActionHandler = null;
+let externalMenuActions = new Map();
 
 export function setup(api) {
   apiRef = api;
@@ -617,6 +619,39 @@ export function setup(api) {
     cursor: pointer;
   }
 
+  .pm-plugin-icon-actions {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    width: 100%;
+    margin-top: 0;
+  }
+
+  .pm-plugin-mini-btn {
+    height: 32px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.1);
+    color: var(--pm-text);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.18s ease, transform 0.15s ease, border-color 0.18s ease;
+    padding: 0;
+  }
+
+  .pm-plugin-mini-btn:hover {
+    background: rgba(255,255,255,0.16);
+    transform: translateY(-0.5px);
+  }
+
+  .pm-plugin-mini-btn svg {
+    width: 15.5px;
+    height: 15.5px;
+    stroke-width: 2.25;
+  }
+
   .pm-check-visual {
     position: absolute;
     inset: 0;
@@ -990,6 +1025,51 @@ export function setup(api) {
   };
   api.bus.on('pm:register-ui', pmRegisterUiHandler);
 
+  pmRegisterMenuActionHandler = (payload = {}) => {
+    try {
+      const owner = String(payload.owner || payload.pluginId || payload.__source || 'external');
+      const id = String(payload.id || '').trim();
+
+      if (!id) {
+        api.bus.emit('pm:register-menu-action-failed', {
+          reason: 'Missing action id',
+          owner
+        });
+        return;
+      }
+
+      const action = {
+        id,
+        owner,
+        pluginId: payload.targetPluginId || payload.pluginId || '*',
+        label: String(payload.label || 'Action'),
+        icon: payload.icon || '',
+        danger: payload.danger === true,
+        showWhen: typeof payload.showWhen === 'function' ? payload.showWhen : null,
+        handler: typeof payload.handler === 'function' ? payload.handler : null,
+        event: payload.event || null
+      };
+
+      if (!externalMenuActions.has(owner)) {
+        externalMenuActions.set(owner, new Map());
+      }
+
+      externalMenuActions.get(owner).set(id, action);
+
+      api.bus.emit('pm:menu-action-registered', {
+        owner,
+        id
+      });
+    } catch (err) {
+      console.error('[Plugin Manager] register-menu-action failed:', err);
+      api.bus.emit('pm:register-menu-action-failed', {
+        reason: err.message || 'Unknown error'
+      });
+    }
+  };
+
+  api.bus.on('pm:register-menu-action', pmRegisterMenuActionHandler);
+
   root.addEventListener('click', onRootClick);
 
   root.querySelectorAll('.pm-filter-btn').forEach(btn => {
@@ -1117,6 +1197,13 @@ export function setup(api) {
     resetLayoutBtn.innerHTML = `${iconReset(15)}<span>Reset Layout</span>`;
     resetLayoutBtn.onclick = resetPluginManagerLayout;
     actions.appendChild(resetLayoutBtn);
+
+    const pluginIconRow = document.createElement('div');
+    pluginIconRow.id = 'pm-plugin-icon-actions';
+    pluginIconRow.className = 'pm-plugin-icon-actions';
+    actions.appendChild(pluginIconRow);
+
+    slots['sidebar-icons'] = pluginIconRow;
   }
 
   function registerPluginManagerUI(slot, el, id, owner = SELF_ID) {
@@ -1484,6 +1571,11 @@ export function setup(api) {
   }
 
   async function handleMenuAction(action, id) {
+    if (action?.startsWith?.('external:')) {
+      const [, owner, actionId] = action.split(':');
+      return runExternalMenuAction(owner, actionId, id);
+    }
+
     if (action === 'details') return showPluginDetails(id);
     if (action === 'whats-new') return showWhatsNewModal(id);
     if (action === 'reload') return reloadPlugin(id);
@@ -2158,6 +2250,67 @@ export function setup(api) {
   // MENUS / TOASTS
   // ─────────────────────────────────────────────
 
+  function getExternalMenuItems(targetPluginId) {
+    const entry = api.registry.getAll().find(p => p.id === targetPluginId);
+    if (!entry) return [];
+
+    const items = [];
+
+    for (const [owner, actionMap] of externalMenuActions.entries()) {
+      for (const action of actionMap.values()) {
+        if (action.pluginId !== '*' && action.pluginId !== targetPluginId) continue;
+
+        if (typeof action.showWhen === 'function') {
+          try {
+            const visible = action.showWhen({
+              pluginId: targetPluginId,
+              entry,
+              registry: api.registry.getAll()
+            });
+
+            if (!visible) continue;
+          } catch (err) {
+            console.warn('[Plugin Manager] external menu showWhen failed:', err);
+            continue;
+          }
+        }
+
+        items.push({ ...action, owner });
+      }
+    }
+
+    return items;
+  }
+
+  async function runExternalMenuAction(owner, actionId, targetPluginId) {
+    const action = externalMenuActions.get(owner)?.get(actionId);
+    if (!action) return;
+
+    const entry = api.registry.getAll().find(p => p.id === targetPluginId);
+    if (!entry) return;
+
+    try {
+      if (typeof action.handler === 'function') {
+        await action.handler({
+          pluginId: targetPluginId,
+          entry,
+          registry: api.registry.getAll()
+        });
+        return;
+      }
+
+      if (action.event) {
+        api.bus.emit(action.event, {
+          pluginId: targetPluginId,
+          entry
+        });
+      }
+    } catch (err) {
+      console.error('[Plugin Manager] external menu action failed:', err);
+      api.notify(`${action.label || 'Action'} failed`, 'error');
+    }
+  }
+
   function openActionMenu(anchor, id) {
     closeActionMenu();
 
@@ -2172,6 +2325,22 @@ export function setup(api) {
     activeMenu.className = 'pm-action-menu';
     const remoteMeta = remoteMetaCache.get(id) || {};
     const hasWhatsNew = Boolean(entry.whatsNew || entry.changelog || remoteMeta.whatsNew || remoteMeta.changelog || remoteMeta.version);
+    const externalItems = getExternalMenuItems(id);
+    const externalMenu = externalItems.length
+      ? `
+        <div class="pm-menu-separator"></div>
+        ${externalItems.map(action => `
+          <button
+            class="pm-menu-item ${action.danger ? 'danger' : ''}"
+            data-menu-action="external:${escapeAttr(action.owner)}:${escapeAttr(action.id)}"
+            data-id="${escapeAttr(id)}"
+          >
+            <span class="pm-menu-icon">${action.icon || menuIcon('sparkle')}</span>
+            <span class="pm-menu-label">${escapeHTML(action.label)}</span>
+          </button>
+        `).join('')}
+      `
+      : '';
     const systemMenu = isSelf ? `
       <div class="pm-menu-separator"></div>
       <button class="pm-menu-item" data-menu-action="logs" data-id="${escapeAttr(id)}">${menuIcon('logs')}<span class="pm-menu-label">View Logs</span></button>
@@ -2183,6 +2352,7 @@ export function setup(api) {
       <button class="pm-menu-item" data-menu-action="check-update" data-id="${escapeAttr(id)}">${menuIcon('update')}<span class="pm-menu-label">Check for Update</span></button>
       ${canReload ? `<button class="pm-menu-item" data-menu-action="reload" data-id="${escapeAttr(id)}">${menuIcon('reload')}<span class="pm-menu-label">Reload</span></button>` : ''}
       ${systemMenu}
+      ${externalMenu}
       ${isSelf ? '' : '<div class="pm-menu-separator"></div>'}
       ${isSelf ? '' : `<button class="pm-menu-item danger" data-menu-action="delete" data-id="${escapeAttr(id)}">${menuIcon('delete')}<span class="pm-menu-label">Delete Plugin</span></button>`}
     `;
@@ -2753,6 +2923,13 @@ export function teardown() {
     document.removeEventListener('click', documentClickHandler);
     documentClickHandler = null;
   }
+
+  if (pmRegisterMenuActionHandler && apiRef?.bus) {
+    apiRef.bus.off('pm:register-menu-action', pmRegisterMenuActionHandler);
+    pmRegisterMenuActionHandler = null;
+  }
+
+  externalMenuActions.clear();
 
   apiRef = null;
 }
