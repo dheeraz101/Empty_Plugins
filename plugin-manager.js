@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '5.7.6-v4',
+  version: '5.7.7-v4',
   compat: '>=4.0.0',
   permissions: [
     'ui',
@@ -1333,9 +1333,21 @@ export function setup(api) {
         const item = freshRegistry.find(p => p.id === plugins[index]?.id);
         if (!item || !metaObj || metaObj.__error) return;
         remoteMetaCache.set(item.id, metaObj);
-        if (metaObj.version && item.remoteVersion !== metaObj.version) {
-          item.remoteVersion = metaObj.version;
-          changed = true;
+        if (metaObj.version) {
+          const installedVersion = normalizeVersionLabel(item.version || '0.0.0');
+          const remoteVersion = normalizeVersionLabel(metaObj.version);
+
+          // Always sync the checked remote version so stale registry values stop showing fake updates.
+          if (normalizeVersionLabel(item.remoteVersion || '') !== remoteVersion) {
+            item.remoteVersion = metaObj.version;
+            changed = true;
+          }
+
+          // If remote is not newer, clear old update-looking state.
+          if (compareVersions(remoteVersion, installedVersion) <= 0 && item.status !== 'updating') {
+            item.remoteVersion = metaObj.version;
+            changed = true;
+          }
         }
       });
 
@@ -1807,6 +1819,20 @@ export function setup(api) {
       const ok = await api.reloadPlugin(pluginDef.id);
       if (!ok) throw new Error(readPluginError(pluginDef.id) || 'Plugin failed to load');
       setPluginStatus(pluginDef.id, 'active');
+      {
+        const reg = api.registry.getAll();
+        const item = reg.find(p => p.id === pluginDef.id);
+
+        if (item) {
+          item.version = remoteMeta.version || item.version || pluginDef.version || '0.0.0';
+          item.remoteVersion = remoteMeta.version || item.version;
+          item.status = 'active';
+          item.error = null;
+          api.registry.save(reg);
+        }
+
+        remoteMetaCache.set(pluginDef.id, remoteMeta);
+      }
       incrementCrash(pluginDef.id, false);
       api.notify(`${pluginDef.name || pluginDef.id} installed`, 'success');
       log('pm:install-success', { id: pluginDef.id, version: pluginDef.version });
@@ -1896,6 +1922,20 @@ export function setup(api) {
       const ok = await api.reloadPlugin(id);
       if (!ok) throw new Error(readPluginError(id) || 'Plugin update failed while reloading');
       setPluginStatus(id, 'active');
+      {
+        const reg = api.registry.getAll();
+        const item = reg.find(p => p.id === id);
+
+        if (item) {
+          item.version = remoteMeta.version || item.version;
+          item.remoteVersion = remoteMeta.version || item.version;
+          item.status = 'active';
+          item.error = null;
+          api.registry.save(reg);
+        }
+
+        remoteMetaCache.set(id, remoteMeta);
+      }
       incrementCrash(id, false);
       api.notify(`${entry.name || id} updated`, 'success');
       log('pm:update-success', { id, version: remoteMeta.version });
@@ -2654,10 +2694,20 @@ export function setup(api) {
   // HELPERS
   // ─────────────────────────────────────────────
 
+  function normalizeVersionLabel(version = '') {
+    return String(version || '')
+      .trim()
+      .replace(/^v/i, '')
+      .replace(/\s+/g, '');
+  }
+
   function hasPluginUpdate(entry = {}, remoteMeta = null) {
-    const installed = entry.version || '0.0.0';
-    const remote = remoteMeta?.version || entry.remoteVersion || null;
+    const installed = normalizeVersionLabel(entry.version || '0.0.0');
+    const remote = normalizeVersionLabel(remoteMeta?.version || entry.remoteVersion || '');
+
     if (!remote) return false;
+    if (!installed) return false;
+
     return compareVersions(remote, installed) > 0;
   }
 
