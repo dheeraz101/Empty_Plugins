@@ -505,7 +505,7 @@ export function setup(api) {
   .pm-btn {
     padding: 6px 14px;
     border-radius: 999px;
-    font-size: 13px;
+    font-size: 13.5px;
     font-weight: 600;
     border: none;
     cursor: pointer;
@@ -528,21 +528,24 @@ export function setup(api) {
   }
 
   .pm-modal-message {
-    margin: -4px 0 18px 0;
+    margin: -2px 0 16px 0;
     font-size: 14px;
     line-height: 1.45;
     color: #6e6e73;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   }
 
   .pm-modal-warning-box {
     padding: 12px 14px;
     border-radius: 14px;
-    background: rgba(255, 59, 48, 0.08);
-    border: 1px solid rgba(255, 59, 48, 0.16);
-    color: #b42318;
-    font-size: 13px;
-    line-height: 1.4;
+    background: rgba(255, 59, 48, 0.09);
+    border: 1px solid rgba(255, 59, 48, 0.18);
+    color: #b3261e;
+    font-size: 13.5px;
+    font-weight: 500;
+    line-height: 1.45;
     margin-bottom: 16px;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   }
   .pm-btn-secondary {
     background: color-mix(in srgb, var(--pm-card) 70%, black);
@@ -592,9 +595,13 @@ export function setup(api) {
   }
   .pm-modal-content {
     background: rgba(255,255,255,0.97);
-    width: 380px; padding: 24px; border-radius: 24px;
+    width: 380px;
+    padding: 24px;
+    border-radius: 24px;
     box-shadow: 0 20px 40px rgba(0,0,0,0.1);
     border: 1px solid rgba(0,0,0,0.08);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #1d1d1f;
   }
   .pm-input {
     width: 100%; padding: 12px; border-radius: 12px;
@@ -627,7 +634,7 @@ export function setup(api) {
     margin-top: 12px;
     height: 1px;
     width: 100%;
-    background: rgba(0,0,0,0.08);
+    background: rgba(128,128,128,0.18);
   }
 
   .pm-tab-container {
@@ -675,7 +682,11 @@ export function setup(api) {
     .badge-failed { background: rgba(255, 59, 48, 0.2); color: #ff6961; }
     .pm-error-msg { color: #ff6961; }
     .pm-btn-retry { background: rgba(255, 59, 48, 0.15); color: #ff6961; border-color: rgba(255, 59, 48, 0.25); }
-    .pm-modal-content { background: rgba(44, 44, 46, 0.95); color: white; border-color: rgba(255,255,255,0.1); }
+    .pm-modal-content {
+      background: rgba(34, 34, 36, 0.96);
+      color: #f5f5f7;
+      border-color: rgba(255,255,255,0.12);
+    }
     .pm-input { background: rgba(0,0,0,0.2); border-color: rgba(255,255,255,0.1); color: white; }
     .last-checked { color: #6e6e73; }
     .pm-modal-title {
@@ -691,15 +702,15 @@ export function setup(api) {
         background-color: rgba(255, 255, 255, 0.35);
       }
 
-    .pm-modal-message {
-      color: #a1a1a6;
-    }
+      .pm-modal-message {
+        color: #a1a1a6;
+      }
 
-    .pm-modal-warning-box {
-      background: rgba(255, 69, 58, 0.13);
-      border-color: rgba(255, 69, 58, 0.24);
-      color: #ff8a80;
-    }
+      .pm-modal-warning-box {
+        background: rgba(255, 69, 58, 0.12);
+        border-color: rgba(255, 69, 58, 0.22);
+        color: #ffb4ab;
+      }
 
     .pm-content {
       scrollbar-color: rgba(255,255,255,0.3) transparent;
@@ -1679,10 +1690,10 @@ export function setup(api) {
 
       const confirmed = await showConfirmModal({
         title: 'Delete Plugin?',
-        message: `You are about to delete "${pluginName}".`,
-        warning: 'This will remove the plugin from your board. Any plugin UI will be unloaded immediately. Plugin data may remain unless the core is configured to purge storage.',
+        message: `Remove "${pluginName}" from your board?`,
+        warning: 'The plugin will be disabled and removed from your workspace. Your saved data will stay on this device unless you clear it later.',
         confirmText: 'Delete',
-        cancelText: 'Cancel',
+        cancelText: 'Keep Plugin',
         danger: true
       });
 
