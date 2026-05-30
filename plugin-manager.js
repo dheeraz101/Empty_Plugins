@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '5.7.7-v4',
+  version: '5.7.8-v4',
   compat: '>=4.0.0',
   permissions: [
     'ui',
@@ -44,6 +44,7 @@ export function setup(api) {
   let globalSearch = '';
   let activeTab = 'installed';
   let communityCache = [];
+  let lastCommunityCacheTime = 0;
   let remoteMetaCache = new Map();
   let slotRegistry = new Map();
   let reloadCooldowns = new Map();
@@ -265,6 +266,26 @@ export function setup(api) {
     justify-content: space-between;
     gap: 12px;
     margin: 0 0 18px 0;
+  }
+
+  .pm-store-refresh-btn {
+    height: 29px;
+    padding: 0 11px;
+    font-size: 12px;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .pm-store-refresh-btn svg {
+    width: 13.5px;
+    height: 13.5px;
+    stroke-width: 2.35;
+  }
+
+  .pm-store-refresh-btn.spinning svg {
+    animation: spin 0.8s linear infinite;
   }
 
   .pm-filter-bar {
@@ -968,6 +989,11 @@ export function setup(api) {
             <button class="pm-filter-btn" data-filter-community="system">System</button>
             <button class="pm-filter-btn" data-filter-community="new">New</button>
           </div>
+
+          <button class="pm-btn pm-btn-secondary pm-store-refresh-btn" data-act="refresh-community-hard" title="Refresh Community Store">
+            ${iconRefresh(14)}
+            <span>Refresh</span>
+          </button>
         </div>
         <div class="pm-list"></div>
       </div>
@@ -1310,7 +1336,14 @@ export function setup(api) {
     activeTab = tabName;
 
     if (tabName === 'installed') renderInstalled();
-    if (tabName === 'community') renderCommunity();
+    if (tabName === 'community') renderCommunity();if (tabName === 'community') {
+      renderCommunity();
+
+      // Quiet background check. Keeps cache useful but still updates eventually.
+      if (isCommunityCacheStale()) {
+        renderCommunity(true);
+      }
+    }
   }
 
   async function renderInstalled(forceCheck = false) {
@@ -1422,9 +1455,9 @@ export function setup(api) {
       listEl.innerHTML = skeletonHTML(4);
     }
 
-    if (forceRefresh || !communityCache.length || isCommunityCacheStale()) {
-      try {
-        await refreshCommunityCache();
+  if (forceRefresh || !communityCache.length || isCommunityCacheStale()) {
+    try {
+      await refreshCommunityCache({ hard: forceRefresh === true });
       } catch (err) {
         if (!communityCache.length) {
           listEl.innerHTML = emptyStateHTML(
@@ -1608,7 +1641,14 @@ export function setup(api) {
     }
 
     if (btn.dataset.act === 'retry-community') {
-      await renderCommunity(true);
+      await hardRefreshCommunity(btn);
+      return;
+    }
+
+    if (btn.dataset.act === 'refresh-community-hard') {
+      e.preventDefault();
+      e.stopPropagation();
+      await hardRefreshCommunity(btn);
       return;
     }
 
@@ -2547,33 +2587,112 @@ export function setup(api) {
   // COMMUNITY CACHE / META
   // ─────────────────────────────────────────────
 
+  function normalizeCommunityPayload(data) {
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.plugins)) return data.plugins;
+    if (Array.isArray(data?.items)) return data.items;
+    return [];
+  }
+
   function loadCommunityFromCache() {
     try {
       const cached = JSON.parse(localStorage.getItem(COMMUNITY_CACHE_KEY) || 'null');
-      if (cached?.items?.length) {
-        communityCache = cached.items;
+
+      const items = normalizeCommunityPayload(cached);
+
+      if (items.length) {
+        communityCache = items;
+        lastCommunityCacheTime = Number(cached?.time || 0);
+        return true;
       }
-    } catch {
-      communityCache = [];
-    }
+    } catch {}
+
+    communityCache = [];
+    lastCommunityCacheTime = 0;
+    return false;
   }
 
   function isCommunityCacheStale() {
-    try {
-      const cached = JSON.parse(localStorage.getItem(COMMUNITY_CACHE_KEY) || 'null');
-      return !cached?.time || Date.now() - cached.time > CACHE_TIMEOUT;
-    } catch {
-      return true;
-    }
+    return !lastCommunityCacheTime || Date.now() - lastCommunityCacheTime > CACHE_TIMEOUT;
   }
 
-  async function refreshCommunityCache() {
-    const res = await fetch(COMMUNITY_URL, { cache: 'no-cache' });
-    if (!res.ok) throw new Error(`Community HTTP ${res.status}`);
-    const items = await res.json();
-    communityCache = Array.isArray(items) ? items : [];
-    localStorage.setItem(COMMUNITY_CACHE_KEY, JSON.stringify({ time: Date.now(), items: communityCache }));
+  async function refreshCommunityCache({ hard = false } = {}) {
+    const bustUrl = COMMUNITY_URL + (COMMUNITY_URL.includes('?') ? '&' : '?') + 'v=' + Date.now();
+
+    const res = await fetch(hard ? bustUrl : COMMUNITY_URL, {
+      cache: hard ? 'no-store' : 'no-cache',
+      headers: hard
+        ? {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        : {}
+    });
+
+    if (!res.ok) {
+      throw new Error(`Community HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    const items = normalizeCommunityPayload(data);
+
+    communityCache = items;
+    lastCommunityCacheTime = Date.now();
+
+    localStorage.setItem(COMMUNITY_CACHE_KEY, JSON.stringify({
+      time: lastCommunityCacheTime,
+      items: communityCache
+    }));
+
     return communityCache;
+  }
+
+  async function hardRefreshCommunity(btn = null) {
+    const oldHTML = btn?.innerHTML;
+
+    if (btn) {
+      btn.disabled = true;
+      btn.classList.add('spinning');
+      btn.innerHTML = `${iconRefresh(14)}<span>Refreshing…</span>`;
+    }
+
+    try {
+      localStorage.removeItem(COMMUNITY_CACHE_KEY);
+      communityCache = [];
+      lastCommunityCacheTime = 0;
+
+      await refreshCommunityCache({ hard: true });
+      await renderCommunity(false);
+
+      api.notify('Community Store refreshed', 'success');
+      log('pm:community-hard-refresh', {
+        count: communityCache.length
+      });
+    } catch (err) {
+      api.notify('Community refresh failed', 'error');
+      log('pm:community-hard-refresh-failed', {
+        error: err.message || String(err)
+      });
+
+      if (!communityCache.length) {
+        const listEl = root?.querySelector('#community .pm-list');
+        if (listEl) {
+          listEl.innerHTML = emptyStateHTML(
+            'Couldn’t refresh Community Store',
+            err.message || 'Check your connection, then try again.',
+            '<button class="pm-btn pm-btn-primary" data-act="retry-community">Retry</button>'
+          );
+        }
+      }
+    } finally {
+      if (btn) {
+        window.setTimeout(() => {
+          btn.classList.remove('spinning');
+          btn.disabled = false;
+          btn.innerHTML = oldHTML || `${iconRefresh(14)}<span>Refresh</span>`;
+        }, 700);
+      }
+    }
   }
 
   async function fetchRemoteMeta(url) {
