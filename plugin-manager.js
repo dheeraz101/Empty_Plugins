@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '5.6.0-v4',
+  version: '5.7.0-v4',
   compat: '>=4.0.0',
   permissions: [
     'ui',
@@ -20,89 +20,47 @@ let contextMenuHandler = null;
 let keydownHandler = null;
 let pmRegisterUiHandler = null;
 let apiRef = null;
+let activeMenu = null;
 
 export function setup(api) {
   apiRef = api;
+
   const SELF_ID = meta.id;
   const COMMUNITY_URL = 'https://raw.githubusercontent.com/dheeraz101/Empty_Plugins/refs/heads/main/plugins.json';
   const DOCS_URL = 'https://empty-ad9a3406.mintlify.app/introduction';
+  const CORE_VERSION = String(api.version || '4.0.0');
+  const CACHE_TIMEOUT = 10 * 60 * 1000;
+  const COMMUNITY_CACHE_KEY = 'pm:community-cache:v2';
+  const LOG_KEY = 'pm:logs:v1';
 
   let lastCheckedTime = 0;
-  const CACHE_TIMEOUT = 10 * 60 * 1000;
   let updateCount = 0;
-  const reloadCooldowns = new Map();
   let installedFilter = 'all';
   let communityFilter = 'all';
   let globalSearch = '';
   let activeTab = 'installed';
+  let communityCache = [];
+  let remoteMetaCache = new Map();
+  let slotRegistry = new Map();
+  let reloadCooldowns = new Map();
 
-  function switchTab(tabName) {
-  if (!root) return;
+  // ─────────────────────────────────────────────
+  // CSS
+  // ─────────────────────────────────────────────
 
-  const installedView = root.querySelector('#installed');
-  const communityView = root.querySelector('#community');
-
-  if (!installedView || !communityView) {
-    console.error('[Plugin Manager] Missing tab views');
-    return;
-  }
-
-  root.querySelectorAll('.pm-tab').forEach(tab => {
-    tab.classList.toggle('active', tab.dataset.tab === tabName);
-  });
-
-  installedView.style.display = tabName === 'installed' ? 'block' : 'none';
-  communityView.style.display = tabName === 'community' ? 'block' : 'none';
-
-  activeTab = tabName;
-
-  if (tabName === 'installed') {
-    renderInstalled();
-  }
-
-  if (tabName === 'community') {
-    renderCommunity();
-  }
-}
-
-  // ───────── STATUS HELPERS ─────────
-  // Persistent status/error fields on registry entries.
-  // status: 'active' | 'installing' | 'updating' | 'failed' | 'disabled'
-  // error:  string | null
-  function setPluginStatus(pluginId, status, error) {
-    const registry = api.registry.getAll();
-    const entry = registry.find(p => p.id === pluginId);
-    if (!entry) return;
-    const prev = entry.status || 'unknown';
-    entry.status = status;
-    entry.error = error || null;
-    api.registry.save(registry);
-    api.bus.emit('pm:status-change', { id: pluginId, from: prev, to: status, ...(error ? { error } : {}) });
-  }
-
-  function getPluginStatus(entry) {
-    // Derive display status from persisted field + enabled flag
-    if (entry.status === 'installing' || entry.status === 'updating' || entry.status === 'failed') {
-      return entry.status;
-    }
-    return entry.enabled ? 'active' : 'disabled';
-  }
-
-  // Returns true if the plugin is mid-transition (block duplicate actions)
-  function isBusy(entry) {
-    return entry.status === 'installing' || entry.status === 'updating';
-  }
-
-  // ───────── STYLE ─────────
   style = document.createElement('style');
   style.textContent = `
   .pm-root {
-    --pm-bg: rgba(255,255,255,0.96); 
-    --pm-card: rgba(255,255,255,0.82); 
-    --apple-red: #ff3b30;
-  }
-
-  .pm-root {
+    --pm-bg: rgba(255,255,255,0.96);
+    --pm-card: rgba(255,255,255,0.82);
+    --pm-card-strong: rgba(255,255,255,0.94);
+    --pm-text: #1d1d1f;
+    --pm-muted: #6e6e73;
+    --pm-soft-muted: #86868b;
+    --pm-border: rgba(0,0,0,0.1);
+    --pm-blue: #0071e3;
+    --pm-red: #ff3b30;
+    --pm-green: #34c759;
     position: fixed;
     top: 50%;
     left: 50%;
@@ -112,15 +70,13 @@ export function setup(api) {
     background: var(--pm-bg);
     backdrop-filter: blur(30px) saturate(180%);
     -webkit-backdrop-filter: blur(30px) saturate(180%);
-    border: 1px solid rgba(0, 0, 0, 0.12);
-    box-shadow: 
-      0 20px 60px rgba(0,0,0,0.12),
-      0 2px 8px rgba(0,0,0,0.06);
+    border: 1px solid var(--pm-border);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
     border-radius: 28px;
     display: flex;
     overflow: hidden;
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
-    color: #1d1d1f;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--pm-text);
     z-index: 10000;
     isolation: isolate;
   }
@@ -128,7 +84,7 @@ export function setup(api) {
   .pm-sidebar {
     width: 220px;
     background: var(--pm-card);
-    border-right: 1px solid rgba(0, 0, 0, 0.1);
+    border-right: 1px solid var(--pm-border);
     padding: 32px 12px 24px 12px;
     display: flex;
     flex-direction: column;
@@ -136,9 +92,18 @@ export function setup(api) {
     box-sizing: border-box;
   }
 
+  .pm-sidebar-title {
+    padding: 0 14px 18px 14px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--pm-soft-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
   .pm-sidebar-footer {
     margin-top: auto;
-    padding: 0 2px 0 2px;
+    padding: 0 2px;
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -154,12 +119,32 @@ export function setup(api) {
     display: flex;
     align-items: center;
     gap: 10px;
-    transition: all 0.15s ease;
+    transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
     margin-bottom: 2px;
   }
 
   .pm-tab.active { background: rgba(0, 0, 0, 0.06); color: #000; font-weight: 600; }
   .pm-tab:hover:not(.active) { background: rgba(0, 0, 0, 0.03); }
+
+  .pm-tab-container { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+
+  .pm-badge {
+    background: var(--pm-red);
+    color: white;
+    font-size: 11px;
+    font-weight: 600;
+    min-width: 20px;
+    height: 20px;
+    border-radius: 10px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    margin-left: auto;
+    padding: 0 6px;
+    box-shadow: 0 2px 5px rgba(255, 59, 48, 0.3);
+    letter-spacing: -0.3px;
+    line-height: 1;
+  }
 
   .pm-search-sidebar {
     margin: 10px 0 12px 0;
@@ -178,45 +163,33 @@ export function setup(api) {
     color: #424245;
     outline: none;
     box-sizing: border-box;
-    transition:
-      background 0.18s ease,
-      border-color 0.18s ease,
-      box-shadow 0.18s ease,
-      transform 0.18s ease;
+    transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
   }
 
-  .pm-search-sidebar .pm-search-input::placeholder {
-    color: #86868b;
-  }
-
-  .pm-search-sidebar .pm-search-input:hover {
-    background: rgba(0, 0, 0, 0.065);
-  }
-
+  .pm-search-sidebar .pm-search-input::placeholder { color: #86868b; }
+  .pm-search-sidebar .pm-search-input:hover { background: rgba(0, 0, 0, 0.065); }
   .pm-search-sidebar .pm-search-input:focus {
     background: rgba(255, 255, 255, 0.72);
     border-color: rgba(0, 113, 227, 0.42);
-    box-shadow:
-      0 0 0 3px rgba(0, 113, 227, 0.12),
-      0 6px 18px rgba(0, 0, 0, 0.06);
+    box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.12), 0 6px 18px rgba(0, 0, 0, 0.06);
   }
 
-  .pm-search-sidebar .pm-search-icon {
+  .pm-search-icon {
     position: absolute;
     left: 14px;
     top: 50%;
     transform: translateY(-50%);
-    color: #86868b;
+    color: var(--pm-soft-muted);
     pointer-events: none;
   }
 
-  .pm-search-sidebar .pm-search-clear {
+  .pm-search-clear {
     position: absolute;
-    right: 14px;
+    right: 12px;
     top: 50%;
     transform: translateY(-50%);
-    width: 16px;
-    height: 16px;
+    width: 18px;
+    height: 18px;
     border-radius: 50%;
     background: rgba(0, 0, 0, 0.15);
     border: none;
@@ -225,32 +198,56 @@ export function setup(api) {
     align-items: center;
     justify-content: center;
     color: #424245;
-    font-size: 11px;
+    font-size: 12px;
     line-height: 1;
-    font-weight: 600;
+    font-weight: 700;
   }
 
-  .pm-search-sidebar .pm-search-clear:hover {
-    background: rgba(0, 0, 0, 0.25);
-  }
-
-  .pm-search-sidebar .pm-search-clear.visible {
-    display: flex;
-  }
+  .pm-search-clear.visible { display: flex; }
+  .pm-search-clear:hover { background: rgba(0, 0, 0, 0.25); }
 
   .pm-content {
     flex: 1;
-    margin: 0; 
+    margin: 0;
     padding: 40px 32px;
     overflow-y: auto;
     scroll-behavior: smooth;
     scrollbar-gutter: stable;
-    position: relative; 
+    position: relative;
   }
 
-  .pm-view-title { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 4px; }
-  .pm-view-subtitle { font-size: 15px; color: #6e6e73; margin-bottom: 32px; font-weight: 400; }
-  .pm-list { display: flex; flex-direction: column; gap: 12px; }
+  .pm-view-title { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; margin: 0 0 4px 0; }
+  .pm-view-subtitle { font-size: 15px; color: var(--pm-muted); margin: 0 0 24px 0; font-weight: 400; }
+  .pm-list { display: flex; flex-direction: column; gap: 12px; position: relative; }
+
+  .pm-toolbar-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0 0 18px 0;
+  }
+
+  .pm-filter-bar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .pm-filter-btn {
+    padding: 6px 13px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    background: rgba(0, 0, 0, 0.04);
+    color: #424245;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+
+  .pm-filter-btn:hover { background: rgba(0, 0, 0, 0.08); }
+  .pm-filter-btn.active { background: var(--pm-blue); color: white; }
 
   .plugin-item {
     background: var(--pm-card);
@@ -261,14 +258,19 @@ export function setup(api) {
     align-items: center;
     gap: 16px;
     margin-bottom: 12px;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: transform 0.2s cubic-bezier(0.4,0,0.2,1), background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    transform: translateZ(0);
+    will-change: transform, background, border-color;
   }
 
   .plugin-item:hover {
+    transform: translateY(-1px);
     background: color-mix(in srgb, var(--pm-card) 85%, white);
     border-color: rgba(0, 0, 0, 0.15);
     box-shadow: 0 8px 20px rgba(0,0,0,0.04);
   }
+
+  .plugin-item.clickable { cursor: pointer; }
 
   .plugin-icon-box {
     width: 48px;
@@ -283,258 +285,198 @@ export function setup(api) {
     font-size: 18px;
     flex-shrink: 0;
     box-shadow: 0 4px 10px rgba(0, 122, 255, 0.2);
+    overflow: hidden;
   }
 
   .plugin-info { flex: 1; min-width: 0; }
-  .plugin-name { font-weight: 600; font-size: 16px; color: #1d1d1f; display: block; overflow: hidden; text-overflow: ellipsis; }
-  .plugin-meta { font-size: 13px; color: #8e8e93; margin-top: 2px; }
+  .plugin-name-row { display:flex; align-items:center; gap:8px; min-width:0; }
+  .plugin-name { font-weight: 650; font-size: 16px; color: var(--pm-text); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .plugin-meta { font-size: 13px; color: var(--pm-soft-muted); margin-top: 2px; }
+  .plugin-desc { font-size: 13px; color: var(--pm-soft-muted); line-height: 1.35; margin-top: 6px; }
 
-  .plugin-badge {
+  .plugin-badge, .perm-badge, .trust-badge {
     padding: 2px 8px;
     border-radius: 999px;
     font-size: 11px;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.45px;
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
   }
+
   .badge-enabled { background: rgba(52, 199, 89, 0.15); color: #248a3d; }
   .badge-disabled { background: rgba(142,142,147,0.15); color: #8e8e93; }
-  .badge-installing { background: rgba(0, 122, 255, 0.15); color: #007aff; }
-  .badge-updating { background: rgba(255, 149, 0, 0.15); color: #cc7700; }
-  .badge-failed { background: rgba(255, 59, 48, 0.15); color: #ff3b30; }
+  .badge-installing { background: rgba(0, 122, 255, 0.15); color: #007aff; animation: pm-pulse 1.2s ease-in-out infinite; }
+  .badge-updating { background: rgba(255, 149, 0, 0.15); color: #cc7700; animation: pm-pulse 1.2s ease-in-out infinite; }
+  .badge-failed, .badge-blocked { background: rgba(255, 59, 48, 0.15); color: #ff3b30; }
   .badge-update { background: rgba(0, 122, 255, 0.15); color: #007aff; }
   .badge-system { background: rgba(88, 86, 214, 0.15); color: #5856d6; }
   .badge-new { background: rgba(255, 149, 0, 0.15); color: #cc7700; }
+  .badge-risk { background: rgba(255, 149, 0, 0.14); color: #b76e00; }
+  .badge-incompatible { background: rgba(255, 59, 48, 0.14); color: #ff3b30; }
 
-  .pm-filter-bar {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 20px;
-  }
+  .pm-badge-row { margin-top: 6px; display:flex; gap: 6px; align-items:center; flex-wrap: wrap; }
 
-  .pm-filter-btn {
-    padding: 6px 14px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 600;
-    border: none;
-    cursor: pointer;
-    background: rgba(0, 0, 0, 0.04);
-    color: #424245;
-    transition: all 0.15s ease;
-  }
-
-  .pm-filter-btn:hover { background: rgba(0, 0, 0, 0.08); }
-  .pm-filter-btn.active { background: #0071e3; color: white; }
-
-  .pm-divider {
-    display: flex;
-    align-items: center;
-    text-align: center;
-    margin: 24px 0;
-    color: #86868b;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-  }
-
-  .pm-divider::before,
-  .pm-divider::after {
-    content: '';
-    flex: 1;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-  }
-
-  .pm-divider:not(:empty)::before {
-    margin-right: 15px;
-  }
-
-  .pm-divider:not(:empty)::after {
-    margin-left: 15px;
-  }
-
-  .pm-search-container {
-    position: relative;
-    margin-bottom: 20px;
-  }
-
-  .pm-search-hint {
-    position: absolute;
-    right: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    background: rgba(0, 0, 0, 0.05);
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    border-radius: 4px;
-    padding: 2px 6px;
-    font-size: 10px;
-    color: #888;
-    pointer-events: none;
-    transition: opacity 0.2s ease;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  }
-
-  #pm-search:focus + .pm-search-hint,
-  #pm-search:not(:placeholder-shown) + .pm-search-hint {
-    opacity: 0;
-  }
-
-  .pm-search-input {
-    width: 100%;
-    padding: 10px 16px 10px 38px;
-    border-radius: 12px;
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    background: rgba(0, 0, 0, 0.04);
-    font-size: 14px;
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
-    color: #1d1d1f;
-    outline: none;
-    transition: all 0.2s ease;
-    box-sizing: border-box;
-  }
-
-  .pm-search-input::placeholder {
-    color: #86868b;
-  }
-
-  .pm-search-input:focus {
-    background: rgba(255, 255, 255, 0.8);
-    border-color: #5e5e60;
-  }
-
-  .pm-search-icon {
-    position: absolute;
-    left: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: #86868b;
-    pointer-events: none;
-  }
-
-  .pm-search-clear {
-    position: absolute;
-    right: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: rgba(0, 0, 0, 0.15);
-    border: none;
-    cursor: pointer;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    color: #424245;
-    font-size: 14px;
-    line-height: 1;
-    transition: all 0.15s ease;
-  }
-
-  .pm-search-clear:hover {
-    background: rgba(0, 0, 0, 0.25);
-    color: #1d1d1f;
-  }
-
-  .pm-search-clear.visible {
-    display: flex;
-  }
-
-  .pm-no-results {
-    text-align: center;
-    padding: 40px 20px;
-    color: #86868b;
-    font-size: 14px;
-  }
+  .perm-badge { background: rgba(0,0,0,0.045); color: var(--pm-muted); text-transform: none; font-weight: 650; letter-spacing: 0; }
+  .perm-badge.risky { background: rgba(255,149,0,0.12); color: #b76e00; }
+  .trust-badge { text-transform: none; letter-spacing: 0; background: rgba(0,0,0,0.045); color: var(--pm-muted); }
 
   .pm-error-msg {
-    font-size: 12px; color: #ff3b30; margin-top: 4px;
-    max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: 12px;
+    color: var(--pm-red);
+    margin-top: 4px;
+    max-width: 310px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  .pm-btn-retry {
-    background: rgba(255, 59, 48, 0.1); color: #ff3b30;
-    border: 1px solid rgba(255, 59, 48, 0.2);
-  }
-  .pm-btn-retry:hover { background: rgba(255, 59, 48, 0.18); }
-
-  .pm-btn[disabled] { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
-
-  @keyframes pm-pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-  }
-  .badge-installing, .badge-updating { animation: pm-pulse 1.2s ease-in-out infinite; }
-
-  .pm-action-group { display: flex; gap: 8px; align-items: center; }
-
-  .pm-content::-webkit-scrollbar {
-      width: 12px;
-  }
-
-  .pm-content::-webkit-scrollbar-track {
-      background: transparent;
-  }
-
-  .pm-content::-webkit-scrollbar-thumb {
-      background-color: rgba(0, 0, 0, 0.08);
-      border-radius: 20px;
-      border: 3px solid transparent;
-      background-clip: padding-box;
-      box-shadow: inset 0 100px 0 100px transparent;  /* ~17% inset for 600px; increase to 120px for 20% */
-      min-height: 40px;
-      transition: background-color 0.2s;
-  }
-
-  .pm-content:hover::-webkit-scrollbar-thumb {
-      background-color: rgba(0, 0, 0, 0.2);
-  }
-
-  .pm-content::-webkit-scrollbar-button,
-  .pm-content::-webkit-scrollbar-corner {
-      display: none;
-  }
-
-  /* Firefox support */
-  .pm-content {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(0,0,0,0.1) transparent;
-  }
+  .pm-action-group { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
 
   .pm-btn {
     padding: 6px 14px;
     border-radius: 999px;
     font-size: 13.5px;
-    font-weight: 600;
+    font-weight: 650;
     border: none;
     cursor: pointer;
-    transition: all 0.2s;
-    display: flex;
+    transition: background 0.2s ease, transform 0.15s ease, opacity 0.2s ease;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
+    font-family: inherit;
+    min-height: 30px;
   }
-  .pm-btn-primary { background: #0071e3; color: white; }
+
+  .pm-btn:hover { transform: translateY(-0.5px); }
+  .pm-btn[disabled] { opacity: 0.45; cursor: not-allowed; pointer-events: none; transform: none; }
+
+  .pm-btn-primary { background: var(--pm-blue); color: white; }
   .pm-btn-primary:hover { background: #0077ed; }
+  .pm-btn-danger { background: var(--pm-red); color: white; }
+  .pm-btn-danger:hover { background: #ff453a; }
+  .pm-btn-secondary {
+    background: color-mix(in srgb, var(--pm-card) 70%, black);
+    border: 1px solid rgba(0,0,0,0.08);
+    color: var(--pm-text);
+  }
+  .pm-btn-secondary:hover { background: color-mix(in srgb, var(--pm-card) 80%, black); }
 
-  .pm-btn-danger {
-    background: #ff3b30;
-    color: white;
+  .pm-icon-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    padding: 0;
+    border: none;
+    background: rgba(0,0,0,0.04);
+    color: var(--pm-muted);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .pm-icon-btn:hover { background: rgba(0,0,0,0.08); color: var(--pm-text); }
+
+  .pm-toggle {
+    width: 44px; height: 26px; border-radius: 999px; border: none; padding: 2px;
+    background: rgba(142,142,147,0.32); cursor: pointer; transition: background 0.2s ease;
+    position: relative; flex-shrink: 0;
+  }
+  .pm-toggle::after {
+    content: ""; width: 22px; height: 22px; border-radius: 50%; background: white;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.22); position:absolute; top:2px; left:2px;
+    transition: transform 0.2s cubic-bezier(0.4,0,0.2,1);
+  }
+  .pm-toggle.on { background: var(--pm-green); }
+  .pm-toggle.on::after { transform: translateX(18px); }
+
+  .pm-action-menu {
+    position: fixed;
+    min-width: 190px;
+    background: var(--pm-card-strong);
+    border: 1px solid var(--pm-border);
+    box-shadow: 0 18px 44px rgba(0,0,0,0.18);
+    border-radius: 14px;
+    padding: 6px;
+    z-index: 2147483647;
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
   }
 
-  .pm-btn-danger:hover {
-    background: #ff453a;
+  .pm-menu-item {
+    width: 100%;
+    text-align: left;
+    border: none;
+    background: transparent;
+    color: var(--pm-text);
+    border-radius: 10px;
+    padding: 9px 10px;
+    font-size: 13.5px;
+    font-weight: 550;
+    cursor: pointer;
+    font-family: inherit;
   }
+  .pm-menu-item:hover { background: rgba(0,0,0,0.055); }
+  .pm-menu-item.danger { color: var(--pm-red); }
+  .pm-menu-separator { height:1px; background: rgba(128,128,128,0.18); margin:5px 4px; }
 
+  .pm-divider {
+    display: flex; align-items: center; text-align: center;
+    margin: 24px 0; color: var(--pm-soft-muted); font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .pm-divider::before, .pm-divider::after { content:''; flex:1; border-bottom:1px solid rgba(128,128,128,0.18); }
+  .pm-divider:not(:empty)::before { margin-right: 15px; }
+  .pm-divider:not(:empty)::after { margin-left: 15px; }
+
+  .pm-no-results, .pm-empty-state {
+    text-align: center;
+    padding: 42px 20px;
+    color: var(--pm-soft-muted);
+    font-size: 14px;
+  }
+  .pm-empty-title { font-size: 17px; color: var(--pm-text); font-weight: 700; margin-bottom: 6px; }
+  .pm-empty-subtitle { font-size: 14px; color: var(--pm-soft-muted); line-height: 1.4; margin-bottom: 16px; }
+
+  .pm-modal-overlay {
+    position: fixed; inset:0;
+    background: rgba(0,0,0,0.22);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    z-index: 2147483647;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .pm-modal-content {
+    background: rgba(255,255,255,0.97);
+    width: 390px;
+    max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 32px);
+    overflow: auto;
+    padding: 24px;
+    border-radius: 24px;
+    box-shadow: 0 20px 46px rgba(0,0,0,0.14);
+    border: 1px solid rgba(0,0,0,0.08);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--pm-text);
+  }
+  .pm-modal-content.wide { width: 560px; }
+  .pm-modal-title {
+    margin: 0 0 18px 0; font-size: 20px; font-weight: 700; letter-spacing: -0.2px; color: var(--pm-text); line-height: 1.2;
+  }
+  .pm-modal-title::after {
+    content: ""; display:block; margin-top:12px; height:1px; width:100%; background: rgba(128,128,128,0.18);
+  }
   .pm-modal-message {
     margin: -2px 0 16px 0;
     font-size: 14px;
     line-height: 1.45;
-    color: #6e6e73;
+    color: var(--pm-muted);
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   }
-
   .pm-modal-warning-box {
     padding: 12px 14px;
     border-radius: 14px;
@@ -545,351 +487,255 @@ export function setup(api) {
     font-weight: 500;
     line-height: 1.45;
     margin-bottom: 16px;
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  }
-  .pm-btn-secondary {
-    background: color-mix(in srgb, var(--pm-card) 70%, black);
-    border: 1px solid rgba(0,0,0,0.08);
-  }
-  .pm-btn-secondary:hover {
-    background: color-mix(in srgb, var(--pm-card) 80%, black);
-  }
-
-  #close-pm:hover { background: #ff3b30 !important; color: white !important; }
-
-  @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-  }
-  .spinning svg { animation: spin 0.8s cubic-bezier(0.4, 0, 0.2, 1); }
-
-  .sidebar-footer-text {
-    font-size: 12.8px;
-    color: #86868b;
-    line-height: 1.42;
-    padding: 0 12px;
-    margin: 0 0 2px 0;
-    font-weight: 400;
-  }
-
-  .docs-link {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 12px;
-    font-size: 13px;
-    color: #0071e3;
-    text-decoration: none;
-    font-weight: 500;
-    border-radius: 12px;
-    transition: background 0.2s, color 0.2s;
-  }
-  .docs-link:hover { background: rgba(0, 113, 227, 0.05); }
-
-  .pm-modal-overlay {
-    position: fixed; top:0; left:0; right:0; bottom:0;
-    background: rgba(0,0,0,0.2);
-    backdrop-filter: blur(10px);
-    z-index: 2147483647;
-    display: flex; align-items: center; justify-content: center;
-  }
-  .pm-modal-content {
-    background: rgba(255,255,255,0.97);
-    width: 380px;
-    padding: 24px;
-    border-radius: 24px;
-    box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-    border: 1px solid rgba(0,0,0,0.08);
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    color: #1d1d1f;
   }
   .pm-input {
     width: 100%; padding: 12px; border-radius: 12px;
     border: 1px solid rgba(0,0,0,0.1); background: rgba(255,255,255,0.5);
-    margin-bottom: 12px; font-size: 14px; outline: none;
-    box-sizing: border-box; transition: border 0.2s;
+    margin-bottom: 12px; font-size: 14px; outline: none; box-sizing: border-box; transition: border 0.2s, background 0.2s;
+    color: var(--pm-text); font-family: inherit;
   }
-  .last-checked {
-    font-size: 11px;
-    color: #86868b;
-    margin-top: 2px;
-    text-align: right;
-    opacity: 0.8;
-  }
-  .pm-input:focus { border-color: #5e5e60; background: rgba(255, 255, 255, 0.8); }
+  .pm-input:focus { border-color: rgba(0,113,227,0.5); background: rgba(255,255,255,0.8); }
 
-  .pm-modal-title {
-    margin: 0 0 18px 0;
-    font-size: 20px;
-    font-weight: 600;
-    letter-spacing: -0.2px;
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
-    color: #1d1d1f;
-    line-height: 1.2;
+  .pm-checkbox-row {
+    display:flex; gap:10px; align-items:flex-start; padding: 10px 0 2px; color: var(--pm-muted); font-size: 13.5px; line-height:1.35;
   }
+  .pm-checkbox-row input { margin-top: 2px; accent-color: var(--pm-red); }
 
-  .pm-modal-title::after {
-    content: "";
-    display: block;
-    margin-top: 12px;
-    height: 1px;
-    width: 100%;
-    background: rgba(128,128,128,0.18);
+  .pm-detail-grid {
+    display:grid; grid-template-columns: 130px 1fr; gap: 10px 14px;
+    font-size: 13.5px; line-height: 1.35; margin: 12px 0;
   }
+  .pm-detail-label { color: var(--pm-soft-muted); font-weight: 600; }
+  .pm-detail-value { color: var(--pm-text); overflow-wrap:anywhere; }
 
-  .pm-tab-container {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
+  .pm-toast {
+    position: fixed; right: 20px; bottom: 20px;
+    z-index: 2147483647;
+    background: rgba(32,32,34,0.94);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: 0 16px 40px rgba(0,0,0,0.18);
+    border-radius: 999px;
+    padding: 10px 12px 10px 16px;
+    display: flex; align-items: center; gap: 12px;
+    font-size: 13.5px; font-weight: 600;
+    backdrop-filter: blur(20px);
+  }
+  .pm-toast button {
+    border: none; background: rgba(255,255,255,0.16); color:white; border-radius:999px;
+    padding: 6px 12px; font-weight:700; cursor:pointer;
   }
 
-  .pm-badge {
-    background: var(--apple-red);
-    color: white;
-    font-size: 11px;
-    font-weight: 600;
-    font-family: -apple-system, "SF Pro Text", sans-serif;
-    min-width: 20px;
-    height: 20px;
-    border-radius: 10px;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    margin-left: auto;
-    padding: 0 6px;
-    box-shadow: 0 2px 5px rgba(255, 59, 48, 0.3);
-    letter-spacing: -0.3px;
-    line-height: 1;
+  .pm-skeleton-card {
+    height: 78px; border-radius:20px; background: rgba(0,0,0,0.045);
+    border: 1px solid rgba(0,0,0,0.06); position:relative; overflow:hidden; margin-bottom:12px;
+  }
+  .pm-skeleton-card::after {
+    content:""; position:absolute; inset:0; transform:translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.38), transparent);
+    animation: pm-shimmer 1.2s infinite;
+  }
+
+  .last-checked { font-size: 11px; color: var(--pm-soft-muted); margin-top: 8px; text-align: right; opacity: 0.85; }
+
+  .docs-link {
+    display: flex; align-items: center; gap: 8px; padding: 10px 12px;
+    font-size: 13px; color: var(--pm-blue); text-decoration: none; font-weight: 550; border-radius: 12px;
+    transition: background 0.2s, color 0.2s;
+  }
+  .docs-link:hover { background: rgba(0, 113, 227, 0.05); }
+  .sidebar-footer-text {
+    font-size: 12.8px; color: var(--pm-soft-muted); line-height: 1.42; padding: 0 12px; margin: 0 0 2px 0; font-weight: 400;
+  }
+
+  .pm-content::-webkit-scrollbar { width: 12px; }
+  .pm-content::-webkit-scrollbar-track { background: transparent; }
+  .pm-content::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.08);
+    border-radius: 20px;
+    border: 3px solid transparent;
+    background-clip: padding-box;
+    min-height: 40px;
+    transition: background-color 0.2s;
+  }
+  .pm-content:hover::-webkit-scrollbar-thumb { background-color: rgba(0, 0, 0, 0.2); }
+  .pm-content { scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.1) transparent; }
+
+  @keyframes pm-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+  @keyframes pm-shimmer { 100% { transform:translateX(100%); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pm-root *, .pm-root *::before, .pm-root *::after {
+      animation: none !important;
+      transition: none !important;
+      scroll-behavior: auto !important;
+    }
   }
 
   @media (prefers-color-scheme: dark) {
     .pm-root {
-    --pm-bg: rgba(28,28,30,0.75);
-    --pm-card: rgba(255,255,255,0.05);
+      --pm-bg: rgba(28,28,30,0.75);
+      --pm-card: rgba(255,255,255,0.05);
+      --pm-card-strong: rgba(44,44,46,0.94);
+      --pm-text: #f5f5f7;
+      --pm-muted: #a1a1a6;
+      --pm-soft-muted: #86868b;
+      --pm-border: rgba(255,255,255,0.1);
+      --pm-blue: #0a84ff;
+      background: var(--pm-bg);
+      border-color: var(--pm-border);
+      color: var(--pm-text);
     }
-    .pm-root { background: var(--pm-bg); border-color: rgba(255,255,255,0.1); color: #f5f5f7; }
+
     .pm-sidebar { background: var(--pm-card); }
     .pm-tab { color: #a1a1a6; }
     .pm-tab.active { background: rgba(255, 255, 255, 0.1); color: #fff; }
+    .pm-tab:hover:not(.active) { background: rgba(255,255,255,0.06); }
+
     .plugin-item { background: var(--pm-card); border-color: rgba(255,255,255,0.1); }
-    .plugin-item:hover { background: rgba(255, 255, 255, 0.08); }
-    .plugin-name { color: #f5f5f7; }
-    .pm-btn-secondary { background: rgba(255,255,255,0.1); color: #f5f5f7; }
+    .plugin-item:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.16); }
+    .plugin-name { color: var(--pm-text); }
+    .pm-btn-secondary { background: rgba(255,255,255,0.1); color: var(--pm-text); border-color: rgba(255,255,255,0.1); }
+    .pm-btn-secondary:hover { background: rgba(255,255,255,0.15); }
+    .pm-icon-btn { background: rgba(255,255,255,0.08); color: var(--pm-muted); }
+    .pm-icon-btn:hover { background: rgba(255,255,255,0.14); color: var(--pm-text); }
+
+    .perm-badge, .trust-badge { background: rgba(255,255,255,0.08); color: #c7c7cc; }
+    .perm-badge.risky, .badge-risk { background: rgba(255,149,0,0.16); color: #ffb340; }
     .badge-disabled { background: rgba(142,142,147,0.2); color: #98989d; }
-    .badge-installing { background: rgba(0, 122, 255, 0.2); color: #409cff; }
-    .badge-updating { background: rgba(255, 149, 0, 0.2); color: #ffb340; }
-    .badge-failed { background: rgba(255, 59, 48, 0.2); color: #ff6961; }
-    .pm-error-msg { color: #ff6961; }
-    .pm-btn-retry { background: rgba(255, 59, 48, 0.15); color: #ff6961; border-color: rgba(255, 59, 48, 0.25); }
-    .pm-modal-content {
-      background: rgba(34, 34, 36, 0.96);
-      color: #f5f5f7;
-      border-color: rgba(255,255,255,0.12);
-    }
-    .pm-input { background: rgba(0,0,0,0.2); border-color: rgba(255,255,255,0.1); color: white; }
-    .last-checked { color: #6e6e73; }
-    .pm-modal-title {
-      color: #f5f5f7;
-    }
-    .pm-modal-title::after {
-      background: rgba(255,255,255,0.08);
-    }
-      .pm-content::-webkit-scrollbar-thumb {
-        background-color: rgba(255, 255, 255, 0.2);
-      }
-      .pm-content::-webkit-scrollbar-thumb:hover {
-        background-color: rgba(255, 255, 255, 0.35);
-      }
+    .badge-installing { background: rgba(0,122,255,0.2); color: #409cff; }
+    .badge-updating { background: rgba(255,149,0,0.2); color: #ffb340; }
+    .badge-failed, .badge-blocked { background: rgba(255,59,48,0.2); color: #ff6961; }
+    .badge-system { background: rgba(88,86,214,0.22); color: #a9a7ff; }
 
-      .pm-modal-message {
-        color: #a1a1a6;
-      }
-
-      .pm-modal-warning-box {
-        background: rgba(255, 69, 58, 0.12);
-        border-color: rgba(255, 69, 58, 0.22);
-        color: #ffb4ab;
-      }
-
-    .pm-content {
-      scrollbar-color: rgba(255,255,255,0.3) transparent;
-    }
-
-    .pm-divider::before,
-    .pm-divider::after {
-      border-bottom-color: rgba(255, 255, 255, 0.1);
-    }
     .pm-filter-btn { background: rgba(255,255,255,0.08); color: #a1a1a6; }
     .pm-filter-btn:hover { background: rgba(255,255,255,0.15); }
-    .pm-filter-btn.active { background: #0071e3; color: white; }
+    .pm-filter-btn.active { background: var(--pm-blue); color: white; }
+
     .pm-search-sidebar .pm-search-input {
       color: #f5f5f7;
-      background: rgba(255, 255, 255, 0.08);
-      border-color: rgba(255, 255, 255, 0.08);
+      background: rgba(255,255,255,0.08);
+      border-color: rgba(255,255,255,0.08);
     }
-
-    .pm-search-sidebar .pm-search-input::placeholder {
-      color: rgba(245, 245, 247, 0.48);
-    }
-
-    .pm-search-sidebar .pm-search-input:hover {
-      background: rgba(255, 255, 255, 0.105);
-    }
-
+    .pm-search-sidebar .pm-search-input::placeholder { color: rgba(245,245,247,0.48); }
+    .pm-search-sidebar .pm-search-input:hover { background: rgba(255,255,255,0.105); }
     .pm-search-sidebar .pm-search-input:focus {
-      background: rgba(255, 255, 255, 0.13);
-      border-color: rgba(10, 132, 255, 0.55);
-      box-shadow:
-        0 0 0 3px rgba(10, 132, 255, 0.18),
-        0 8px 24px rgba(0, 0, 0, 0.16);
+      background: rgba(255,255,255,0.13);
+      border-color: rgba(10,132,255,0.55);
+      box-shadow: 0 0 0 3px rgba(10,132,255,0.18), 0 8px 24px rgba(0,0,0,0.16);
     }
+    .pm-search-icon { color: rgba(245,245,247,0.58); }
+    .pm-search-clear { background: rgba(255,255,255,0.14); color: rgba(245,245,247,0.72); }
+    .pm-search-clear:hover { background: rgba(255,255,255,0.24); color: #fff; }
 
-    .pm-search-sidebar .pm-search-icon {
-      color: rgba(245, 245, 247, 0.58);
-    }
-
-    .pm-search-sidebar .pm-search-clear {
-      background: rgba(255, 255, 255, 0.14);
-      color: rgba(245, 245, 247, 0.72);
-    }
-
-    .pm-search-sidebar .pm-search-clear:hover {
-      background: rgba(255, 255, 255, 0.24);
-      color: #fff;
-    }
+    .pm-modal-content { background: rgba(34,34,36,0.96); color: var(--pm-text); border-color: rgba(255,255,255,0.12); }
+    .pm-modal-title { color: var(--pm-text); }
+    .pm-modal-title::after { background: rgba(255,255,255,0.08); }
+    .pm-modal-message { color: var(--pm-muted); }
+    .pm-modal-warning-box { background: rgba(255,69,58,0.12); border-color: rgba(255,69,58,0.22); color: #ffb4ab; }
+    .pm-input { background: rgba(0,0,0,0.2); border-color: rgba(255,255,255,0.1); color: white; }
+    .pm-skeleton-card { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.08); }
+    .pm-content::-webkit-scrollbar-thumb { background-color: rgba(255,255,255,0.2); }
+    .pm-content::-webkit-scrollbar-thumb:hover { background-color: rgba(255,255,255,0.35); }
+    .pm-content { scrollbar-color: rgba(255,255,255,0.3) transparent; }
   }
 `;
   document.head.appendChild(style);
 
-  // ───────── ROOT ─────────
+  // ─────────────────────────────────────────────
+  // ROOT
+  // ─────────────────────────────────────────────
+
   root = document.createElement('div');
   root.className = 'pm-root';
   root.style.display = 'none';
 
   root.innerHTML = `
-  <div class="pm-sidebar">
-    <div style="padding: 0 14px 20px 14px;">
-      <div style="font-size: 12px; font-weight: 700; color: #86868b; text-transform: uppercase; letter-spacing: 1px;">Library</div>
-    </div>
-    <div class="pm-tab active" data-tab="installed">
-      <div class="pm-tab-container">
-        <div style="display: flex; align-items: center; gap: 10px;">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-          <span style="flex: 1;">Installed</span>
+    <div class="pm-sidebar">
+      <div class="pm-sidebar-title">Library</div>
+
+      <div class="pm-tab active" data-tab="installed">
+        <div class="pm-tab-container">
+          <div style="display:flex;align-items:center;gap:10px;">
+            ${iconGrid()}
+            <span>Installed</span>
           </div>
           <span id="update-badge-count" class="pm-badge"></span>
-      </div>
-    </div>
-    <div class="pm-tab" data-tab="community">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
-      Community
-    </div>
-    <div class="pm-search-sidebar" style="margin-top: 6px;">
-      <svg class="pm-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
-      <input type="text" class="pm-search-input" id="pm-search" placeholder="Search... (Ctrl+F)" />
-      <button class="pm-search-clear" id="pm-search-clear">&times;</button>
-    </div>
-    <div id="pm-actions" style="padding: 14px; display: flex; flex-direction: column; gap: 10px;"></div>
-    <div class="pm-sidebar-footer">
-      <a href="${DOCS_URL}" target="_blank" class="docs-link">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
-        Developer Portal
-      </a>
-       <p class="sidebar-footer-text">Add, manage, and control your tools in one place. Plugins extend and reshape your workspace.</p>
-        <div style="padding: 0 10px;">
-          <button id="close-pm" class="pm-btn pm-btn-secondary" style="width: 100%; height: 30px;">Close</button>
         </div>
-    </div>
-  </div>
-
-  <div class="pm-content">
-    <div id="installed">
-      <h1 class="pm-view-title">Installed Plugins</h1>
-      <p class="pm-view-subtitle">Manage and configure your active workspace tools.</p>
-      <div class="pm-list"></div>
-    </div>
-    <div id="community" style="display:none;">
-      <h1 class="pm-view-title">Discovery</h1>
-      <p class="pm-view-subtitle">Explore new extensions built by the community.</p>
-      <div class="pm-filter-bar">
-        <button class="pm-filter-btn active" data-filter-community="all">All</button>
-        <button class="pm-filter-btn" data-filter-community="system">System</button>
-        <button class="pm-filter-btn" data-filter-community="new">New</button>
       </div>
-      <div class="pm-list"></div>
+
+      <div class="pm-tab" data-tab="community">
+        ${iconGlobe()}
+        <span>Community</span>
+      </div>
+
+      <div class="pm-search-sidebar">
+        ${iconSearch()}
+        <input type="text" class="pm-search-input" id="pm-search" placeholder="Search... (Ctrl+F)" />
+        <button class="pm-search-clear" id="pm-search-clear" aria-label="Clear search">&times;</button>
+      </div>
+
+      <div id="pm-actions" style="padding: 8px 14px 14px 14px; display:flex; flex-direction:column; gap:10px;"></div>
+
+      <div class="pm-sidebar-footer">
+        <a href="${DOCS_URL}" target="_blank" class="docs-link">
+          ${iconBook()}
+          Developer Portal
+        </a>
+        <p class="sidebar-footer-text">Add, manage, and control your tools in one place. Plugins extend and reshape your workspace.</p>
+        <div style="padding: 0 10px;">
+          <button id="close-pm" class="pm-btn pm-btn-secondary" style="width:100%;height:30px;">Close</button>
+        </div>
+      </div>
     </div>
-  </div>
-`;
+
+    <div class="pm-content">
+      <div id="installed">
+        <h1 class="pm-view-title">Installed Plugins</h1>
+        <p class="pm-view-subtitle">Manage and configure your active workspace tools.</p>
+        <div class="pm-toolbar-row">
+          <div class="pm-filter-bar">
+            <button class="pm-filter-btn active" data-filter-installed="all">All</button>
+            <button class="pm-filter-btn" data-filter-installed="system">System</button>
+            <button class="pm-filter-btn" data-filter-installed="updates">Updates</button>
+            <button class="pm-filter-btn" data-filter-installed="failed">Issues</button>
+          </div>
+        </div>
+        <div class="pm-list"></div>
+      </div>
+
+      <div id="community" style="display:none;">
+        <h1 class="pm-view-title">Discovery</h1>
+        <p class="pm-view-subtitle">Explore new extensions built by the community.</p>
+        <div class="pm-toolbar-row">
+          <div class="pm-filter-bar" id="community-filter-bar">
+            <button class="pm-filter-btn active" data-filter-community="all">All</button>
+            <button class="pm-filter-btn" data-filter-community="productivity">Productivity</button>
+            <button class="pm-filter-btn" data-filter-community="developer">Developer</button>
+            <button class="pm-filter-btn" data-filter-community="utilities">Utilities</button>
+            <button class="pm-filter-btn" data-filter-community="design">Design</button>
+            <button class="pm-filter-btn" data-filter-community="system">System</button>
+            <button class="pm-filter-btn" data-filter-community="new">New</button>
+          </div>
+        </div>
+        <div class="pm-list"></div>
+      </div>
+    </div>
+  `;
 
   api.boardEl.appendChild(root);
 
-  // Do not make the whole Plugin Manager draggable.
-  // Full-root dragging can swallow clicks on tabs/buttons in v4.
   if (typeof api.makeResizable === 'function') {
     api.makeResizable(root);
   }
 
   const slots = { 'header-actions': root.querySelector('#pm-actions') };
-  const slotRegistry = new Map();
+  registerCoreUI();
 
-  function registerPluginManagerUI(slot, el, id, owner = SELF_ID) {
-    if (!slot || !slots[slot] || !(el instanceof HTMLElement)) return false;
+  // ─────────────────────────────────────────────
+  // LISTENERS
+  // ─────────────────────────────────────────────
 
-    if (id) el.dataset.uiId = String(id);
-    el.dataset.owner = String(owner);
-
-    slots[slot].appendChild(el);
-
-    if (!slotRegistry.has(owner)) slotRegistry.set(owner, []);
-    slotRegistry.get(owner).push(el);
-
-    return true;
-  }
-
-  function cleanupPluginUI(pluginId) {
-    const items = slotRegistry.get(pluginId);
-    if (!items) return;
-
-    items.forEach(el => {
-      try {
-        el.remove();
-      } catch {}
-    });
-
-    slotRegistry.delete(pluginId);
-  }
-
-  // v4-safe extension point.
-  // Other trusted/system plugins can ask Plugin Manager to add UI by emitting:
-  // api.bus.emit('pm:register-ui', { slot: 'header-actions', element, id: 'my-button', owner: 'my-plugin' })
-  pmRegisterUiHandler = (payload = {}) => {
-    try {
-      const slot = payload.slot;
-      const el = payload.element || payload.el;
-      const id = payload.id;
-      const owner = payload.owner || payload.pluginId || 'external';
-
-      const ok = registerPluginManagerUI(slot, el, id, owner);
-
-      if (!ok) {
-        api.bus.emit('pm:register-ui-failed', {
-          reason: 'Invalid slot or element',
-          slot,
-          owner
-        });
-      }
-    } catch (err) {
-      console.error('[Plugin Manager] register-ui failed:', err);
-      api.bus.emit('pm:register-ui-failed', {
-        reason: err.message || 'Unknown error'
-      });
-    }
-  };
-
-  api.bus.on('pm:register-ui', pmRegisterUiHandler);
-
-  // ───────── FIX: CLOSE BUTTON ─────────
   root.querySelector('#close-pm').onclick = () => {
     root.style.display = 'none';
   };
@@ -900,7 +746,6 @@ export function setup(api) {
 
     if (modifier && e.key.toLowerCase() === 'f') {
       const searchInput = root?.querySelector('#pm-search');
-
       if (searchInput && root && root.style.display !== 'none') {
         e.preventDefault();
         searchInput.focus();
@@ -908,971 +753,31 @@ export function setup(api) {
       }
     }
   };
-
   window.addEventListener('keydown', keydownHandler);
 
-  // ───────── FIX: ESC KEY CLOSE ─────────
   escHandler = (e) => {
-    if (e.key === 'Escape' && root?.style.display === 'flex') {
-      root.style.display = 'none';
+    if (e.key === 'Escape') {
+      closeActionMenu();
+      if (root?.style.display === 'flex') root.style.display = 'none';
     }
   };
   document.addEventListener('keydown', escHandler);
 
-  // ───────── HEADER BUTTONS + BADGE ─────────
-  const actions = root.querySelector('#pm-actions');
-
-  const checkUpdatesBtn = document.createElement('button');
-  checkUpdatesBtn.className = 'pm-btn pm-btn-secondary check-updates';
-  checkUpdatesBtn.innerHTML = `
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
-    Check Updates
-  `;
-  checkUpdatesBtn.onclick = async () => {
-    checkUpdatesBtn.classList.add('spinning');
-    await renderInstalled(true);
-    setTimeout(() => checkUpdatesBtn.classList.remove('spinning'), 800);
+  pmRegisterUiHandler = (payload = {}) => {
+    try {
+      const ok = registerPluginManagerUI(payload.slot, payload.element || payload.el, payload.id, payload.owner || payload.pluginId || 'external');
+      if (!ok) api.bus.emit('pm:register-ui-failed', { reason: 'Invalid slot or element', slot: payload.slot });
+    } catch (err) {
+      console.error('[Plugin Manager] register-ui failed:', err);
+      api.bus.emit('pm:register-ui-failed', { reason: err.message || 'Unknown error' });
+    }
   };
-  actions.appendChild(checkUpdatesBtn);
+  api.bus.on('pm:register-ui', pmRegisterUiHandler);
 
-  const installBtn = document.createElement('button');
-  installBtn.className = 'pm-btn pm-btn-primary';
-  installBtn.textContent = 'Install via URL';
-  installBtn.onclick = openInstallModal;
-  actions.appendChild(installBtn);
+  root.addEventListener('click', onRootClick);
 
-  // ───────── HELPERS ─────────
-  function timeAgo(timestamp) {
-    const seconds = Math.floor((Date.now() - timestamp) / 1000);
-    if (seconds < 30) return "just now";
-    if (seconds < 60) return "a few seconds ago";
-    if (seconds < 3600) return Math.floor(seconds / 60) + " min ago";
-    if (seconds < 86400) return Math.floor(seconds / 3600) + " hr ago";
-    return Math.floor(seconds / 86400) + " days ago";
-  }
-
-  function getCommunityIcon(id) {
-    if (!communityCache || !communityCache.length) return null;
-    const c = communityCache.find(p => p.id === id);
-    return c?.icon || null;
-  }
-
-  async function ensureCommunityCache() {
-    if (communityCache && communityCache.length) return;
-    try {
-      communityCache = await fetch(COMMUNITY_URL + '?t=' + Date.now()).then(r => r.json());
-    } catch {
-      communityCache = [];
-    }
-  }
-
-  // Resolve the URL to use for fetching remote meta / checking updates.
-  // If a plugin has been rolled back, entry.url may be a data: URL containing
-  // snapshot code — in that case use entry.originalUrl (the real remote URL).
-  function getRemoteUrl(entry) {
-    if (entry.originalUrl && !entry.originalUrl.startsWith('blob:') && !entry.originalUrl.startsWith('data:')) {
-      return entry.originalUrl;
-    }
-    if (entry.url && !entry.url.startsWith('blob:') && !entry.url.startsWith('data:')) {
-      return entry.url;
-    }
-    return null;
-  }
-
-  async function fetchRemoteMeta(url) {
-    if (!url || url.startsWith('blob:') || url.startsWith('data:')) return null;
-    try {
-      const res = await fetch(url + (url.includes('?') ? '&' : '?') + 't=' + Date.now());
-      const code = await res.text();
-      const metaMatch = code.match(/export const meta\s*=\s*(\{[\s\S]*?\})(?:;|$)/);
-      if (!metaMatch) return null;
-      return new Function(`return ${metaMatch[1]}`)();
-    } catch (e) {
-      console.error('Fetch failed for:', url, e);
-      return { __error: true };
-    }
-  }
-
-  function compareVersions(a = '0.0.0', b = '0.0.0') {
-    const pa = a.split('.').map(n => parseInt(n) || 0);
-    const pb = b.split('.').map(n => parseInt(n) || 0);
-    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-      if ((pa[i] || 0) > (pb[i] || 0)) return 1;
-      if ((pa[i] || 0) < (pb[i] || 0)) return -1;
-    }
-    return 0;
-  }
-
-  function saveRemoteVersion(pluginId, version) {
-    if (!version) return;
-    const registry = api.registry.getAll();
-    const item = registry.find(entry => entry.id === pluginId);
-    if (!item) return;
-
-    item.remoteVersion = version; // ✅ NEW FIELD
-    api.registry.save([...registry]);
-  }
-
-  function updateBadge(count) {
-    updateCount = count;
-    const badge = root.querySelector('#update-badge-count');
-    if (!badge) return;
-
-    if (count > 0) {
-      badge.textContent = count;
-      badge.style.display = 'inline-flex';
-    } else {
-      badge.style.display = 'none';
-    }
-  }
-
-  function saveRegistryPluginVersion(pluginId, version) {
-    if (!version) return;
-    const registry = api.registry.getAll();
-    const item = registry.find(entry => entry.id === pluginId);
-    if (!item) return;
-    item.version = version;
-    api.registry.save([...registry]);
-  }
-
-  // ───────── INSTALL MODAL ─────────
-  function openInstallModal() {
-    const overlay = document.createElement('div');
-    overlay.className = 'pm-modal-overlay';
-    // Ensure the modal always stacks above the plugin manager (and any app chrome).
-    overlay.style.zIndex = '2147483647';
-
-    overlay.innerHTML = `
-      <div class="pm-modal-content">
-        <h3 class="pm-modal-title">Install Extension</h3>
-        <input type="text" id="pm-url" class="pm-input" placeholder="https://source.com/plugin.js">
-        <input type="text" id="pm-id" class="pm-input" placeholder="Unique Plugin ID">
-        <div style="display:flex; gap:10px; margin-top:8px;">
-          <button id="pm-cancel" class="pm-btn pm-btn-secondary" style="flex:1">Cancel</button>
-          <button id="pm-confirm" class="pm-btn pm-btn-primary" style="flex:1">Install</button>
-        </div>
-      </div>
-    `;
-
-    document.documentElement.appendChild(overlay);
-
-    overlay.querySelector('#pm-confirm').onclick = async () => {
-      const confirmBtn = overlay.querySelector('#pm-confirm');
-      const url = overlay.querySelector('#pm-url').value.trim();
-      const inputId = overlay.querySelector('#pm-id').value.trim();
-
-      if (!url || !inputId) {
-        return api.notify('All fields required', 'error');
-      }
-
-      // Lock the button to prevent double-click
-      confirmBtn.disabled = true;
-      confirmBtn.textContent = 'Installing…';
-      api.bus.emit('pm:install-start', { id: inputId, url });
-
-      try {
-        const remoteMeta = await fetchRemoteMeta(url);
-
-        if (!remoteMeta) {
-          confirmBtn.disabled = false; confirmBtn.textContent = 'Install';
-          return api.notify('Invalid plugin (meta not found)', 'error');
-        }
-
-        // 🔴 STRICT VALIDATION
-        if (!remoteMeta.id || typeof remoteMeta.id !== 'string') {
-          confirmBtn.disabled = false; confirmBtn.textContent = 'Install';
-          return api.notify('Invalid plugin (missing id)', 'error');
-        }
-
-        if (remoteMeta.id !== inputId) {
-          api.bus.emit('pm:install-id-mismatch', { expected: inputId, got: remoteMeta.id });
-          confirmBtn.disabled = false; confirmBtn.textContent = 'Install';
-          return api.notify(
-            `ID mismatch → Expected "${inputId}", got "${remoteMeta.id}"`,
-            'error'
-          );
-        }
-
-        const newDef = {
-          id: remoteMeta.id,
-          url,
-          name: remoteMeta.name,
-          version: remoteMeta.version,
-          icon: remoteMeta.icon,
-          enabled: true,
-          source: 'registry',
-          remoteVersion: remoteMeta.version,
-          status: 'installing',
-          error: null
-        };
-
-        const registry = api.registry.getAll();
-
-        if (registry.some(p => p.id === newDef.id)) {
-          confirmBtn.disabled = false; confirmBtn.textContent = 'Install';
-          return api.notify('Plugin already installed', 'warning');
-        }
-
-        api.registry.save([...registry, newDef]);
-        renderInstalled(); // show "Installing…" badge immediately
-
-        await api.reloadPlugin(newDef.id);
-
-        setPluginStatus(newDef.id, 'active');
-        api.bus.emit('pm:install-success', { id: newDef.id, version: newDef.version });
-        api.notify('Installed Successfully', 'success');
-        overlay.remove();
-        renderInstalled();
-
-      } catch (e) {
-        api.bus.emit('pm:install-fail', { id: inputId, error: e.message });
-        // Mark as failed in registry so user can retry
-        if (inputId) setPluginStatus(inputId, 'failed', e.message || 'Installation failed');
-        api.notify('Installation failed', 'error');
-        confirmBtn.disabled = false; confirmBtn.textContent = 'Install';
-        renderInstalled();
-      }
-    };
-
-    overlay.querySelector('#pm-cancel').onclick = () => overlay.remove();
-
-  }
-
-  function showConfirmModal({
-    title = 'Are you sure?',
-    message = '',
-    warning = '',
-    confirmText = 'Confirm',
-    cancelText = 'Cancel',
-    danger = false
-  } = {}) {
-    return new Promise((resolve) => {
-      const overlay = document.createElement('div');
-      overlay.className = 'pm-modal-overlay';
-      overlay.style.zIndex = '2147483647';
-
-      overlay.innerHTML = `
-        <div class="pm-modal-content">
-          <h3 class="pm-modal-title">${escapeHTML(title)}</h3>
-          ${message ? `<p class="pm-modal-message">${escapeHTML(message)}</p>` : ''}
-          ${warning ? `<div class="pm-modal-warning-box">${escapeHTML(warning)}</div>` : ''}
-          <div style="display:flex; gap:10px; margin-top:8px;">
-            <button class="pm-btn pm-btn-secondary" data-confirm-action="cancel" style="flex:1">${escapeHTML(cancelText)}</button>
-            <button class="pm-btn ${danger ? 'pm-btn-danger' : 'pm-btn-primary'}" data-confirm-action="confirm" style="flex:1">${escapeHTML(confirmText)}</button>
-          </div>
-        </div>
-      `;
-
-      function close(value) {
-        overlay.remove();
-        document.removeEventListener('keydown', onKeyDown);
-        resolve(value);
-      }
-
-      function onKeyDown(e) {
-        if (e.key === 'Escape') close(false);
-        if (e.key === 'Enter') close(true);
-      }
-
-      overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) {
-          close(false);
-          return;
-        }
-
-        const btn = e.target.closest('[data-confirm-action]');
-        if (!btn) return;
-
-        const action = btn.dataset.confirmAction;
-        close(action === 'confirm');
-      });
-
-      document.addEventListener('keydown', onKeyDown);
-      document.documentElement.appendChild(overlay);
-    });
-  }
-
-  function escapeHTML(value = '') {
-    return String(value)
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&#039;');
-  }
-
-  let remoteMetaCache = new Map();
-
-  function isPluginNew(pluginDate) {
-    if (!pluginDate) return false;
-    const now = Date.now();
-    const published = new Date(pluginDate).getTime();
-    const sixDays = 6 * 24 * 60 * 60 * 1000;
-    return (now - published) < sixDays;
-  }
-
-  function isSystemPlugin(plugin) {
-    if (plugin.id === SELF_ID) return true;
-    if (plugin.category === 'system') return true;
-    // Also check community cache for system status
-    const communityPlugin = communityCache.find(c => c.id === plugin.id);
-    if (communityPlugin && communityPlugin.category === 'system') return true;
-    return false;
-  }
-
-// ───────── RENDER INSTALLED (With Persistence Fix) ─────────
-  async function renderInstalled(forceCheck = false) {
-    if (!root || !document.body.contains(root)) return;
-    await ensureCommunityCache();
-
-    const now = Date.now();
-    const shouldCheck = forceCheck || (now - lastCheckedTime > CACHE_TIMEOUT);
-
-    if (shouldCheck) {
-      lastCheckedTime = now;
-    }
-
-    const el = root.querySelector('#installed .pm-list') || root.querySelector('#installed');
-    if (!el) return;
-
-    const plugins = api.registry.getAll();
-    let remoteMetas = [];
-
-    if (shouldCheck) {
-      const results = await Promise.all(
-        plugins.map(p => fetchRemoteMeta(getRemoteUrl(p)))
-      );
-
-      results.forEach((meta, i) => {
-        if (plugins[i]?.id && meta) {
-          remoteMetaCache.set(plugins[i].id, meta);
-        }
-      });
-
-      remoteMetas = results;
-    } else {
-      remoteMetas = plugins.map(p => remoteMetaCache.get(p.id) || null);
-    }
-    let registryChanged = false;
-    const registryCopy = [...plugins];
-
-    // Separate system and normal plugins
-    const systemPlugins = [];
-    const normalPlugins = [];
-
-    for (let i = 0; i < plugins.length; i++) {
-      const p = plugins[i];
-      const remoteMeta = shouldCheck ? remoteMetas[i] : null;
-
-      if (remoteMeta?.__error) {
-        console.warn('Update check failed for:', p.id);
-      }
-      
-      // Check if it's a system plugin via category or id
-      const isSystem = isSystemPlugin(p);
-      
-      // Update remote version
-      if (remoteMeta?.version) {
-        const entry = registryCopy.find(e => e.id === p.id);
-
-        if (entry && entry.remoteVersion !== remoteMeta.version) {
-          entry.remoteVersion = remoteMeta.version;
-          registryChanged = true;
-        }
-      }
-      
-      const pluginData = { ...p, remoteMeta, index: i };
-      if (isSystem) {
-        systemPlugins.push(pluginData);
-      } else {
-        normalPlugins.push(pluginData);
-      }
-    }
-
-    // Apply filter
-    let displaySystemPlugins = systemPlugins;
-    let displayNormalPlugins = normalPlugins;
-    
-    if (installedFilter === 'system') {
-      displaySystemPlugins = systemPlugins;
-      displayNormalPlugins = [];
-    } else if (installedFilter === 'all') {
-      displaySystemPlugins = systemPlugins;
-      displayNormalPlugins = normalPlugins;
-    }
-
-    // Apply search filter
-    if (globalSearch.trim()) {
-      const searchTerm = globalSearch.toLowerCase().trim();
-      displaySystemPlugins = displaySystemPlugins.filter(p => {
-        const pItem = plugins[p.index];
-        return (pItem.name || pItem.id).toLowerCase().includes(searchTerm);
-      });
-      displayNormalPlugins = displayNormalPlugins.filter(p => {
-        const pItem = plugins[p.index];
-        return (pItem.name || pItem.id).toLowerCase().includes(searchTerm);
-      });
-    }
-
-    let html = '';
-    let availableUpdates = 0;
-
-    // Update clear button visibility
-    const globalClear = root.querySelector('#pm-search-clear');
-    if (globalClear) {
-      globalClear.classList.toggle('visible', globalSearch.length > 0);
-    }
-
-    // Show no results message
-    if (displaySystemPlugins.length === 0 && displayNormalPlugins.length === 0) {
-      el.innerHTML = `<div class="pm-no-results">No plugins found${globalSearch ? ` matching "${globalSearch}"` : ''}</div>`;
-      updateBadge(0);
-      return;
-    }
-
-    // Render system plugins first
-    for (const pData of displaySystemPlugins) {
-      const p = plugins[pData.index];
-      const remoteMeta = pData.remoteMeta;
-      const isSelf = p.id === SELF_ID;
-      const isSystem = true;
-
-      let installedVer = p.version || null;
-      let remoteVer = p.remoteVersion || null;
-
-      if (remoteMeta?.version) {
-        remoteVer = remoteMeta.version;
-      }
-
-      const displayName = remoteMeta?.name || p.name || p.id;
-
-      if (!installedVer && remoteVer) {
-        installedVer = remoteVer;
-      }
-
-      let hasUpdate = false;
-      let updateBadge = '';
-      let updateBtn = '';
-
-      if (installedVer && remoteVer) {
-        const cmp = compareVersions(remoteVer, installedVer);
-        if (cmp > 0) {
-          hasUpdate = true;
-          availableUpdates++;
-          updateBtn = `<button class="pm-btn pm-btn-primary" data-update="${p.id}">Update</button>`;
-        }
-      }
-      
-      if (hasUpdate) {
-        updateBadge = '<span class="plugin-badge badge-update" style="margin-left:6px;">Update Available</span>';
-      }
-
-      const pStatus = isSelf ? 'active' : getPluginStatus(p);
-      let typeBadge = '';
-      if (isSelf) {
-        typeBadge = '<span class="plugin-badge badge-system">System</span>';
-      } else if (pStatus === 'installing') {
-        typeBadge = '<span class="plugin-badge badge-installing">Installing…</span>';
-      } else if (pStatus === 'updating') {
-        typeBadge = '<span class="plugin-badge badge-updating">Updating…</span>';
-      } else if (pStatus === 'failed') {
-        typeBadge = '<span class="plugin-badge badge-failed">Failed</span>';
-      } else if (pStatus === 'disabled') {
-        typeBadge = '<span class="plugin-badge badge-disabled">Inactive</span>';
-      } else {
-        typeBadge = '<span class="plugin-badge badge-system">System</span>';
-      }
-
-      const errorHtml = p.error ? `<div class="pm-error-msg" title="${p.error.replace(/"/g, '&quot;')}">⚠ ${p.error}</div>` : '';
-      const statusBadges = `<div style="margin-top:4px; display:flex; align-items:center;">${typeBadge}${updateBadge}</div>${errorHtml}`;
-
-      const versionText = installedVer ? `v${installedVer}` : 'Version unknown';
-      const colors = ['#007AFF', '#5856D6', '#AF52DE', '#FF2D55', '#FF9500'];
-      const iconBg = colors[p.id.length % colors.length];
-      const iconContent = p.icon || remoteMeta?.icon || getCommunityIcon(p.id) || '📦';
-      const iconHtml = (typeof iconContent === 'string' && (iconContent.startsWith('http://') || iconContent.startsWith('https://')))
-        ? `<img src="${iconContent}" alt="${displayName}" style="width:100%;height:100%;border-radius:10px;object-fit:cover;" />`
-        : iconContent;
-
-      const busy = isBusy(p);
-      const reloadDisabled = (!p.enabled && !isSelf) || busy;
-      const reloadBtnHTML = isSelf ? '' : `
-        <button class="pm-btn pm-btn-secondary reload-btn" 
-                data-act="reload" 
-                data-id="${p.id}"
-                ${reloadDisabled ? 'disabled title="' + (busy ? 'Operation in progress' : 'Enable the plugin first to reload') + '"' : ''}>
-          Reload
-        </button>
-      `;
-
-      const retryBtn = pStatus === 'failed'
-        ? `<button class="pm-btn pm-btn-retry" data-act="retry" data-id="${p.id}">Retry</button>`
-        : '';
-
-      html += `
-        <div class="plugin-item" data-plugin-id="${p.id}">
-          <div class="plugin-icon-box" style="background: ${iconBg};">${iconHtml}</div>
-          <div class="plugin-info">
-            <span class="plugin-name">${displayName}</span>
-            <div class="plugin-meta">${versionText} • <span style="opacity: 0.7">${p.id}</span></div>
-            ${statusBadges}
-          </div>
-          <div class="pm-action-group">
-            ${retryBtn}
-            ${reloadBtnHTML}
-            ${isSelf ? '' : `<button class="pm-btn ${p.enabled ? 'pm-btn-secondary' : 'pm-btn-primary'} toggle-btn" data-act="toggle" data-id="${p.id}" ${busy ? 'disabled' : ''}>${p.enabled ? 'Disable' : 'Enable'}</button>`}
-            ${isSelf ? '' : `<button class="pm-btn pm-btn-secondary delete-btn" data-act="delete" data-id="${p.id}" style="color:#ff3b30;" ${busy ? 'disabled' : ''}>Delete</button>`}
-            ${busy ? '' : updateBtn}
-          </div>
-        </div>
-      `;
-    }
-
-    // Add divider if there are both system and normal plugins
-    if (displaySystemPlugins.length > 0 && displayNormalPlugins.length > 0) {
-      html += '<div class="pm-divider">Standard Extensions</div>';
-    }
-
-    // Render normal plugins
-    for (const pData of displayNormalPlugins) {
-      const p = plugins[pData.index];
-      const remoteMeta = pData.remoteMeta;
-      const isSelf = p.id === SELF_ID;
-
-      let installedVer = p.version || null;
-      let remoteVer = p.remoteVersion || null;
-
-      if (remoteMeta?.version) {
-        remoteVer = remoteMeta.version;
-      }
-
-      const displayName = remoteMeta?.name || p.name || p.id;
-
-      if (!installedVer && remoteVer) {
-        installedVer = remoteVer;
-      }
-
-      let hasUpdate = false;
-      let updateBadge = '';
-      let updateBtn = '';
-
-      if (installedVer && remoteVer) {
-        const cmp = compareVersions(remoteVer, installedVer);
-        if (cmp > 0) {
-          hasUpdate = true;
-          availableUpdates++;
-          updateBtn = `<button class="pm-btn pm-btn-primary" data-update="${p.id}">Update</button>`;
-        }
-      }
-      
-      if (hasUpdate) {
-        updateBadge = '<span class="plugin-badge badge-update" style="margin-left:6px;">Update Available</span>';
-      }
-
-      const pStatus = isSelf ? 'active' : getPluginStatus(p);
-      let typeBadge = '';
-      if (isSelf) {
-        typeBadge = '<span class="plugin-badge badge-system">System</span>';
-      } else if (pStatus === 'installing') {
-        typeBadge = '<span class="plugin-badge badge-installing">Installing…</span>';
-      } else if (pStatus === 'updating') {
-        typeBadge = '<span class="plugin-badge badge-updating">Updating…</span>';
-      } else if (pStatus === 'failed') {
-        typeBadge = '<span class="plugin-badge badge-failed">Failed</span>';
-      } else if (pStatus === 'disabled') {
-        typeBadge = '<span class="plugin-badge badge-disabled">Inactive</span>';
-      } else {
-        typeBadge = '<span class="plugin-badge badge-enabled">Active</span>';
-      }
-
-      const errorHtml = p.error ? `<div class="pm-error-msg" title="${p.error.replace(/"/g, '&quot;')}">⚠ ${p.error}</div>` : '';
-      const statusBadges = `<div style="margin-top:4px; display:flex; align-items:center;">${typeBadge}${updateBadge}</div>${errorHtml}`;
-
-      const versionText = installedVer ? `v${installedVer}` : 'Version unknown';
-      const colors = ['#007AFF', '#5856D6', '#AF52DE', '#FF2D55', '#FF9500'];
-      const iconBg = colors[p.id.length % colors.length];
-      const iconContent = p.icon || remoteMeta?.icon || getCommunityIcon(p.id) || '📦';
-      const iconHtml = (typeof iconContent === 'string' && (iconContent.startsWith('http://') || iconContent.startsWith('https://')))
-        ? `<img src="${iconContent}" alt="${displayName}" style="width:100%;height:100%;border-radius:10px;object-fit:cover;" />`
-        : iconContent;
-
-      const busy = isBusy(p);
-      const reloadDisabled = (!p.enabled && !isSelf) || busy;
-      const reloadBtnHTML = isSelf ? '' : `
-        <button class="pm-btn pm-btn-secondary reload-btn" 
-                data-act="reload" 
-                data-id="${p.id}"
-                ${reloadDisabled ? 'disabled title="' + (busy ? 'Operation in progress' : 'Enable the plugin first to reload') + '"' : ''}>
-          Reload
-        </button>
-      `;
-
-      const retryBtn = pStatus === 'failed'
-        ? `<button class="pm-btn pm-btn-retry" data-act="retry" data-id="${p.id}">Retry</button>`
-        : '';
-
-      html += `
-        <div class="plugin-item" data-plugin-id="${p.id}">
-          <div class="plugin-icon-box" style="background: ${iconBg};">${iconHtml}</div>
-          <div class="plugin-info">
-            <span class="plugin-name">${displayName}</span>
-            <div class="plugin-meta">${versionText} • <span style="opacity: 0.7">${p.id}</span></div>
-            ${statusBadges}
-          </div>
-          <div class="pm-action-group">
-            ${retryBtn}
-            ${reloadBtnHTML}
-            ${isSelf ? '' : `<button class="pm-btn ${p.enabled ? 'pm-btn-secondary' : 'pm-btn-primary'} toggle-btn" data-act="toggle" data-id="${p.id}" ${busy ? 'disabled' : ''}>${p.enabled ? 'Disable' : 'Enable'}</button>`}
-            ${isSelf ? '' : `<button class="pm-btn pm-btn-secondary delete-btn" data-act="delete" data-id="${p.id}" style="color:#ff3b30;" ${busy ? 'disabled' : ''}>Delete</button>`}
-            ${busy ? '' : updateBtn}
-          </div>
-        </div>
-      `;
-    }
-
-    const lastCheckedHTML = lastCheckedTime
-      ? `<div class="last-checked">Last update checked: ${timeAgo(lastCheckedTime)}</div>`
-      : '';
-      if (registryChanged) {
-        setTimeout(() => {
-          api.registry.save(registryCopy);
-        }, 0);
-      }
-
-    el.innerHTML = html + lastCheckedHTML;
-    updateBadge(availableUpdates);
-  }
-
-  // ───────── RENDER COMMUNITY (with filters) ─────────
-  let communityCache = [];
-  async function renderCommunity() {
-    if (!root || !document.body.contains(root)) return;
-    const el = root.querySelector('#community .pm-list') || root.querySelector('#community');
-    if (!el) return;
-
-    if (!communityCache.length) {
-      try {
-        communityCache = await fetch(COMMUNITY_URL + '?t=' + Date.now()).then(r => r.json());
-      } catch {
-        communityCache = [];
-      }
-    }
-
-    const registry = api.registry.getAll();
-    const installed = new Set(registry.map(p => p.id));
-    const installedVersions = registry.reduce((acc, item) => {
-      if (item.version) acc[item.id] = item.version;
-      return acc;
-    }, {});
-
-    // Filter plugins based on communityFilter
-    let filteredPlugins = communityCache;
-    if (communityFilter === 'system') {
-      filteredPlugins = communityCache.filter(p => p.category === 'system');
-    } else if (communityFilter === 'new') {
-      filteredPlugins = communityCache.filter(p => isPluginNew(p.date));
-    }
-
-    // Apply search filter
-    if (globalSearch.trim()) {
-      const searchTerm = globalSearch.toLowerCase().trim();
-      filteredPlugins = filteredPlugins.filter(p => 
-        (p.name || p.id).toLowerCase().includes(searchTerm) ||
-        (p.description || '').toLowerCase().includes(searchTerm) ||
-        (p.author || '').toLowerCase().includes(searchTerm)
-      );
-    }
-
-    // Show no results message
-    if (filteredPlugins.length === 0) {
-      el.innerHTML = `<div class="pm-no-results">No plugins found${globalSearch ? ` matching "${globalSearch}"` : ''}</div>`;
-      return;
-    }
-
-    el.innerHTML = filteredPlugins.map(p => {
-      const displayVersion = p.version || installedVersions[p.id];
-      const colors = ['#007AFF', '#5856D6', '#AF52DE', '#FF2D55', '#FF9500'];
-      const iconBg = colors[p.id.length % colors.length];
-      const isInstalled = installed.has(p.id);
-      const isNew = isPluginNew(p.date);
-      const isSystem = p.category === 'system';
-
-      let badges = '';
-      if (isSystem) {
-        badges += '<span class="plugin-badge badge-system" style="margin-right: 4px;">System</span>';
-      }
-      if (isNew) {
-        badges += '<span class="plugin-badge badge-new">New</span>';
-      }
-
-      return `
-      <div class="plugin-item">
-        <div class="plugin-icon-box" style="background: ${iconBg};">${p.icon || '📦'}</div>
-        <div class="plugin-info">
-          <span class="plugin-name">${p.name}</span>
-          <div class="plugin-meta">${displayVersion ? `v${displayVersion} • ` : ''}${p.author || 'Unknown'}</div>
-          <div style="margin-top: 4px; display: flex; align-items: center; gap: 6px;">${badges}</div>
-          <div class="plugin-meta" style="margin-top: 6px; color: #8e8e93;">${p.description || ''}</div>
-        </div>
-        <div class="pm-action-group" style="min-width: 110px;">
-          ${
-            isInstalled
-              ? `<button class="pm-btn pm-btn-secondary" disabled style="width:100%;opacity:0.5">Installed</button>`
-              : `<button class="pm-btn pm-btn-primary" style="width:100%" data-install="${p.id}" data-url="${p.url}" data-icon="${p.icon || ''}">Install Plugin</button>`
-          }
-        </div>
-      </div>
-    `;
-    }).join('');
-  }
-
-  // ───────── CLICK HANDLER ─────────
-  root.addEventListener('click', async (e) => {
-    const tab = e.target.closest('.pm-tab');
-
-    if (tab && root.contains(tab)) {
-      e.preventDefault();
-      e.stopPropagation();
-
-      const tabName = tab.dataset.tab;
-
-      if (tabName === 'installed' || tabName === 'community') {
-        switchTab(tabName);
-      }
-
-      return;
-    }
-
-    const btn = e.target.closest('button');
-    if (!btn || !root.contains(btn)) return;
-
-    const id = btn.dataset.id;
-
-    if (btn.dataset.act === 'retry') {
-      const retryEntry = api.registry.getAll().find(p => p.id === id);
-      if (!retryEntry || isBusy(retryEntry)) return;
-
-      btn.disabled = true;
-      btn.textContent = 'Retrying…';
-      api.bus.emit('pm:retry-start', { id });
-      setPluginStatus(id, 'installing');
-      renderInstalled();
-
-      try {
-        await api.reloadPlugin(id);
-        setPluginStatus(id, 'active');
-        api.bus.emit('pm:retry-success', { id });
-        api.notify(`${retryEntry.name || id} loaded successfully`, 'success');
-      } catch (e) {
-        api.bus.emit('pm:retry-fail', { id, error: e.message });
-        setPluginStatus(id, 'failed', e.message || 'Retry failed');
-        api.notify('Retry failed', 'error');
-      }
-      renderInstalled();
-      return;
-    }
-
-    if (btn.dataset.act === 'toggle') {
-      const tEntry = api.registry.getAll().find(p => p.id === id);
-      if (tEntry && isBusy(tEntry)) return;
-      const newState = tEntry?.enabled ? 'disabled' : 'active';
-      api.bus.emit('pm:toggle', { id, to: newState });
-      await api.togglePlugin(id);
-      cleanupPluginUI(id);
-      setPluginStatus(id, tEntry?.enabled ? 'active' : 'disabled');
-    }
-
-    if (btn.dataset.act === 'delete') {
-      const dEntry = api.registry.getAll().find(p => p.id === id);
-      if (!dEntry || isBusy(dEntry)) return;
-
-      const pluginName = dEntry.name || dEntry.id;
-
-      const confirmed = await showConfirmModal({
-        title: 'Delete Plugin?',
-        message: `Remove "${pluginName}" from your board?`,
-        warning: 'The plugin will be disabled and removed from your workspace. Your saved data will stay on this device unless you clear it later.',
-        confirmText: 'Delete',
-        cancelText: 'Keep Plugin',
-        danger: true
-      });
-
-      if (!confirmed) {
-        api.bus.emit('pm:delete-cancelled', { id });
-        return;
-      }
-
-      api.bus.emit('pm:delete', { id });
-      await api.deletePlugin(id);
-      cleanupPluginUI(id);
-      api.notify(`${pluginName} deleted`, 'success');
-    }
-
-    if (btn.dataset.act === 'reload') {
-        if (id === SELF_ID) {
-          api.notify('Plugin Manager cannot reload itself', 'warning');
-          return;
-        }
-
-      const rEntry = api.registry.getAll().find(p => p.id === id);
-      if (rEntry && isBusy(rEntry)) return;
-
-      const cooldownMs = 30000;
-      const lastReload = reloadCooldowns.get(id) || 0;
-      const now = Date.now();
-      if (now - lastReload < cooldownMs) {
-        api.notify('Please wait before reloading again', 'warning');
-        return;
-      }
-      reloadCooldowns.set(id, now);
-
-      if (!rEntry || (!rEntry.enabled && id !== SELF_ID)) {
-        api.notify('Enable the plugin first before reloading', 'warning');
-        return;
-      }
-
-      api.bus.emit('pm:reload-start', { id });
-      try {
-        await api.reloadPlugin(id);
-        setPluginStatus(id, 'active');
-        api.bus.emit('pm:reload-success', { id });
-        api.notify(`Reloaded ${id}`, 'success');
-      } catch (e) {
-        api.bus.emit('pm:reload-fail', { id, error: e.message });
-        setPluginStatus(id, 'failed', e.message || 'Reload failed');
-        api.notify('Reload failed', 'error');
-      }
-      cleanupPluginUI(id);
-
-      renderInstalled();
-      return;
-    }
-
-    if (btn.dataset.install) {
-      // Prevent double-click
-      btn.disabled = true;
-      btn.textContent = 'Installing…';
-
-      const installId = btn.dataset.install;
-      api.bus.emit('pm:install-start', { id: installId, url: btn.dataset.url, source: 'community' });
-
-      const remoteMeta = await fetchRemoteMeta(btn.dataset.url);
-
-      if (!remoteMeta) {
-        btn.disabled = false; btn.textContent = 'Install Plugin';
-        return api.notify('Invalid plugin (meta not found)', 'error');
-      }
-
-      if (!remoteMeta.id || typeof remoteMeta.id !== 'string') {
-        btn.disabled = false; btn.textContent = 'Install Plugin';
-        return api.notify('Invalid plugin (missing id)', 'error');
-      }
-
-      if (remoteMeta.id !== installId) {
-        api.bus.emit('pm:install-id-mismatch', { expected: installId, got: remoteMeta.id, source: 'community' });
-        btn.disabled = false; btn.textContent = 'Install Plugin';
-        return api.notify(
-          `Plugin ID mismatch (expected "${installId}", got "${remoteMeta.id}")`,
-          'error'
-        );
-      }
-
-      const newDef = {
-        id: remoteMeta.id || installId,
-        url: btn.dataset.url,
-        name: remoteMeta.name,
-        version: remoteMeta.version,
-        icon: remoteMeta.icon || btn.dataset.icon,
-        enabled: true,
-        source: 'registry',
-        remoteVersion: remoteMeta.version,
-        status: 'installing',
-        error: null
-      };
-
-      const registry = api.registry.getAll();
-
-      if (registry.some(p => p.id === newDef.id)) {
-        btn.disabled = false; btn.textContent = 'Install Plugin';
-        return api.notify('Plugin already installed', 'warning');
-      }
-
-      api.registry.save([...registry, newDef]);
-      renderInstalled(); // show "Installing…" badge
-
-      try {
-        cleanupPluginUI(newDef.id);
-        await api.reloadPlugin(newDef.id);
-        setPluginStatus(newDef.id, 'active');
-        api.bus.emit('pm:install-success', { id: newDef.id, version: newDef.version, source: 'community' });
-      } catch (e) {
-        api.bus.emit('pm:install-fail', { id: newDef.id, error: e.message, source: 'community' });
-        setPluginStatus(newDef.id, 'failed', e.message || 'Install failed');
-        api.notify('Install failed', 'error');
-      }
-    }
-
-    if (btn.dataset.update) {
-      const updateId = btn.dataset.update;
-      const registry = api.registry.getAll();
-      const entry = registry.find(p => p.id === updateId);
-
-      // Block if already busy
-      if (entry && isBusy(entry)) return;
-
-      // Prevent double-click
-      btn.disabled = true;
-      btn.textContent = 'Updating…';
-      api.bus.emit('pm:update-start', { id: updateId });
-
-      let remoteVersion = null;
-      const updateUrl = getRemoteUrl(entry);
-      if (updateUrl) {
-        const remoteMeta = await fetchRemoteMeta(updateUrl);
-        remoteVersion = remoteMeta?.version || null;
-      }
-
-      try {
-        setPluginStatus(updateId, 'updating');
-        renderInstalled(); // show "Updating…" badge
-
-        // If the plugin was rolled back, entry.url is a data: URL (snapshot code).
-        // Restore the real remote URL so core loads the latest version.
-        if (updateUrl && entry.url !== updateUrl) {
-          const freshReg = api.registry.getAll();
-          const freshEntry = freshReg.find(p => p.id === updateId);
-          if (freshEntry) {
-            freshEntry.url = updateUrl;
-            api.registry.save(freshReg);
-          }
-        }
-
-        await api.reloadPlugin(updateId);
-        if (remoteVersion) {
-          saveRegistryPluginVersion(updateId, remoteVersion);
-          saveRemoteVersion(updateId, remoteVersion);
-        }
-        setPluginStatus(updateId, 'active');
-        api.bus.emit('pm:update-success', { id: updateId, version: remoteVersion });
-        api.notify(`${updateId} updated successfully!`, 'success');
-        if (updateId === SELF_ID) {
-          setTimeout(() => window.location.reload(), 200);
-          return;
-        }
-      } catch (e) {
-        api.bus.emit('pm:update-fail', { id: updateId, error: e.message });
-        setPluginStatus(updateId, 'failed', e.message || 'Update failed');
-        api.notify('Update failed', 'error');
-      }
-    }
-
-    renderInstalled();
-    renderCommunity();
-  });
-
-  // Filter button handlers
   root.querySelectorAll('.pm-filter-btn').forEach(btn => {
-    btn.onclick = () => {
+    btn.addEventListener('click', () => {
       const container = btn.closest('.pm-filter-bar');
       container.querySelectorAll('.pm-filter-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
@@ -1884,44 +789,1476 @@ export function setup(api) {
         communityFilter = btn.dataset.filterCommunity;
         renderCommunity();
       }
-    };
+    });
   });
 
-  // Search input handlers
   const globalSearchInput = root.querySelector('#pm-search');
-
-  if (globalSearchInput) {
-    globalSearchInput.addEventListener('input', (e) => {
-      globalSearch = e.target.value;
-      renderInstalled();
-      renderCommunity();
-    });
-  }
-
-  // Search clear button handlers
   const globalSearchClear = root.querySelector('#pm-search-clear');
-  if (globalSearchClear) {
-    globalSearchClear.onclick = () => {
-      globalSearch = '';
-      if (globalSearchInput) globalSearchInput.value = '';
-      globalSearchClear.classList.remove('visible');
-      renderInstalled();
-      renderCommunity();
-    };
-  }
+
+  globalSearchInput?.addEventListener('input', (e) => {
+    globalSearch = e.target.value;
+    globalSearchClear?.classList.toggle('visible', globalSearch.length > 0);
+    renderInstalled();
+    renderCommunity();
+  });
+
+  globalSearchClear.onclick = () => {
+    globalSearch = '';
+    globalSearchInput.value = '';
+    globalSearchClear.classList.remove('visible');
+    renderInstalled();
+    renderCommunity();
+  };
+
+  document.addEventListener('click', (e) => {
+    if (activeMenu && !e.target.closest('.pm-action-menu') && !e.target.closest('[data-act="menu"]')) {
+      closeActionMenu();
+    }
+  });
 
   contextMenuHandler = (e) => {
     if (e.target.closest('.pm-root')) return;
     e.preventDefault();
     root.style.display = 'flex';
-    renderInstalled();
+    switchTab('installed');
   };
   api.boardEl.addEventListener('contextmenu', contextMenuHandler);
 
+  loadCommunityFromCache();
+  log('pm:loaded', { version: meta.version });
   api.bus.emit('pm:loaded', { version: meta.version });
+
+  // ─────────────────────────────────────────────
+  // UI REGISTRATION
+  // ─────────────────────────────────────────────
+
+  function registerCoreUI() {
+    const actions = root.querySelector('#pm-actions');
+    actions.innerHTML = '';
+
+    const checkUpdatesBtn = document.createElement('button');
+    checkUpdatesBtn.className = 'pm-btn pm-btn-secondary check-updates';
+    checkUpdatesBtn.innerHTML = `${iconRefresh(14)} Check Updates`;
+    checkUpdatesBtn.onclick = async () => {
+      setButtonBusy(checkUpdatesBtn, 'Checking…');
+      await renderInstalled(true);
+      resetButton(checkUpdatesBtn, `${iconRefresh(14)} Check Updates`);
+    };
+    actions.appendChild(checkUpdatesBtn);
+
+    const installBtn = document.createElement('button');
+    installBtn.className = 'pm-btn pm-btn-primary';
+    installBtn.textContent = 'Install via URL';
+    installBtn.onclick = openInstallModal;
+    actions.appendChild(installBtn);
+
+    const safeBtn = document.createElement('button');
+    safeBtn.className = 'pm-btn pm-btn-secondary';
+    safeBtn.textContent = 'Safe Mode';
+    safeBtn.onclick = enableSafeMode;
+    actions.appendChild(safeBtn);
+  }
+
+  function registerPluginManagerUI(slot, el, id, owner = SELF_ID) {
+    if (!slot || !slots[slot] || !(el instanceof HTMLElement)) return false;
+    if (id) el.dataset.uiId = String(id);
+    el.dataset.owner = String(owner);
+    slots[slot].appendChild(el);
+    if (!slotRegistry.has(owner)) slotRegistry.set(owner, []);
+    slotRegistry.get(owner).push(el);
+    return true;
+  }
+
+  function cleanupPluginUI(pluginId) {
+    const items = slotRegistry.get(pluginId);
+    if (!items) return;
+    items.forEach(el => { try { el.remove(); } catch {} });
+    slotRegistry.delete(pluginId);
+  }
+
+  // ─────────────────────────────────────────────
+  // RENDERING
+  // ─────────────────────────────────────────────
+
+  function switchTab(tabName) {
+    if (!root) return;
+
+    const installedView = root.querySelector('#installed');
+    const communityView = root.querySelector('#community');
+    if (!installedView || !communityView) return;
+
+    root.querySelectorAll('.pm-tab').forEach(tab => {
+      tab.classList.toggle('active', tab.dataset.tab === tabName);
+    });
+
+    installedView.style.display = tabName === 'installed' ? 'block' : 'none';
+    communityView.style.display = tabName === 'community' ? 'block' : 'none';
+
+    activeTab = tabName;
+
+    if (tabName === 'installed') renderInstalled();
+    if (tabName === 'community') renderCommunity();
+  }
+
+  async function renderInstalled(forceCheck = false) {
+    if (!root || !document.body.contains(root)) return;
+
+    const listEl = root.querySelector('#installed .pm-list');
+    if (!listEl) return;
+
+    let plugins = api.registry.getAll();
+    const now = Date.now();
+    const shouldCheck = forceCheck || (now - lastCheckedTime > CACHE_TIMEOUT);
+
+    if (shouldCheck) {
+      lastCheckedTime = now;
+      const results = await Promise.all(plugins.map(p => fetchRemoteMeta(getRemoteUrl(p))));
+      const freshRegistry = api.registry.getAll();
+      let changed = false;
+
+      results.forEach((metaObj, index) => {
+        const item = freshRegistry.find(p => p.id === plugins[index]?.id);
+        if (!item || !metaObj || metaObj.__error) return;
+        remoteMetaCache.set(item.id, metaObj);
+        if (metaObj.version && item.remoteVersion !== metaObj.version) {
+          item.remoteVersion = metaObj.version;
+          changed = true;
+        }
+      });
+
+      if (changed) api.registry.save(freshRegistry);
+      plugins = api.registry.getAll();
+    }
+
+    const communityMap = new Map(communityCache.map(p => [p.id, p]));
+    let rows = plugins.map((p, index) => {
+      const remoteMeta = remoteMetaCache.get(p.id) || null;
+      const community = communityMap.get(p.id) || {};
+      const merged = { ...community, ...p };
+      return { p: merged, remoteMeta, index };
+    });
+
+    let availableUpdates = 0;
+    rows.forEach(({ p, remoteMeta }) => {
+      if (hasPluginUpdate(p, remoteMeta)) availableUpdates++;
+    });
+
+    rows = rows.filter(({ p, remoteMeta }) => {
+      if (installedFilter === 'system' && !isSystemPlugin(p)) return false;
+      if (installedFilter === 'updates' && !hasPluginUpdate(p, remoteMeta)) return false;
+      if (installedFilter === 'failed' && !['failed', 'blocked'].includes(getPluginStatus(p))) return false;
+
+      if (globalSearch.trim()) {
+        const term = globalSearch.toLowerCase().trim();
+        return [p.name, p.id, p.description, p.author].some(v => String(v || '').toLowerCase().includes(term));
+      }
+
+      return true;
+    });
+
+    if (!rows.length) {
+      listEl.innerHTML = emptyStateHTML(
+        globalSearch ? `No plugins found for “${escapeHTML(globalSearch)}”` : 'No plugins here',
+        globalSearch ? 'Try a different search or clear the search field.' : 'Install a plugin to start shaping your board.',
+        globalSearch ? '<button class="pm-btn pm-btn-secondary" data-act="clear-search">Clear Search</button>' : ''
+      );
+      updateBadge(availableUpdates);
+      return;
+    }
+
+    const systemRows = rows.filter(({ p }) => isSystemPlugin(p));
+    const normalRows = rows.filter(({ p }) => !isSystemPlugin(p));
+
+    let html = '';
+    if (systemRows.length) {
+      html += systemRows.map(({ p, remoteMeta }) => pluginRowHTML(p, remoteMeta, true)).join('');
+    }
+
+    if (systemRows.length && normalRows.length) {
+      html += '<div class="pm-divider">Standard Extensions</div>';
+    }
+
+    if (normalRows.length) {
+      html += normalRows.map(({ p, remoteMeta }) => pluginRowHTML(p, remoteMeta, false)).join('');
+    }
+
+    html += lastCheckedTime ? `<div class="last-checked">Last checked ${timeAgo(lastCheckedTime)}</div>` : '';
+    listEl.innerHTML = html;
+    updateBadge(availableUpdates);
+  }
+
+  async function renderCommunity(forceRefresh = false) {
+    if (!root || !document.body.contains(root)) return;
+
+    const listEl = root.querySelector('#community .pm-list');
+    if (!listEl) return;
+
+    if (!communityCache.length) {
+      listEl.innerHTML = skeletonHTML(4);
+    }
+
+    if (forceRefresh || !communityCache.length || isCommunityCacheStale()) {
+      try {
+        await refreshCommunityCache();
+      } catch (err) {
+        if (!communityCache.length) {
+          listEl.innerHTML = emptyStateHTML(
+            'Couldn’t load Community Store',
+            'Check your connection, then try again.',
+            '<button class="pm-btn pm-btn-primary" data-act="retry-community">Retry</button>'
+          );
+          return;
+        }
+      }
+    }
+
+    const registry = api.registry.getAll();
+    const installed = new Set(registry.map(p => p.id));
+    const installedVersions = registry.reduce((acc, item) => {
+      if (item.version) acc[item.id] = item.version;
+      return acc;
+    }, {});
+
+    let plugins = [...communityCache];
+
+    plugins = plugins.filter(p => {
+      if (communityFilter === 'system' && p.category !== 'system') return false;
+      if (communityFilter === 'new' && !isPluginNew(p.date)) return false;
+      if (!['all', 'system', 'new'].includes(communityFilter) && normalizeCategory(p.category) !== communityFilter) return false;
+
+      if (globalSearch.trim()) {
+        const term = globalSearch.toLowerCase().trim();
+        return [p.name, p.id, p.description, p.author, p.category].some(v => String(v || '').toLowerCase().includes(term));
+      }
+
+      return true;
+    });
+
+    if (!plugins.length) {
+      listEl.innerHTML = emptyStateHTML(
+        globalSearch ? `No plugins found for “${escapeHTML(globalSearch)}”` : 'No plugins in this category',
+        globalSearch ? 'Try a different search or clear the search field.' : 'Try another category.',
+        globalSearch ? '<button class="pm-btn pm-btn-secondary" data-act="clear-search">Clear Search</button>' : ''
+      );
+      return;
+    }
+
+    listEl.innerHTML = plugins.map(p => communityRowHTML(p, installed.has(p.id), installedVersions[p.id])).join('');
+  }
+
+  function pluginRowHTML(p, remoteMeta, isSystem) {
+    const status = p.id === SELF_ID ? 'active' : getPluginStatus(p);
+    const displayName = escapeHTML(remoteMeta?.name || p.name || p.id);
+    const installedVer = p.version || remoteMeta?.version || p.remoteVersion || null;
+    const remoteVer = remoteMeta?.version || p.remoteVersion || null;
+    const hasUpdate = hasPluginUpdate(p, remoteMeta);
+    const iconContent = p.icon || remoteMeta?.icon || getCommunityIcon(p.id) || '📦';
+    const iconBg = pickColor(p.id);
+    const busy = isBusy(p);
+    const incompatible = !isCompatible(p.compat || remoteMeta?.compat);
+    const permissions = normalizePermissions(p.permissions || remoteMeta?.permissions || inferPermissions(p));
+    const trust = getTrustLabel(p);
+    const sourceBadge = `<span class="trust-badge">${escapeHTML(trust)}</span>`;
+    const versionText = installedVer ? `v${escapeHTML(installedVer)}` : 'Version unknown';
+    const errorHtml = p.error ? `<div class="pm-error-msg" title="${escapeHTML(p.error)}">⚠ ${escapeHTML(p.error)}</div>` : '';
+    const crashHtml = Number(p.crashCount || 0) > 0 ? `<span class="plugin-badge badge-risk">${Number(p.crashCount)} issue${Number(p.crashCount) === 1 ? '' : 's'}</span>` : '';
+    const updateBadge = hasUpdate ? '<span class="plugin-badge badge-update">Update Available</span>' : '';
+    const systemBadge = isSystem ? '<span class="plugin-badge badge-system">System</span>' : '';
+    const statusBadge = statusBadgeHTML(status, isSystem);
+    const permBadges = permissions.slice(0, 4).map(permissionBadgeHTML).join('');
+    const disabled = busy || incompatible || status === 'blocked';
+
+    return `
+      <div class="plugin-item clickable" data-plugin-id="${escapeAttr(p.id)}">
+        <div class="plugin-icon-box" style="background:${iconBg};">${iconHTML(iconContent, displayName)}</div>
+        <div class="plugin-info">
+          <div class="plugin-name-row">
+            <span class="plugin-name">${displayName}</span>
+            <span class="plugin-badge badge-disabled">${versionText}</span>
+          </div>
+          <div class="plugin-meta">${escapeHTML(p.id)}</div>
+          <div class="pm-badge-row">
+            ${statusBadge}
+            ${systemBadge}
+            ${updateBadge}
+            ${incompatible ? '<span class="plugin-badge badge-incompatible">Not Compatible</span>' : ''}
+            ${crashHtml}
+            ${sourceBadge}
+          </div>
+          <div class="pm-badge-row">${permBadges}</div>
+          ${errorHtml}
+        </div>
+        <div class="pm-action-group">
+          ${hasUpdate && !busy ? `<button class="pm-btn pm-btn-primary" data-update="${escapeAttr(p.id)}">Update</button>` : ''}
+          ${p.id === SELF_ID ? '' : `<button class="pm-toggle ${p.enabled ? 'on' : ''}" data-act="toggle" data-id="${escapeAttr(p.id)}" title="${p.enabled ? 'Disable' : 'Enable'}" ${disabled ? 'disabled' : ''}></button>`}
+          ${p.id === SELF_ID ? '' : `<button class="pm-icon-btn" data-act="menu" data-id="${escapeAttr(p.id)}" title="More actions">•••</button>`}
+        </div>
+      </div>
+    `;
+  }
+
+  function communityRowHTML(p, isInstalled, installedVersion) {
+    const displayName = escapeHTML(p.name || p.id);
+    const category = normalizeCategory(p.category);
+    const permissions = normalizePermissions(p.permissions || inferPermissions(p));
+    const incompatible = !isCompatible(p.compat);
+    const isNew = isPluginNew(p.date);
+    const isSystem = p.category === 'system';
+    const displayVersion = p.version || installedVersion;
+    const iconBg = pickColor(p.id);
+
+    const badges = [
+      isSystem ? '<span class="plugin-badge badge-system">System</span>' : '',
+      isNew ? '<span class="plugin-badge badge-new">New</span>' : '',
+      incompatible ? '<span class="plugin-badge badge-incompatible">Not Compatible</span>' : '',
+      `<span class="trust-badge">${escapeHTML(categoryLabel(category))}</span>`
+    ].filter(Boolean).join('');
+
+    const permBadges = permissions.slice(0, 4).map(permissionBadgeHTML).join('');
+
+    return `
+      <div class="plugin-item clickable" data-community-id="${escapeAttr(p.id)}">
+        <div class="plugin-icon-box" style="background:${iconBg};">${iconHTML(p.icon || '📦', displayName)}</div>
+        <div class="plugin-info">
+          <div class="plugin-name-row">
+            <span class="plugin-name">${displayName}</span>
+            ${displayVersion ? `<span class="plugin-badge badge-disabled">v${escapeHTML(displayVersion)}</span>` : ''}
+          </div>
+          <div class="plugin-meta">${escapeHTML(p.author || 'Unknown')} • ${escapeHTML(p.id)}</div>
+          <div class="pm-badge-row">${badges}</div>
+          <div class="pm-badge-row">${permBadges}</div>
+          <div class="plugin-desc">${escapeHTML(p.description || '')}</div>
+        </div>
+        <div class="pm-action-group" style="min-width:112px;">
+          ${
+            isInstalled
+              ? `<button class="pm-btn pm-btn-secondary" disabled style="width:100%;">Installed</button>`
+              : `<button class="pm-btn pm-btn-primary" style="width:100%;" data-install="${escapeAttr(p.id)}" data-url="${escapeAttr(p.url)}" ${incompatible ? 'disabled title="Not compatible with this Blank Board version"' : ''}>Install</button>`
+          }
+        </div>
+      </div>
+    `;
+  }
+
+  // ─────────────────────────────────────────────
+  // ACTIONS
+  // ─────────────────────────────────────────────
+
+  async function onRootClick(e) {
+    const tab = e.target.closest('.pm-tab');
+    if (tab && root.contains(tab)) {
+      e.preventDefault();
+      switchTab(tab.dataset.tab);
+      return;
+    }
+
+    const pluginCard = e.target.closest('[data-plugin-id]');
+    const communityCard = e.target.closest('[data-community-id]');
+    const btn = e.target.closest('button');
+
+    if (btn && root.contains(btn)) {
+      await handleButtonClick(btn, e);
+      return;
+    }
+
+    if (pluginCard && root.contains(pluginCard)) {
+      showPluginDetails(pluginCard.dataset.pluginId);
+      return;
+    }
+
+    if (communityCard && root.contains(communityCard)) {
+      showCommunityDetails(communityCard.dataset.communityId);
+    }
+  }
+
+  async function handleButtonClick(btn, e) {
+    const id = btn.dataset.id;
+
+    if (btn.dataset.act === 'clear-search') {
+      clearSearch();
+      return;
+    }
+
+    if (btn.dataset.act === 'retry-community') {
+      await renderCommunity(true);
+      return;
+    }
+
+    if (btn.dataset.act === 'menu') {
+      e.preventDefault();
+      e.stopPropagation();
+      openActionMenu(btn, id);
+      return;
+    }
+
+    if (btn.dataset.menuAction) {
+      e.preventDefault();
+      e.stopPropagation();
+      closeActionMenu();
+      await handleMenuAction(btn.dataset.menuAction, btn.dataset.id);
+      return;
+    }
+
+    if (btn.dataset.act === 'toggle') {
+      e.preventDefault();
+      e.stopPropagation();
+      await togglePlugin(id, btn);
+      return;
+    }
+
+    if (btn.dataset.install) {
+      e.preventDefault();
+      e.stopPropagation();
+      await installCommunityPlugin(btn.dataset.install, btn.dataset.url, btn);
+      return;
+    }
+
+    if (btn.dataset.update) {
+      e.preventDefault();
+      e.stopPropagation();
+      await updatePlugin(btn.dataset.update, btn);
+      return;
+    }
+  }
+
+  async function handleMenuAction(action, id) {
+    if (action === 'details') return showPluginDetails(id);
+    if (action === 'reload') return reloadPlugin(id);
+    if (action === 'delete') return deletePluginWithConfirmation(id);
+    if (action === 'logs') return showLogsModal();
+    if (action === 'reset-layout') return resetPluginManagerLayout();
+    if (action === 'check-update') return checkSingleUpdate(id);
+  }
+
+  async function togglePlugin(id, btn) {
+    const entry = api.registry.getAll().find(p => p.id === id);
+    if (!entry || isBusy(entry)) return;
+
+    setButtonBusy(btn, '');
+    try {
+      log('pm:toggle', { id, to: entry.enabled ? 'disabled' : 'active' });
+      await api.togglePlugin(id);
+      cleanupPluginUI(id);
+      setPluginStatus(id, entry.enabled ? 'disabled' : 'active');
+    } catch (err) {
+      setPluginStatus(id, 'failed', err.message || 'Toggle failed');
+      api.notify('Toggle failed', 'error');
+      log('pm:toggle-fail', { id, error: err.message });
+    }
+    renderInstalled();
+  }
+
+  async function reloadPlugin(id) {
+    if (id === SELF_ID) {
+      api.notify('Plugin Manager cannot reload itself. Refresh the board instead.', 'warning');
+      return;
+    }
+
+    const entry = api.registry.getAll().find(p => p.id === id);
+    if (!entry || !entry.enabled || isBusy(entry)) return;
+
+    const cooldownMs = 30000;
+    const last = reloadCooldowns.get(id) || 0;
+    if (Date.now() - last < cooldownMs) {
+      api.notify('Please wait before reloading again', 'warning');
+      return;
+    }
+
+    reloadCooldowns.set(id, Date.now());
+    setPluginStatus(id, 'updating');
+
+    try {
+      log('pm:reload-start', { id });
+      await api.reloadPlugin(id);
+      setPluginStatus(id, 'active');
+      incrementCrash(id, false);
+      api.notify(`Reloaded ${entry.name || id}`, 'success');
+      log('pm:reload-success', { id });
+    } catch (err) {
+      handlePluginFailure(id, err, 'Reload failed');
+    }
+
+    renderInstalled();
+  }
+
+  async function checkSingleUpdate(id) {
+    const entry = api.registry.getAll().find(p => p.id === id);
+    if (!entry) return;
+
+    const metaObj = await fetchRemoteMeta(getRemoteUrl(entry));
+    if (!metaObj || metaObj.__error) {
+      api.notify('Could not check for updates', 'error');
+      return;
+    }
+
+    remoteMetaCache.set(id, metaObj);
+
+    if (hasPluginUpdate(entry, metaObj)) {
+      api.notify(`Update available: ${metaObj.version}`, 'info');
+    } else {
+      api.notify('Plugin is up to date', 'success');
+    }
+
+    renderInstalled();
+  }
+
+  async function installCommunityPlugin(id, url, btn) {
+    const community = communityCache.find(p => p.id === id) || {};
+    const isManualInstall = !community.id;
+    const remoteMeta = await fetchRemoteMeta(url);
+
+    if (!remoteMeta || remoteMeta.__error) {
+      api.notify('Invalid plugin. Metadata could not be read.', 'error');
+      return;
+    }
+
+    const pluginDef = {
+      ...community,
+      ...remoteMeta,
+      id: remoteMeta.id || id,
+      url,
+      enabled: true,
+      source: isManualInstall ? 'manual' : 'registry',
+      remoteVersion: remoteMeta.version || community.version || null,
+      status: 'installing',
+      error: null,
+      installedAt: Date.now(),
+      trust: community.trust || (isManualInstall ? 'manual' : 'community'),
+      permissions: normalizePermissions(remoteMeta.permissions || community.permissions || inferPermissions(community)),
+      category: community.category || remoteMeta.category || 'utilities'
+    };
+
+    if (pluginDef.id !== id) {
+      api.notify(`Plugin ID mismatch: expected "${id}", got "${pluginDef.id}"`, 'error');
+      return;
+    }
+
+    if (!isCompatible(pluginDef.compat)) {
+      api.notify('This plugin is not compatible with your Blank Board version', 'error');
+      return;
+    }
+
+    if (api.registry.getAll().some(p => p.id === pluginDef.id)) {
+      api.notify('Plugin already installed', 'warning');
+      return;
+    }
+
+    const confirmed = await showInstallConfirm(pluginDef);
+    if (!confirmed) return;
+
+    setButtonBusy(btn, 'Installing…');
+
+    try {
+      api.registry.save([...api.registry.getAll(), pluginDef]);
+      renderInstalled();
+      await api.reloadPlugin(pluginDef.id);
+      setPluginStatus(pluginDef.id, 'active');
+      incrementCrash(pluginDef.id, false);
+      api.notify(`${pluginDef.name || pluginDef.id} installed`, 'success');
+      log('pm:install-success', { id: pluginDef.id, version: pluginDef.version });
+    } catch (err) {
+      setPluginStatus(pluginDef.id, 'failed', err.message || 'Install failed');
+      incrementCrash(pluginDef.id, true);
+      api.notify('Install failed', 'error');
+      log('pm:install-fail', { id: pluginDef.id, error: err.message });
+    }
+
+    renderInstalled();
+    renderCommunity();
+  }
+
+  async function updatePlugin(id, btn) {
+    const entry = api.registry.getAll().find(p => p.id === id);
+    if (!entry || isBusy(entry)) return;
+
+    const updateUrl = getRemoteUrl(entry);
+    const remoteMeta = await fetchRemoteMeta(updateUrl);
+
+    if (!remoteMeta || remoteMeta.__error) {
+      api.notify('Could not read update metadata', 'error');
+      return;
+    }
+
+    if (!hasPluginUpdate(entry, remoteMeta)) {
+      api.notify('Plugin is already up to date', 'success');
+      return;
+    }
+
+    if (!isCompatible(remoteMeta.compat || entry.compat)) {
+      api.notify('This update is not compatible with your Blank Board version', 'error');
+      return;
+    }
+
+    const confirmed = await showConfirmModal({
+      title: `Update ${entry.id === SELF_ID ? 'Plugin Manager' : 'Plugin'}?`,
+      message: `${entry.name || id} will update from v${entry.version || 'unknown'} to v${remoteMeta.version || 'latest'}.`,
+      warning: entry.id === SELF_ID
+        ? 'Plugin Manager will refresh the board after updating.'
+        : 'The plugin will reload automatically after the update.',
+      confirmText: 'Update',
+      cancelText: 'Cancel',
+      danger: false
+    });
+
+    if (!confirmed.confirmed) {
+      log('pm:update-cancelled', { id });
+      return;
+    }
+
+    setButtonBusy(btn, 'Updating…');
+    setPluginStatus(id, 'updating');
+
+    try {
+      const reg = api.registry.getAll();
+      const item = reg.find(p => p.id === id);
+      if (item) {
+        item.url = updateUrl || item.url;
+        item.version = remoteMeta.version || item.version;
+        item.remoteVersion = remoteMeta.version || item.remoteVersion;
+        item.name = remoteMeta.name || item.name;
+        item.icon = remoteMeta.icon || item.icon;
+        item.permissions = normalizePermissions(remoteMeta.permissions || item.permissions || inferPermissions(item));
+        item.compat = remoteMeta.compat || item.compat;
+        item.updatedAt = Date.now();
+      }
+      api.registry.save(reg);
+
+      await api.reloadPlugin(id);
+      setPluginStatus(id, 'active');
+      incrementCrash(id, false);
+      api.notify(`${entry.name || id} updated`, 'success');
+      log('pm:update-success', { id, version: remoteMeta.version });
+
+      if (id === SELF_ID) {
+        setTimeout(() => window.location.reload(), 350);
+        return;
+      }
+    } catch (err) {
+      handlePluginFailure(id, err, 'Update failed');
+    }
+
+    renderInstalled(true);
+  }
+
+  async function deletePluginWithConfirmation(id) {
+    const entry = api.registry.getAll().find(p => p.id === id);
+    if (!entry || isBusy(entry) || entry.id === SELF_ID) return;
+
+    const pluginName = entry.name || entry.id;
+    const result = await showConfirmModal({
+      title: 'Delete Plugin?',
+      message: `Remove "${pluginName}" from your board?`,
+      warning: 'The plugin will be disabled and removed from your workspace. Your saved data will stay on this device unless you remove it below.',
+      confirmText: 'Delete',
+      cancelText: 'Keep Plugin',
+      danger: true,
+      checkbox: {
+        label: 'Also remove saved plugin data from this device',
+        checked: false
+      }
+    });
+
+    if (!result.confirmed) {
+      log('pm:delete-cancelled', { id });
+      return;
+    }
+
+    const deletedEntry = { ...entry };
+
+    try {
+      await api.deletePlugin(id);
+      cleanupPluginUI(id);
+
+      if (result.checked) {
+        purgePluginData(id);
+      }
+
+      log('pm:delete-success', { id, purgeData: result.checked });
+      showUndoToast(`${pluginName} deleted`, 'Undo', async () => {
+        const reg = api.registry.getAll();
+        if (!reg.some(p => p.id === deletedEntry.id)) {
+          api.registry.save([...reg, { ...deletedEntry, enabled: false, status: 'disabled' }]);
+          api.notify(`${pluginName} restored`, 'success');
+          renderInstalled();
+        }
+      });
+
+    } catch (err) {
+      api.notify('Delete failed', 'error');
+      log('pm:delete-fail', { id, error: err.message });
+    }
+
+    renderInstalled();
+    renderCommunity();
+  }
+
+  async function enableSafeMode() {
+    const confirmed = await showConfirmModal({
+      title: 'Enable Safe Mode?',
+      message: 'Disable all non-system plugins?',
+      warning: 'This is useful when a plugin breaks the board. System plugins like Plugin Manager will stay enabled.',
+      confirmText: 'Enable Safe Mode',
+      cancelText: 'Cancel',
+      danger: false
+    });
+
+    if (!confirmed.confirmed) return;
+
+    const registry = api.registry.getAll();
+    const targets = registry.filter(p => p.enabled && !isSystemPlugin(p));
+
+    for (const item of targets) {
+      try {
+        await api.togglePlugin(item.id);
+        setPluginStatus(item.id, 'disabled');
+      } catch (err) {
+        setPluginStatus(item.id, 'failed', err.message || 'Could not disable plugin');
+      }
+    }
+
+    api.notify(`Safe Mode enabled (${targets.length} plugin${targets.length === 1 ? '' : 's'} disabled)`, 'success');
+    log('pm:safe-mode', { disabled: targets.map(p => p.id) });
+    renderInstalled();
+  }
+
+  function resetPluginManagerLayout() {
+    root.style.width = '';
+    root.style.height = '';
+    root.style.left = '';
+    root.style.top = '';
+    root.style.transform = '';
+    api.notify('Plugin Manager layout reset', 'success');
+    log('pm:layout-reset', {});
+  }
+
+  // ─────────────────────────────────────────────
+  // MODALS
+  // ─────────────────────────────────────────────
+
+  function openInstallModal() {
+    const overlay = document.createElement('div');
+    overlay.className = 'pm-modal-overlay';
+
+    overlay.innerHTML = `
+      <div class="pm-modal-content">
+        <h3 class="pm-modal-title">Install Extension</h3>
+        <input type="text" id="pm-url" class="pm-input" placeholder="https://source.com/plugin.js">
+        <input type="text" id="pm-id" class="pm-input" placeholder="Unique Plugin ID">
+        <div style="display:flex; gap:10px; margin-top:8px;">
+          <button id="pm-cancel" class="pm-btn pm-btn-secondary" style="flex:1">Cancel</button>
+          <button id="pm-confirm" class="pm-btn pm-btn-primary" style="flex:1">Continue</button>
+        </div>
+      </div>
+    `;
+
+    document.documentElement.appendChild(overlay);
+
+    overlay.querySelector('#pm-cancel').onclick = () => overlay.remove();
+    overlay.querySelector('#pm-confirm').onclick = async () => {
+      const confirmBtn = overlay.querySelector('#pm-confirm');
+      const url = overlay.querySelector('#pm-url').value.trim();
+      const inputId = overlay.querySelector('#pm-id').value.trim();
+
+      if (!url || !inputId) return api.notify('All fields required', 'error');
+
+      setButtonBusy(confirmBtn, 'Checking…');
+
+      try {
+        const remoteMeta = await fetchRemoteMeta(url);
+        if (!remoteMeta || remoteMeta.__error || !remoteMeta.id) {
+          resetButton(confirmBtn, 'Continue');
+          return api.notify('Invalid plugin metadata', 'error');
+        }
+
+        if (remoteMeta.id !== inputId) {
+          resetButton(confirmBtn, 'Continue');
+          return api.notify(`ID mismatch: expected "${inputId}", got "${remoteMeta.id}"`, 'error');
+        }
+
+        overlay.remove();
+
+        await installCommunityPlugin(inputId, url, null);
+      } catch (err) {
+        resetButton(confirmBtn, 'Continue');
+        api.notify('Install failed', 'error');
+      }
+    };
+  }
+
+  async function showInstallConfirm(pluginDef) {
+    const permissions = normalizePermissions(pluginDef.permissions || inferPermissions(pluginDef));
+    const permissionList = permissions.length
+      ? permissions.map(p => `• ${permissionLabel(p)}`).join('\n')
+      : '• Basic UI access';
+
+    const result = await showConfirmModal({
+      title: `Install “${pluginDef.name || pluginDef.id}”?`,
+      message: `This plugin wants access to:\n${permissionList}`,
+      warning: getTrustLabel(pluginDef) === 'Manual URL'
+        ? 'Manual URL plugins can run code from outside the community store. Install only if you trust the source.'
+        : 'Install only plugins from sources you trust.',
+      confirmText: 'Install',
+      cancelText: 'Cancel',
+      danger: false
+    });
+
+    return result.confirmed;
+  }
+
+  function showConfirmModal({
+    title = 'Are you sure?',
+    message = '',
+    warning = '',
+    confirmText = 'Confirm',
+    cancelText = 'Cancel',
+    danger = false,
+    checkbox = null
+  } = {}) {
+    return new Promise((resolve) => {
+      const overlay = document.createElement('div');
+      overlay.className = 'pm-modal-overlay';
+
+      const messageHTML = message
+        ? `<p class="pm-modal-message">${escapeHTML(message).replaceAll('\n', '<br>')}</p>`
+        : '';
+
+      const checkboxHTML = checkbox
+        ? `<label class="pm-checkbox-row"><input type="checkbox" ${checkbox.checked ? 'checked' : ''}> <span>${escapeHTML(checkbox.label || '')}</span></label>`
+        : '';
+
+      overlay.innerHTML = `
+        <div class="pm-modal-content">
+          <h3 class="pm-modal-title">${escapeHTML(title)}</h3>
+          ${messageHTML}
+          ${warning ? `<div class="pm-modal-warning-box">${escapeHTML(warning)}</div>` : ''}
+          ${checkboxHTML}
+          <div style="display:flex; gap:10px; margin-top:14px;">
+            <button class="pm-btn pm-btn-secondary" data-confirm-action="cancel" style="flex:1">${escapeHTML(cancelText)}</button>
+            <button class="pm-btn ${danger ? 'pm-btn-danger' : 'pm-btn-primary'}" data-confirm-action="confirm" style="flex:1">${escapeHTML(confirmText)}</button>
+          </div>
+        </div>
+      `;
+
+      function close(confirmed) {
+        const checked = Boolean(overlay.querySelector('input[type="checkbox"]')?.checked);
+        overlay.remove();
+        document.removeEventListener('keydown', onKeyDown);
+        resolve({ confirmed, checked });
+      }
+
+      function onKeyDown(e) {
+        if (e.key === 'Escape') close(false);
+        if (e.key === 'Enter') close(true);
+      }
+
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) return close(false);
+        const btn = e.target.closest('[data-confirm-action]');
+        if (!btn) return;
+        close(btn.dataset.confirmAction === 'confirm');
+      });
+
+      document.addEventListener('keydown', onKeyDown);
+      document.documentElement.appendChild(overlay);
+    });
+  }
+
+  function showPluginDetails(id) {
+    const registry = api.registry.getAll();
+    const entry = registry.find(p => p.id === id);
+    if (!entry) return;
+
+    const community = communityCache.find(p => p.id === id) || {};
+    const remoteMeta = remoteMetaCache.get(id) || {};
+    const p = { ...community, ...entry };
+    const permissions = normalizePermissions(p.permissions || remoteMeta.permissions || inferPermissions(p));
+    const details = [
+      ['Status', getPluginStatus(p)],
+      ['Version', p.version || 'Unknown'],
+      ['Remote Version', p.remoteVersion || remoteMeta.version || 'Unknown'],
+      ['Author', p.author || 'Unknown'],
+      ['Source', getTrustLabel(p)],
+      ['Category', categoryLabel(normalizeCategory(p.category))],
+      ['Compatibility', p.compat || remoteMeta.compat || 'Not declared'],
+      ['Permissions', permissions.map(permissionLabel).join(', ') || 'Basic UI'],
+      ['Storage Used', estimatePluginStorage(id)],
+      ['Installed URL', getRemoteUrl(p) || p.url || 'Unknown'],
+      ['Last Error', p.error || 'None']
+    ];
+
+    showInfoModal({
+      title: p.name || p.id,
+      subtitle: p.description || 'Plugin details and safety information.',
+      rows: details,
+      actions: `
+        ${p.changelog ? `<a class="pm-btn pm-btn-secondary" href="${escapeAttr(p.changelog)}" target="_blank" style="text-decoration:none;">What’s New</a>` : ''}
+        <button class="pm-btn pm-btn-secondary" data-confirm-action="cancel">Close</button>
+      `
+    });
+  }
+
+  function showCommunityDetails(id) {
+    const p = communityCache.find(item => item.id === id);
+    if (!p) return;
+
+    const permissions = normalizePermissions(p.permissions || inferPermissions(p));
+    const details = [
+      ['Author', p.author || 'Unknown'],
+      ['Category', categoryLabel(normalizeCategory(p.category))],
+      ['Compatibility', p.compat || 'Not declared'],
+      ['Permissions', permissions.map(permissionLabel).join(', ') || 'Basic UI'],
+      ['Source', 'Community Store'],
+      ['URL', p.url || 'Unknown']
+    ];
+
+    showInfoModal({
+      title: p.name || p.id,
+      subtitle: p.description || 'Community plugin.',
+      rows: details,
+      actions: `
+        ${p.changelog ? `<a class="pm-btn pm-btn-secondary" href="${escapeAttr(p.changelog)}" target="_blank" style="text-decoration:none;">What’s New</a>` : ''}
+        <button class="pm-btn pm-btn-secondary" data-confirm-action="cancel">Close</button>
+        <button class="pm-btn pm-btn-primary" data-confirm-action="install">Install</button>
+      `,
+      onAction: async (action) => {
+        if (action === 'install') await installCommunityPlugin(p.id, p.url, null);
+      }
+    });
+  }
+
+  function showInfoModal({ title, subtitle, rows = [], actions = '', onAction = null }) {
+    const overlay = document.createElement('div');
+    overlay.className = 'pm-modal-overlay';
+
+    overlay.innerHTML = `
+      <div class="pm-modal-content wide">
+        <h3 class="pm-modal-title">${escapeHTML(title)}</h3>
+        ${subtitle ? `<p class="pm-modal-message">${escapeHTML(subtitle)}</p>` : ''}
+        <div class="pm-detail-grid">
+          ${rows.map(([label, value]) => `
+            <div class="pm-detail-label">${escapeHTML(label)}</div>
+            <div class="pm-detail-value">${escapeHTML(value)}</div>
+          `).join('')}
+        </div>
+        <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:18px; flex-wrap:wrap;">
+          ${actions || '<button class="pm-btn pm-btn-secondary" data-confirm-action="cancel">Close</button>'}
+        </div>
+      </div>
+    `;
+
+    overlay.addEventListener('click', async (e) => {
+      if (e.target === overlay) return overlay.remove();
+      const btn = e.target.closest('[data-confirm-action]');
+      if (!btn) return;
+      const action = btn.dataset.confirmAction;
+      overlay.remove();
+      if (action !== 'cancel' && onAction) await onAction(action);
+    });
+
+    document.documentElement.appendChild(overlay);
+  }
+
+  function showLogsModal() {
+    const logs = getLogs().slice(-100).reverse();
+    showInfoModal({
+      title: 'Plugin Logs',
+      subtitle: 'Recent Plugin Manager and plugin lifecycle activity.',
+      rows: logs.length
+        ? logs.map(logItem => [
+            new Date(logItem.time).toLocaleTimeString(),
+            `${logItem.event}${logItem.data ? ' — ' + JSON.stringify(logItem.data) : ''}`
+          ])
+        : [['No logs yet', 'Actions and errors will appear here.']],
+      actions: `
+        <button class="pm-btn pm-btn-secondary" data-confirm-action="clear">Clear Logs</button>
+        <button class="pm-btn pm-btn-primary" data-confirm-action="cancel">Done</button>
+      `,
+      onAction: (action) => {
+        if (action === 'clear') {
+          localStorage.removeItem(LOG_KEY);
+          api.notify('Logs cleared', 'success');
+        }
+      }
+    });
+  }
+
+  // ─────────────────────────────────────────────
+  // MENUS / TOASTS
+  // ─────────────────────────────────────────────
+
+  function openActionMenu(anchor, id) {
+    closeActionMenu();
+
+    const entry = api.registry.getAll().find(p => p.id === id);
+    if (!entry) return;
+
+    const rect = anchor.getBoundingClientRect();
+    const canReload = entry.enabled && entry.id !== SELF_ID;
+    const isSelf = entry.id === SELF_ID;
+
+    activeMenu = document.createElement('div');
+    activeMenu.className = 'pm-action-menu';
+    activeMenu.innerHTML = `
+      <button class="pm-menu-item" data-menu-action="details" data-id="${escapeAttr(id)}">View Details</button>
+      <button class="pm-menu-item" data-menu-action="check-update" data-id="${escapeAttr(id)}">Check for Update</button>
+      ${canReload ? `<button class="pm-menu-item" data-menu-action="reload" data-id="${escapeAttr(id)}">Reload</button>` : ''}
+      <div class="pm-menu-separator"></div>
+      <button class="pm-menu-item" data-menu-action="logs" data-id="${escapeAttr(id)}">View Logs</button>
+      <button class="pm-menu-item" data-menu-action="reset-layout" data-id="${escapeAttr(id)}">Reset Manager Layout</button>
+      ${isSelf ? '' : '<div class="pm-menu-separator"></div>'}
+      ${isSelf ? '' : `<button class="pm-menu-item danger" data-menu-action="delete" data-id="${escapeAttr(id)}">Delete Plugin</button>`}
+    `;
+
+    document.documentElement.appendChild(activeMenu);
+    const menuRect = activeMenu.getBoundingClientRect();
+    activeMenu.style.left = Math.min(rect.right - menuRect.width, window.innerWidth - menuRect.width - 12) + 'px';
+    activeMenu.style.top = Math.min(rect.bottom + 8, window.innerHeight - menuRect.height - 12) + 'px';
+
+    activeMenu.addEventListener('click', async (e) => {
+      const btn = e.target.closest('[data-menu-action]');
+      if (!btn) return;
+      const action = btn.dataset.menuAction;
+      const targetId = btn.dataset.id;
+      closeActionMenu();
+      await handleMenuAction(action, targetId);
+    });
+  }
+
+  function closeActionMenu() {
+    if (activeMenu) {
+      activeMenu.remove();
+      activeMenu = null;
+    }
+  }
+
+  function showUndoToast(message, actionText, onAction) {
+    const toast = document.createElement('div');
+    toast.className = 'pm-toast';
+    toast.innerHTML = `<span>${escapeHTML(message)}</span><button>${escapeHTML(actionText)}</button>`;
+    document.documentElement.appendChild(toast);
+
+    let done = false;
+    const timer = setTimeout(() => {
+      if (!done) toast.remove();
+    }, 8000);
+
+    toast.querySelector('button').onclick = async () => {
+      done = true;
+      clearTimeout(timer);
+      toast.remove();
+      await onAction?.();
+    };
+  }
+
+  // ─────────────────────────────────────────────
+  // COMMUNITY CACHE / META
+  // ─────────────────────────────────────────────
+
+  function loadCommunityFromCache() {
+    try {
+      const cached = JSON.parse(localStorage.getItem(COMMUNITY_CACHE_KEY) || 'null');
+      if (cached?.items?.length) {
+        communityCache = cached.items;
+      }
+    } catch {
+      communityCache = [];
+    }
+  }
+
+  function isCommunityCacheStale() {
+    try {
+      const cached = JSON.parse(localStorage.getItem(COMMUNITY_CACHE_KEY) || 'null');
+      return !cached?.time || Date.now() - cached.time > CACHE_TIMEOUT;
+    } catch {
+      return true;
+    }
+  }
+
+  async function refreshCommunityCache() {
+    const res = await fetch(COMMUNITY_URL, { cache: 'no-cache' });
+    if (!res.ok) throw new Error(`Community HTTP ${res.status}`);
+    const items = await res.json();
+    communityCache = Array.isArray(items) ? items : [];
+    localStorage.setItem(COMMUNITY_CACHE_KEY, JSON.stringify({ time: Date.now(), items: communityCache }));
+    return communityCache;
+  }
+
+  async function fetchRemoteMeta(url) {
+    if (!url || url.startsWith('blob:') || url.startsWith('data:')) return null;
+
+    try {
+      const res = await fetch(url + (url.includes('?') ? '&' : '?') + 't=' + Date.now());
+      if (!res.ok) return { __error: true, status: res.status };
+      const code = await res.text();
+      const metaMatch = code.match(/export const meta\s*=\s*(\{[\s\S]*?\})(?:;|$)/);
+      if (!metaMatch) return null;
+      return new Function(`return ${metaMatch[1]}`)();
+    } catch (e) {
+      console.error('Fetch failed for:', url, e);
+      return { __error: true, message: e.message };
+    }
+  }
+
+  function getRemoteUrl(entry = {}) {
+    if (entry.originalUrl && !entry.originalUrl.startsWith('blob:') && !entry.originalUrl.startsWith('data:')) return entry.originalUrl;
+    if (entry.url && !entry.url.startsWith('blob:') && !entry.url.startsWith('data:')) return entry.url;
+    return null;
+  }
+
+  // ─────────────────────────────────────────────
+  // STATE / STATUS
+  // ─────────────────────────────────────────────
+
+  function setPluginStatus(pluginId, status, error = null) {
+    const registry = api.registry.getAll();
+    const entry = registry.find(p => p.id === pluginId);
+    if (!entry) return;
+
+    const prev = entry.status || 'unknown';
+    entry.status = status;
+    entry.error = error || null;
+
+    if (status === 'failed') entry.lastFailedAt = Date.now();
+    if (status === 'active') entry.lastLoadedAt = Date.now();
+
+    api.registry.save(registry);
+    api.bus.emit('pm:status-change', { id: pluginId, from: prev, to: status, ...(error ? { error } : {}) });
+  }
+
+  function getPluginStatus(entry = {}) {
+    if (entry.status === 'installing' || entry.status === 'updating' || entry.status === 'failed' || entry.status === 'blocked') return entry.status;
+    return entry.enabled ? 'active' : 'disabled';
+  }
+
+  function isBusy(entry = {}) {
+    return entry.status === 'installing' || entry.status === 'updating';
+  }
+
+  function handlePluginFailure(id, err, fallback = 'Plugin failed') {
+    const count = incrementCrash(id, true);
+    const shouldBlock = count >= 3;
+
+    if (shouldBlock) {
+      blockPlugin(id, err.message || fallback);
+      api.notify('Plugin blocked after repeated failures', 'error');
+    } else {
+      setPluginStatus(id, 'failed', err.message || fallback);
+      api.notify(fallback, 'error');
+    }
+
+    log('pm:plugin-fail', { id, error: err.message, crashCount: count });
+  }
+
+  function incrementCrash(id, failed) {
+    const registry = api.registry.getAll();
+    const entry = registry.find(p => p.id === id);
+    if (!entry) return 0;
+
+    if (failed) {
+      entry.crashCount = Number(entry.crashCount || 0) + 1;
+      entry.lastFailedAt = Date.now();
+    } else {
+      entry.crashCount = 0;
+      entry.lastLoadedAt = Date.now();
+    }
+
+    api.registry.save(registry);
+    return Number(entry.crashCount || 0);
+  }
+
+  async function blockPlugin(id, error) {
+    const registry = api.registry.getAll();
+    const entry = registry.find(p => p.id === id);
+    if (!entry) return;
+
+    const wasEnabled = Boolean(entry.enabled);
+
+    entry.enabled = false;
+    entry.status = 'blocked';
+    entry.error = error || 'Blocked after repeated failures';
+    entry.lastFailedAt = Date.now();
+
+    api.registry.save(registry);
+
+    try {
+      if (wasEnabled && typeof api.togglePlugin === 'function') {
+        // api.togglePlugin flips current registry state, so only use it if the core still has it loaded.
+        // If this fails, the registry state above still protects the next boot.
+        await api.togglePlugin(id);
+        const fresh = api.registry.getAll();
+        const freshEntry = fresh.find(p => p.id === id);
+        if (freshEntry) {
+          freshEntry.enabled = false;
+          freshEntry.status = 'blocked';
+          freshEntry.error = error || 'Blocked after repeated failures';
+          api.registry.save(fresh);
+        }
+      }
+    } catch {}
+  }
+
+  // ─────────────────────────────────────────────
+  // HELPERS
+  // ─────────────────────────────────────────────
+
+  function hasPluginUpdate(entry = {}, remoteMeta = null) {
+    const installed = entry.version || '0.0.0';
+    const remote = remoteMeta?.version || entry.remoteVersion || null;
+    if (!remote) return false;
+    return compareVersions(remote, installed) > 0;
+  }
+
+  function compareVersions(a = '0.0.0', b = '0.0.0') {
+    const pa = String(a).split(/[.-]/).map(n => parseInt(n, 10) || 0);
+    const pb = String(b).split(/[.-]/).map(n => parseInt(n, 10) || 0);
+    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+      if ((pa[i] || 0) > (pb[i] || 0)) return 1;
+      if ((pa[i] || 0) < (pb[i] || 0)) return -1;
+    }
+    return 0;
+  }
+
+  function isCompatible(range) {
+    if (!range) return true;
+    const normalized = String(range).trim();
+    const match = normalized.match(/^>=\s*([0-9]+(?:\.[0-9]+){0,2})/);
+    if (match) return compareVersions(CORE_VERSION, match[1]) >= 0;
+    const exact = normalized.match(/^([0-9]+(?:\.[0-9]+){0,2})$/);
+    if (exact) return compareVersions(CORE_VERSION, exact[1]) === 0;
+    return true;
+  }
+
+  function normalizePermissions(perms = []) {
+    if (!Array.isArray(perms)) return [];
+    return [...new Set(perms.map(p => String(p).trim()).filter(Boolean))];
+  }
+
+  function inferPermissions(p = {}) {
+    const category = normalizeCategory(p.category);
+    const perms = ['ui'];
+    if (/note|todo|kanban|planner|password|counter|quote|timer|clock/i.test(`${p.id} ${p.name} ${p.description}`)) perms.push('storage');
+    if (/theme|layout|manager|enhancer/i.test(`${p.id} ${p.name} ${p.description}`)) perms.push('global-css');
+    if (category === 'system') perms.push('registry', 'system');
+    if (/api|quote|community|network/i.test(`${p.id} ${p.name} ${p.description}`)) perms.push('network');
+    return normalizePermissions(perms);
+  }
+
+  function permissionBadgeHTML(permission) {
+    const risky = ['network', 'global-css', 'registry', 'system'].includes(permission);
+    return `<span class="perm-badge ${risky ? 'risky' : ''}">${escapeHTML(permissionLabel(permission))}</span>`;
+  }
+
+  function permissionLabel(permission) {
+    const labels = {
+      ui: 'UI',
+      storage: 'Storage',
+      network: 'Network',
+      clipboard: 'Clipboard',
+      'global-css': 'Global CSS',
+      registry: 'Registry',
+      system: 'System',
+      layout: 'Layout',
+      theme: 'Theme'
+    };
+    return labels[permission] || permission;
+  }
+
+  function statusBadgeHTML(status, isSystem) {
+    if (status === 'installing') return '<span class="plugin-badge badge-installing">Installing…</span>';
+    if (status === 'updating') return '<span class="plugin-badge badge-updating">Updating…</span>';
+    if (status === 'failed') return '<span class="plugin-badge badge-failed">Failed</span>';
+    if (status === 'blocked') return '<span class="plugin-badge badge-blocked">Blocked</span>';
+    if (status === 'disabled') return '<span class="plugin-badge badge-disabled">Inactive</span>';
+    return `<span class="plugin-badge ${isSystem ? 'badge-system' : 'badge-enabled'}">${isSystem ? 'System' : 'Active'}</span>`;
+  }
+
+  function getTrustLabel(p = {}) {
+    if (p.id === SELF_ID || p.source === 'system' || p.trust === 'official') return 'Official';
+    if (p.source === 'manual' || p.trust === 'manual') return 'Manual URL';
+    if (p.source === 'local' || p.trust === 'local') return 'Local';
+    return 'Community';
+  }
+
+  function isSystemPlugin(plugin = {}) {
+    if (plugin.id === SELF_ID) return true;
+    if (plugin.category === 'system') return true;
+    if (plugin.permissions?.includes?.('system')) return true;
+    const communityPlugin = communityCache.find(c => c.id === plugin.id);
+    return communityPlugin?.category === 'system';
+  }
+
+  function normalizeCategory(category) {
+    const c = String(category || '').toLowerCase().trim();
+    if (['productivity', 'developer', 'utilities', 'design', 'system'].includes(c)) return c;
+    return 'utilities';
+  }
+
+  function categoryLabel(category) {
+    return {
+      productivity: 'Productivity',
+      developer: 'Developer',
+      utilities: 'Utilities',
+      design: 'Design',
+      system: 'System'
+    }[category] || 'Utilities';
+  }
+
+  function isPluginNew(pluginDate) {
+    if (!pluginDate) return false;
+    const published = new Date(pluginDate).getTime();
+    if (!Number.isFinite(published)) return false;
+    return Date.now() - published < 6 * 24 * 60 * 60 * 1000;
+  }
+
+  function getCommunityIcon(id) {
+    const c = communityCache.find(p => p.id === id);
+    return c?.icon || null;
+  }
+
+  function pickColor(id = '') {
+    const colors = ['#007AFF', '#5856D6', '#AF52DE', '#FF2D55', '#FF9500', '#34C759'];
+    return colors[String(id).length % colors.length];
+  }
+
+  function iconHTML(icon, alt) {
+    const value = String(icon || '📦');
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      return `<img src="${escapeAttr(value)}" alt="${escapeAttr(alt)}" style="width:100%;height:100%;border-radius:10px;object-fit:cover;">`;
+    }
+    return escapeHTML(value);
+  }
+
+  function clearSearch() {
+    globalSearch = '';
+    const input = root.querySelector('#pm-search');
+    const clear = root.querySelector('#pm-search-clear');
+    if (input) input.value = '';
+    clear?.classList.remove('visible');
+    renderInstalled();
+    renderCommunity();
+  }
+
+  function skeletonHTML(count = 3) {
+    return Array.from({ length: count }, () => '<div class="pm-skeleton-card"></div>').join('');
+  }
+
+  function emptyStateHTML(title, subtitle, action = '') {
+    return `<div class="pm-empty-state"><div class="pm-empty-title">${escapeHTML(title)}</div><div class="pm-empty-subtitle">${escapeHTML(subtitle)}</div>${action}</div>`;
+  }
+
+  function updateBadge(count) {
+    updateCount = count;
+    const badge = root.querySelector('#update-badge-count');
+    if (!badge) return;
+    if (count > 0) {
+      badge.textContent = count;
+      badge.style.display = 'inline-flex';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  function setButtonBusy(btn, text = 'Working…') {
+    if (!btn) return;
+    btn.dataset.prevHtml = btn.innerHTML;
+    btn.disabled = true;
+    if (text) btn.textContent = text;
+  }
+
+  function resetButton(btn, html = null) {
+    if (!btn) return;
+    btn.disabled = false;
+    btn.innerHTML = html || btn.dataset.prevHtml || btn.innerHTML;
+  }
+
+  function timeAgo(timestamp) {
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+    if (seconds < 30) return 'just now';
+    if (seconds < 60) return 'a few seconds ago';
+    if (seconds < 3600) return Math.floor(seconds / 60) + ' min ago';
+    if (seconds < 86400) return Math.floor(seconds / 3600) + ' hr ago';
+    return Math.floor(seconds / 86400) + ' days ago';
+  }
+
+  function estimatePluginStorage(id) {
+    let bytes = 0;
+    const prefix = `plugin:${id}:`;
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith(prefix)) bytes += key.length + (localStorage.getItem(key) || '').length;
+    }
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  }
+
+  function purgePluginData(id) {
+    const prefix = `plugin:${id}:`;
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith(prefix)) localStorage.removeItem(key);
+    });
+    log('pm:purge-data', { id });
+  }
+
+  function log(event, data = null) {
+    try {
+      const logs = getLogs();
+      logs.push({ time: Date.now(), event, data });
+      localStorage.setItem(LOG_KEY, JSON.stringify(logs.slice(-100)));
+    } catch {}
+  }
+
+  function getLogs() {
+    try {
+      return JSON.parse(localStorage.getItem(LOG_KEY) || '[]');
+    } catch {
+      return [];
+    }
+  }
+
+  function escapeHTML(value = '') {
+    return String(value)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+  }
+
+  function escapeAttr(value = '') {
+    return escapeHTML(value).replaceAll('`', '&#096;');
+  }
+
+  // ─────────────────────────────────────────────
+  // ICONS
+  // ─────────────────────────────────────────────
+
+  function iconGrid() {
+    return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>';
+  }
+
+  function iconGlobe() {
+    return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>';
+  }
+
+  function iconSearch() {
+    return '<svg class="pm-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>';
+  }
+
+  function iconBook() {
+    return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>';
+  }
+
+  function iconRefresh(size = 16) {
+    return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>`;
+  }
 }
 
 export function teardown() {
+  if (activeMenu) {
+    activeMenu.remove();
+    activeMenu = null;
+  }
+
   if (root) {
     root.remove();
     root = null;

@@ -6,7 +6,15 @@
     "author": "Empty",
     "description": "A friendly about widget to get you started with Blank Board.",
     "icon": "👋",
-    "date": "2026-04-05"
+    "date": "2026-04-05",
+    "category": "utilities",
+    "permissions": [
+      "ui"
+    ],
+    "compat": ">=4.0.0",
+    "trust": "community",
+    "changelog": "https://github.com/dheeraz101/Empty_Plugins/releases",
+    "version": "0.1.0"
   },
   {
     "id": "layout-engine",
@@ -15,7 +23,16 @@
     "author": "Dheeraz",
     "description": "Advanced layout engine with column presets, resizers, and drag-to-zone support.",
     "icon": "📐",
-    "date": "2024-02-15"
+    "date": "2024-02-15",
+    "category": "utilities",
+    "permissions": [
+      "ui",
+      "global-css"
+    ],
+    "compat": ">=4.0.0",
+    "trust": "community",
+    "changelog": "https://github.com/dheeraz101/Empty_Plugins/releases",
+    "version": "0.1.0"
   },
   {
     "id": "clock-widget",
@@ -24,7 +41,15 @@
     "author": "Dheeraz",
     "description": "Beautiful analog & digital clock widget with multiple styles.",
     "icon": "⏰",
-    "date": "2024-02-20"
+    "date": "2024-02-20",
+    "category": "utilities",
+    "permissions": [
+      "ui"
+    ],
+    "compat": ">=4.0.0",
+    "trust": "community",
+    "changelog": "https://github.com/dheeraz101/Empty_Plugins/releases",
+    "version": "0.1.0"
   },
   {
     "id": "notes-widget",
@@ -33,7 +58,16 @@
     "author": "Dheeraz",
     "description": "Quick sticky notes with auto-save and rich text support.",
     "icon": "📝",
-    "date": "2024-03-01"
+    "date": "2024-03-01",
+    "category": "productivity",
+    "permissions": [
+      "ui",
+      "storage"
+    ],
+    "compat": ">=4.0.0",
+    "trust": "community",
+    "changelog": "https://github.com/dheeraz101/Empty_Plugins/releases",
+    "version": "0.1.0"
   },
   {
     "id": "sample-theme",
@@ -42,7 +76,16 @@
     "author": "Dheeraz",
     "description": "A sample theme plugin to demonstrate how to create and apply custom themes in Blank Board.",
     "icon": "🎨",
-    "date": "2024-03-10"
+    "date": "2024-03-10",
+    "category": "design",
+    "permissions": [
+      "ui",
+      "global-css"
+    ],
+    "compat": ">=4.0.0",
+    "trust": "community",
+    "changelog": "https://github.com/dheeraz101/Empty_Plugins/releases",
+    "version": "0.1.0"
   },
   {
     "id": "music-player",
@@ -51,7 +94,16 @@
     "author": "Dheeraz",
     "description": "A music player plugin with playlist support.",
     "icon": "🎵",
-    "date": "2024-03-15"
+    "date": "2024-03-15",
+    "category": "utilities",
+    "permissions": [
+      "ui",
+      "storage"
+    ],
+    "compat": ">=4.0.0",
+    "trust": "community",
+    "changelog": "https://github.com/dheeraz101/Empty_Plugins/releases",
+    "version": "0.1.0"
   },
   {
     "id": "plugin-builder",
@@ -61,7 +113,16 @@
     "description": "A plugin builder to help you create your own plugins for Blank Board.",
     "icon": "🔨",
     "category": "system",
-    "date": "2024-03-20"
+    "date": "2024-03-20",
+    "permissions": [
+      "ui",
+      "registry",
+      "system"
+    ],
+    "compat": ">=4.0.0",
+    "trust": "official",
+    "changelog": "https://github.com/dheeraz101/Empty_Plugins/releases",
+    "version": "0.1.0"
   },
   {
     "id": "pm-enhancer",
@@ -71,7 +132,17 @@
     "description": "Advanced plugin manager with grid/list views, search, active/paused categories, and polished community store.",
     "icon": "⚡",
     "category": "system",
-    "date": "2024-03-25"
+    "date": "2024-03-25",
+    "permissions": [
+      "ui",
+      "global-css",
+      "registry",
+      "system"
+    ],
+    "compat": ">=4.0.0",
+    "trust": "official",
+    "changelog": "https://github.com/dheeraz101/Empty_Plugins/releases",
+    "version": "0.1.0"
   },
   {
     "id": "pomodoro-timer",
@@ -80,7 +151,17 @@
     "author": "Dheeraz",
     "description": "Focus timer with 25-min work sessions and 5-min breaks. Tracks completed sessions.",
     "icon": "🍅",
-    "date": "2024-04-01"
+    "date": "2024-04-01",
+    "category": "productivity",
+    "permissions": [
+      "ui",
+      "storage",
+      "global-css"
+    ],
+    "compat": ">=4.0.0",
+    "trust": "community",
+    "changelog": "https://github.com/dheeraz101/Empty_Plugins/releases",
+    "version": "0.1.0"
   },
   {
     "id": "calculator",
@@ -89,7 +170,15 @@
     "author": "Dheeraz",
     "description": "A sleek calculator with basic arithmetic operations and expression display.",
     "icon": "🔢",
-    "date": "2024-04-05"
+    "date": "2024-04-05",
+    "category": "utilities",
+    "permissions": [
+      "ui"
+    ],
+    "compat": ">=4.0.0",
+    "trust": "community",
+    "changelog": "https://github.com/dheeraz101/Empty_Plugins/releases",
+    "version": "0.1.0"
   },
   {
     "id": "todo-list",
@@ -98,7 +187,16 @@
     "author": "Dheeraz",
     "description": "Manage tasks with auto-save, completion tracking, and event bus integration.",
     "icon": "✅",
-    "date": "2024-04-10"
+    "date": "2024-04-10",
+    "category": "productivity",
+    "permissions": [
+      "ui",
+      "storage"
+    ],
+    "compat": ">=4.0.0",
+    "trust": "community",
+    "changelog": "https://github.com/dheeraz101/Empty_Plugins/releases",
+    "version": "0.1.0"
   },
   {
     "id": "color-picker",
@@ -107,7 +205,15 @@
     "author": "Dheeraz",
     "description": "Pick colors with RGB sliders and copy hex values to clipboard.",
     "icon": "🎨",
-    "date": "2024-04-15"
+    "date": "2024-04-15",
+    "category": "design",
+    "permissions": [
+      "ui"
+    ],
+    "compat": ">=4.0.0",
+    "trust": "community",
+    "changelog": "https://github.com/dheeraz101/Empty_Plugins/releases",
+    "version": "0.1.0"
   },
   {
     "id": "stopwatch",
@@ -116,7 +222,16 @@
     "author": "Dheeraz",
     "description": "Precision stopwatch with start/stop, lap tracking, and centisecond display.",
     "icon": "⏱️",
-    "date": "2024-04-20"
+    "date": "2024-04-20",
+    "category": "utilities",
+    "permissions": [
+      "ui",
+      "storage"
+    ],
+    "compat": ">=4.0.0",
+    "trust": "community",
+    "changelog": "https://github.com/dheeraz101/Empty_Plugins/releases",
+    "version": "0.1.0"
   },
   {
     "id": "dice-roller",
@@ -125,7 +240,16 @@
     "author": "Dheeraz",
     "description": "Roll polyhedral dice (d4-d100) with roll history tracking.",
     "icon": "🎲",
-    "date": "2024-04-25"
+    "date": "2024-04-25",
+    "category": "utilities",
+    "permissions": [
+      "ui",
+      "storage"
+    ],
+    "compat": ">=4.0.0",
+    "trust": "community",
+    "changelog": "https://github.com/dheeraz101/Empty_Plugins/releases",
+    "version": "0.1.0"
   },
   {
     "id": "countdown-timer",
@@ -134,7 +258,16 @@
     "author": "Dheeraz",
     "description": "Set custom countdowns with hours, minutes, and seconds. Notifies when done.",
     "icon": "⏳",
-    "date": "2024-05-01"
+    "date": "2024-05-01",
+    "category": "utilities",
+    "permissions": [
+      "ui",
+      "storage"
+    ],
+    "compat": ">=4.0.0",
+    "trust": "community",
+    "changelog": "https://github.com/dheeraz101/Empty_Plugins/releases",
+    "version": "0.1.0"
   },
   {
     "id": "random-quote",
@@ -143,7 +276,16 @@
     "author": "Dheeraz",
     "description": "Get inspired with random quotes from famous thinkers and developers.",
     "icon": "💬",
-    "date": "2024-05-05"
+    "date": "2024-05-05",
+    "category": "developer",
+    "permissions": [
+      "ui",
+      "network"
+    ],
+    "compat": ">=4.0.0",
+    "trust": "community",
+    "changelog": "https://github.com/dheeraz101/Empty_Plugins/releases",
+    "version": "0.1.0"
   },
   {
     "id": "unit-converter",
@@ -152,7 +294,15 @@
     "author": "Dheeraz",
     "description": "Convert between length, weight, temperature, and speed units.",
     "icon": "🔄",
-    "date": "2024-05-10"
+    "date": "2024-05-10",
+    "category": "utilities",
+    "permissions": [
+      "ui"
+    ],
+    "compat": ">=4.0.0",
+    "trust": "community",
+    "changelog": "https://github.com/dheeraz101/Empty_Plugins/releases",
+    "version": "0.1.0"
   },
   {
     "id": "markdown-previewer",
@@ -161,7 +311,16 @@
     "author": "Dheeraz",
     "description": "Write and preview Markdown with split-view editing and syntax highlighting.",
     "icon": "📄",
-    "date": "2024-05-15"
+    "date": "2024-05-15",
+    "category": "developer",
+    "permissions": [
+      "ui",
+      "storage"
+    ],
+    "compat": ">=4.0.0",
+    "trust": "community",
+    "changelog": "https://github.com/dheeraz101/Empty_Plugins/releases",
+    "version": "0.1.0"
   },
   {
     "id": "json-formatter",
@@ -170,7 +329,16 @@
     "author": "Dheeraz",
     "description": "Format, validate, and syntax-highlight JSON with minify and copy support.",
     "icon": "📋",
-    "date": "2024-05-20"
+    "date": "2024-05-20",
+    "category": "developer",
+    "permissions": [
+      "ui",
+      "storage"
+    ],
+    "compat": ">=4.0.0",
+    "trust": "community",
+    "changelog": "https://github.com/dheeraz101/Empty_Plugins/releases",
+    "version": "0.1.0"
   },
   {
     "id": "base64-tool",
@@ -179,7 +347,15 @@
     "author": "Dheeraz",
     "description": "Encode and decode Base64 strings with a clean split-panel interface.",
     "icon": "🔐",
-    "date": "2024-05-25"
+    "date": "2024-05-25",
+    "category": "developer",
+    "permissions": [
+      "ui"
+    ],
+    "compat": ">=4.0.0",
+    "trust": "community",
+    "changelog": "https://github.com/dheeraz101/Empty_Plugins/releases",
+    "version": "0.1.0"
   },
   {
     "id": "password-generator",
@@ -188,7 +364,16 @@
     "author": "Dheeraz",
     "description": "Generate secure passwords with customizable length, character types, and strength meter.",
     "icon": "🔑",
-    "date": "2024-06-01"
+    "date": "2024-06-01",
+    "category": "utilities",
+    "permissions": [
+      "ui",
+      "storage"
+    ],
+    "compat": ">=4.0.0",
+    "trust": "community",
+    "changelog": "https://github.com/dheeraz101/Empty_Plugins/releases",
+    "version": "0.1.0"
   },
   {
     "id": "text-counter",
@@ -197,7 +382,16 @@
     "author": "Dheeraz",
     "description": "Count words, characters, lines, sentences, and estimate reading time.",
     "icon": "📊",
-    "date": "2024-06-05"
+    "date": "2024-06-05",
+    "category": "utilities",
+    "permissions": [
+      "ui",
+      "storage"
+    ],
+    "compat": ">=4.0.0",
+    "trust": "community",
+    "changelog": "https://github.com/dheeraz101/Empty_Plugins/releases",
+    "version": "0.1.0"
   },
   {
     "id": "emoji-keyboard",
@@ -206,7 +400,15 @@
     "author": "Dheeraz",
     "description": "Browse and copy emojis by category with a searchable grid interface.",
     "icon": "😀",
-    "date": "2024-06-10"
+    "date": "2024-06-10",
+    "category": "design",
+    "permissions": [
+      "ui"
+    ],
+    "compat": ">=4.0.0",
+    "trust": "community",
+    "changelog": "https://github.com/dheeraz101/Empty_Plugins/releases",
+    "version": "0.1.0"
   },
   {
     "id": "drawing-canvas",
@@ -215,7 +417,16 @@
     "author": "Dheeraz",
     "description": "Freehand drawing with pen/eraser, color palette, and adjustable brush size.",
     "icon": "🖌️",
-    "date": "2024-06-15"
+    "date": "2024-06-15",
+    "category": "design",
+    "permissions": [
+      "ui",
+      "storage"
+    ],
+    "compat": ">=4.0.0",
+    "trust": "community",
+    "changelog": "https://github.com/dheeraz101/Empty_Plugins/releases",
+    "version": "0.1.0"
   },
   {
     "id": "kanban-board",
@@ -224,7 +435,16 @@
     "author": "Dheeraz",
     "description": "Drag-and-drop task management with To Do, In Progress, and Done columns.",
     "icon": "📌",
-    "date": "2024-06-20"
+    "date": "2024-06-20",
+    "category": "productivity",
+    "permissions": [
+      "ui",
+      "storage"
+    ],
+    "compat": ">=4.0.0",
+    "trust": "community",
+    "changelog": "https://github.com/dheeraz101/Empty_Plugins/releases",
+    "version": "0.1.0"
   },
   {
     "id": "daily-planner",
@@ -233,7 +453,16 @@
     "author": "Dheeraz",
     "description": "Plan your day hour by hour with event creation and current-time highlighting.",
     "icon": "📅",
-    "date": "2024-06-25"
+    "date": "2024-06-25",
+    "category": "productivity",
+    "permissions": [
+      "ui",
+      "storage"
+    ],
+    "compat": ">=4.0.0",
+    "trust": "community",
+    "changelog": "https://github.com/dheeraz101/Empty_Plugins/releases",
+    "version": "0.1.0"
   },
   {
     "id": "world-clock",
@@ -242,7 +471,15 @@
     "author": "Dheeraz",
     "description": "View live times across multiple cities and timezones with auto-refresh.",
     "icon": "🌍",
-    "date": "2024-07-01"
+    "date": "2024-07-01",
+    "category": "utilities",
+    "permissions": [
+      "ui"
+    ],
+    "compat": ">=4.0.0",
+    "trust": "community",
+    "changelog": "https://github.com/dheeraz101/Empty_Plugins/releases",
+    "version": "0.1.0"
   },
   {
     "id": "dark-theme",
@@ -251,7 +488,16 @@
     "author": "Dheeraz",
     "description": "Apply a sleek dark theme to the entire board with subtle grid lines.",
     "icon": "🌙",
-    "date": "2024-07-05"
+    "date": "2024-07-05",
+    "category": "design",
+    "permissions": [
+      "ui",
+      "global-css"
+    ],
+    "compat": ">=4.0.0",
+    "trust": "community",
+    "changelog": "https://github.com/dheeraz101/Empty_Plugins/releases",
+    "version": "0.1.0"
   },
   {
     "id": "rollback-manager",
@@ -261,7 +507,17 @@
     "description": "Version rollback for plugins with confirmation dialog. Injects rollback buttons into Plugin Manager.",
     "icon": "↩️",
     "category": "system",
-    "date": "2024-07-10"
+    "date": "2024-07-10",
+    "permissions": [
+      "ui",
+      "global-css",
+      "registry",
+      "system"
+    ],
+    "compat": ">=4.0.0",
+    "trust": "official",
+    "changelog": "https://github.com/dheeraz101/Empty_Plugins/releases",
+    "version": "0.1.0"
   },
   {
     "id": "logger",
@@ -271,7 +527,17 @@
     "description": "Records plugin lifecycle events. Adds a Logs button to Plugin Manager.",
     "icon": "📋",
     "category": "system",
-    "date": "2026-04-06"
+    "date": "2026-04-06",
+    "permissions": [
+      "ui",
+      "global-css",
+      "registry",
+      "system"
+    ],
+    "compat": ">=4.0.0",
+    "trust": "official",
+    "changelog": "https://github.com/dheeraz101/Empty_Plugins/releases",
+    "version": "0.1.0"
   },
   {
     "id": "focus",
@@ -280,6 +546,17 @@
     "author": "Dheeraz",
     "description": "Focuses on the current plugin. Adds a Focus button to Plugin Manager.",
     "icon": "🔍",
-    "date": "2024-07-20"
+    "date": "2024-07-20",
+    "category": "system",
+    "permissions": [
+      "ui",
+      "global-css",
+      "registry",
+      "system"
+    ],
+    "compat": ">=4.0.0",
+    "trust": "official",
+    "changelog": "https://github.com/dheeraz101/Empty_Plugins/releases",
+    "version": "0.1.0"
   }
 ]
