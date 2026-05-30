@@ -126,23 +126,17 @@
   },
   {
     "id": "pm-enhancer",
-    "name": "Plugin Manager Enhancer",
-    "url": "https://raw.githubusercontent.com/dheeraz101/Plugins/refs/heads/main/plugin-manager-enhancer.js",
+    "name": "PM Enhancer",
+    "url": "https://raw.githubusercontent.com/dheeraz101/Empty_Plugins/refs/heads/main/plugin-manager-enhancer.js",
     "author": "Dheeraz",
-    "description": "Advanced plugin manager with grid/list views, search, active/paused categories, and polished community store.",
+    "description": "A refined visual polish layer for Plugin Manager.",
     "icon": "⚡",
     "category": "system",
-    "date": "2024-03-25",
-    "permissions": [
-      "ui",
-      "global-css",
-      "registry",
-      "system"
-    ],
-    "compat": ">=4.0.0",
     "trust": "official",
-    "changelog": "https://github.com/dheeraz101/Empty_Plugins/releases",
-    "version": "0.1.0"
+    "version": "3.1.0",
+    "compat": ">=4.0.0",
+    "permissions": ["ui", "globalCSS", "bus"],
+    "date": "2026-04-08"
   },
   {
     "id": "pomodoro-timer",
