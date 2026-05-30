@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '5.5.9-v4',
+  version: '5.6.0-v4',
   compat: '>=4.0.0',
   permissions: [
     'ui',
@@ -129,20 +129,19 @@ export function setup(api) {
     width: 220px;
     background: var(--pm-card);
     border-right: 1px solid rgba(0, 0, 0, 0.1);
-    padding: 32px 12px;
+    padding: 32px 12px 24px 12px;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
     height: 100%;
+    box-sizing: border-box;
   }
 
   .pm-sidebar-footer {
     margin-top: auto;
-    padding-bottom: 60px;
-    padding-top: 0px;
+    padding: 0 2px 0 2px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
   }
 
   .pm-tab {
@@ -163,32 +162,43 @@ export function setup(api) {
   .pm-tab:hover:not(.active) { background: rgba(0, 0, 0, 0.03); }
 
   .pm-search-sidebar {
-    padding: 0px 0px;
-    margin-bottom: 2px;
+    margin: 10px 0 12px 0;
     position: relative;
   }
 
   .pm-search-sidebar .pm-search-input {
-    height: 30px;
+    height: 34px;
     width: 100%;
-    padding: 0;
-    padding-left: 40px;
-    padding-right: 35px;
-    border: none;
-    border-radius: 0;
-    background: transparent;
+    padding: 0 34px 0 38px;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.045);
     font-size: 13.5px;
     font-weight: 500;
     color: #424245;
     outline: none;
+    box-sizing: border-box;
+    transition:
+      background 0.18s ease,
+      border-color 0.18s ease,
+      box-shadow 0.18s ease,
+      transform 0.18s ease;
   }
 
   .pm-search-sidebar .pm-search-input::placeholder {
     color: #86868b;
   }
 
+  .pm-search-sidebar .pm-search-input:hover {
+    background: rgba(0, 0, 0, 0.065);
+  }
+
   .pm-search-sidebar .pm-search-input:focus {
-    outline: none;
+    background: rgba(255, 255, 255, 0.72);
+    border-color: rgba(0, 113, 227, 0.42);
+    box-shadow:
+      0 0 0 3px rgba(0, 113, 227, 0.12),
+      0 6px 18px rgba(0, 0, 0, 0.06);
   }
 
   .pm-search-sidebar .pm-search-icon {
@@ -507,6 +517,33 @@ export function setup(api) {
   }
   .pm-btn-primary { background: #0071e3; color: white; }
   .pm-btn-primary:hover { background: #0077ed; }
+
+  .pm-btn-danger {
+    background: #ff3b30;
+    color: white;
+  }
+
+  .pm-btn-danger:hover {
+    background: #ff453a;
+  }
+
+  .pm-modal-message {
+    margin: -4px 0 18px 0;
+    font-size: 14px;
+    line-height: 1.45;
+    color: #6e6e73;
+  }
+
+  .pm-modal-warning-box {
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: rgba(255, 59, 48, 0.08);
+    border: 1px solid rgba(255, 59, 48, 0.16);
+    color: #b42318;
+    font-size: 13px;
+    line-height: 1.4;
+    margin-bottom: 16px;
+  }
   .pm-btn-secondary {
     background: color-mix(in srgb, var(--pm-card) 70%, black);
     border: 1px solid rgba(0,0,0,0.08);
@@ -526,9 +563,9 @@ export function setup(api) {
   .sidebar-footer-text {
     font-size: 12.8px;
     color: #86868b;
-    line-height: 1.4;
-    padding: 0 14px;
-    margin-bottom: 12px;
+    line-height: 1.42;
+    padding: 0 12px;
+    margin: 0 0 2px 0;
     font-weight: 400;
   }
 
@@ -536,13 +573,13 @@ export function setup(api) {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 10px 14px;
+    padding: 10px 12px;
     font-size: 13px;
     color: #0071e3;
     text-decoration: none;
     font-weight: 500;
-    border-radius: 10px;
-    transition: background 0.2s;
+    border-radius: 12px;
+    transition: background 0.2s, color 0.2s;
   }
   .docs-link:hover { background: rgba(0, 113, 227, 0.05); }
 
@@ -654,6 +691,16 @@ export function setup(api) {
         background-color: rgba(255, 255, 255, 0.35);
       }
 
+    .pm-modal-message {
+      color: #a1a1a6;
+    }
+
+    .pm-modal-warning-box {
+      background: rgba(255, 69, 58, 0.13);
+      border-color: rgba(255, 69, 58, 0.24);
+      color: #ff8a80;
+    }
+
     .pm-content {
       scrollbar-color: rgba(255,255,255,0.3) transparent;
     }
@@ -665,11 +712,41 @@ export function setup(api) {
     .pm-filter-btn { background: rgba(255,255,255,0.08); color: #a1a1a6; }
     .pm-filter-btn:hover { background: rgba(255,255,255,0.15); }
     .pm-filter-btn.active { background: #0071e3; color: white; }
-    .pm-search-sidebar .pm-search-input { color: #f5f5f7; }
-    .pm-search-sidebar .pm-search-input::placeholder { color: #6e6e73; }
-    .pm-search-sidebar .pm-search-icon { color: #a1a1a6; }
-    .pm-search-sidebar .pm-search-clear { background: rgba(255,255,255,0.15); color: #a1a1a6; }
-    .pm-search-sidebar .pm-search-clear:hover { background: rgba(255,255,255,0.25); color: #fff; }
+    .pm-search-sidebar .pm-search-input {
+      color: #f5f5f7;
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.08);
+    }
+
+    .pm-search-sidebar .pm-search-input::placeholder {
+      color: rgba(245, 245, 247, 0.48);
+    }
+
+    .pm-search-sidebar .pm-search-input:hover {
+      background: rgba(255, 255, 255, 0.105);
+    }
+
+    .pm-search-sidebar .pm-search-input:focus {
+      background: rgba(255, 255, 255, 0.13);
+      border-color: rgba(10, 132, 255, 0.55);
+      box-shadow:
+        0 0 0 3px rgba(10, 132, 255, 0.18),
+        0 8px 24px rgba(0, 0, 0, 0.16);
+    }
+
+    .pm-search-sidebar .pm-search-icon {
+      color: rgba(245, 245, 247, 0.58);
+    }
+
+    .pm-search-sidebar .pm-search-clear {
+      background: rgba(255, 255, 255, 0.14);
+      color: rgba(245, 245, 247, 0.72);
+    }
+
+    .pm-search-sidebar .pm-search-clear:hover {
+      background: rgba(255, 255, 255, 0.24);
+      color: #fff;
+    }
   }
 `;
   document.head.appendChild(style);
@@ -709,9 +786,9 @@ export function setup(api) {
         Developer Portal
       </a>
        <p class="sidebar-footer-text">Add, manage, and control your tools in one place. Plugins extend and reshape your workspace.</p>
-       <div style="padding: 0 12px 14px 12px;">
-         <button id="close-pm" class="pm-btn pm-btn-secondary" style="width: 100%">Close</button>
-       </div>
+        <div style="padding: 0 10px;">
+          <button id="close-pm" class="pm-btn pm-btn-secondary" style="width: 100%; height: 30px;">Close</button>
+        </div>
     </div>
   </div>
 
@@ -1048,6 +1125,69 @@ export function setup(api) {
 
     overlay.querySelector('#pm-cancel').onclick = () => overlay.remove();
 
+  }
+
+  function showConfirmModal({
+    title = 'Are you sure?',
+    message = '',
+    warning = '',
+    confirmText = 'Confirm',
+    cancelText = 'Cancel',
+    danger = false
+  } = {}) {
+    return new Promise((resolve) => {
+      const overlay = document.createElement('div');
+      overlay.className = 'pm-modal-overlay';
+      overlay.style.zIndex = '2147483647';
+
+      overlay.innerHTML = `
+        <div class="pm-modal-content">
+          <h3 class="pm-modal-title">${escapeHTML(title)}</h3>
+          ${message ? `<p class="pm-modal-message">${escapeHTML(message)}</p>` : ''}
+          ${warning ? `<div class="pm-modal-warning-box">${escapeHTML(warning)}</div>` : ''}
+          <div style="display:flex; gap:10px; margin-top:8px;">
+            <button class="pm-btn pm-btn-secondary" data-confirm-action="cancel" style="flex:1">${escapeHTML(cancelText)}</button>
+            <button class="pm-btn ${danger ? 'pm-btn-danger' : 'pm-btn-primary'}" data-confirm-action="confirm" style="flex:1">${escapeHTML(confirmText)}</button>
+          </div>
+        </div>
+      `;
+
+      function close(value) {
+        overlay.remove();
+        document.removeEventListener('keydown', onKeyDown);
+        resolve(value);
+      }
+
+      function onKeyDown(e) {
+        if (e.key === 'Escape') close(false);
+        if (e.key === 'Enter') close(true);
+      }
+
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+          close(false);
+          return;
+        }
+
+        const btn = e.target.closest('[data-confirm-action]');
+        if (!btn) return;
+
+        const action = btn.dataset.confirmAction;
+        close(action === 'confirm');
+      });
+
+      document.addEventListener('keydown', onKeyDown);
+      document.documentElement.appendChild(overlay);
+    });
+  }
+
+  function escapeHTML(value = '') {
+    return String(value)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
   }
 
   let remoteMetaCache = new Map();
@@ -1533,10 +1673,28 @@ export function setup(api) {
 
     if (btn.dataset.act === 'delete') {
       const dEntry = api.registry.getAll().find(p => p.id === id);
-      if (dEntry && isBusy(dEntry)) return;
+      if (!dEntry || isBusy(dEntry)) return;
+
+      const pluginName = dEntry.name || dEntry.id;
+
+      const confirmed = await showConfirmModal({
+        title: 'Delete Plugin?',
+        message: `You are about to delete "${pluginName}".`,
+        warning: 'This will remove the plugin from your board. Any plugin UI will be unloaded immediately. Plugin data may remain unless the core is configured to purge storage.',
+        confirmText: 'Delete',
+        cancelText: 'Cancel',
+        danger: true
+      });
+
+      if (!confirmed) {
+        api.bus.emit('pm:delete-cancelled', { id });
+        return;
+      }
+
       api.bus.emit('pm:delete', { id });
       await api.deletePlugin(id);
       cleanupPluginUI(id);
+      api.notify(`${pluginName} deleted`, 'success');
     }
 
     if (btn.dataset.act === 'reload') {
