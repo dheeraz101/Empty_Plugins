@@ -1,7 +1,7 @@
 export const meta = {
   id: 'about',
   name: 'About Blank Board',
-  version: '0.4.3',
+  version: '0.4.4',
   compat: '>=1.0.0'
 };
 
