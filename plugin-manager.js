@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '5.7.4-v4',
+  version: '5.7.6-v4',
   compat: '>=4.0.0',
   permissions: [
     'ui',
@@ -1204,15 +1204,46 @@ export function setup(api) {
     actions.appendChild(pluginIconRow);
 
     slots['sidebar-icons'] = pluginIconRow;
+
+    restoreRegisteredUI('sidebar-icons');
+
+    api.bus.emit('pm:ui-slots-ready', {
+      slots: Object.keys(slots)
+    });
   }
 
   function registerPluginManagerUI(slot, el, id, owner = SELF_ID) {
     if (!slot || !slots[slot] || !(el instanceof HTMLElement)) return false;
-    if (id) el.dataset.uiId = String(id);
-    el.dataset.owner = String(owner);
+
+    const safeOwner = String(owner || 'external');
+    const safeId = id ? String(id) : '';
+
+    // Replace old UI from the same owner/id instead of duplicating or keeping stale detached nodes.
+    if (safeId && slotRegistry.has(safeOwner)) {
+      const oldItems = slotRegistry.get(safeOwner) || [];
+      const kept = [];
+
+      oldItems.forEach(oldEl => {
+        if (oldEl?.dataset?.uiId === safeId) {
+          try { oldEl.remove(); } catch {}
+        } else {
+          kept.push(oldEl);
+        }
+      });
+
+      slotRegistry.set(safeOwner, kept);
+    }
+
+    if (safeId) el.dataset.uiId = safeId;
+    el.dataset.owner = safeOwner;
+    el.dataset.pmSlot = slot;
+    el.dataset.pluginOwner = safeOwner;
+
     slots[slot].appendChild(el);
-    if (!slotRegistry.has(owner)) slotRegistry.set(owner, []);
-    slotRegistry.get(owner).push(el);
+
+    if (!slotRegistry.has(safeOwner)) slotRegistry.set(safeOwner, []);
+    slotRegistry.get(safeOwner).push(el);
+
     return true;
   }
 
@@ -1221,6 +1252,41 @@ export function setup(api) {
     if (!items) return;
     items.forEach(el => { try { el.remove(); } catch {} });
     slotRegistry.delete(pluginId);
+  }
+
+  function restoreRegisteredUI(slotName = null) {
+    for (const [owner, items] of slotRegistry.entries()) {
+      const kept = [];
+
+      items.forEach(el => {
+        if (!el || !(el instanceof HTMLElement)) return;
+
+        const slot = el.dataset.pmSlot;
+        if (slotName && slot !== slotName) {
+          kept.push(el);
+          return;
+        }
+
+        const target = slots[slot];
+        if (!target) {
+          kept.push(el);
+          return;
+        }
+
+        try {
+          if (!el.isConnected) {
+            target.appendChild(el);
+          }
+          kept.push(el);
+        } catch {}
+      });
+
+      if (kept.length) {
+        slotRegistry.set(owner, kept);
+      } else {
+        slotRegistry.delete(owner);
+      }
+    }
   }
 
   // ─────────────────────────────────────────────
@@ -1412,7 +1478,8 @@ export function setup(api) {
     const updateBadge = hasUpdate ? '<span class="plugin-badge badge-update">Update Available</span>' : '';
     const systemBadge = isSystem ? '<span class="plugin-badge badge-system">System</span>' : '';
     const statusBadge = statusBadgeHTML(status, isSystem);
-    const permBadges = permissions.slice(0, 4).map(permissionBadgeHTML).join('');
+    const visiblePermissions = permissions.filter(permission => permission !== 'system');
+    const permBadges = visiblePermissions.slice(0, 4).map(permissionBadgeHTML).join('');
     const disabled = busy || incompatible || status === 'blocked';
 
     return `
@@ -1544,6 +1611,16 @@ export function setup(api) {
       e.preventDefault();
       e.stopPropagation();
       closeActionMenu();
+
+      if (btn.dataset.menuAction === 'external') {
+        await runExternalMenuAction(
+          btn.dataset.externalOwner,
+          btn.dataset.externalId,
+          btn.dataset.id
+        );
+        return;
+      }
+
       await handleMenuAction(btn.dataset.menuAction, btn.dataset.id);
       return;
     }
@@ -1571,10 +1648,6 @@ export function setup(api) {
   }
 
   async function handleMenuAction(action, id) {
-    if (action?.startsWith?.('external:')) {
-      const [, owner, actionId] = action.split(':');
-      return runExternalMenuAction(owner, actionId, id);
-    }
 
     if (action === 'details') return showPluginDetails(id);
     if (action === 'whats-new') return showWhatsNewModal(id);
@@ -1789,6 +1862,22 @@ export function setup(api) {
     setButtonBusy(btn, 'Updating…');
     setPluginStatus(id, 'updating');
 
+    log('pm:update-start', {
+      id,
+      from: entry.version || null,
+      to: remoteMeta.version || null,
+      url: getRemoteUrl(entry)
+    });
+
+    try {
+      api.bus.emit('pm:before-update', {
+        id,
+        entry: { ...entry },
+        remoteMeta: { ...remoteMeta },
+        url: getRemoteUrl(entry)
+      });
+    } catch {}
+
     try {
       const reg = api.registry.getAll();
       const item = reg.find(p => p.id === id);
@@ -1897,9 +1986,23 @@ export function setup(api) {
     for (const item of targets) {
       try {
         await api.togglePlugin(item.id);
+
+        // Remove any Plugin Manager UI registered by this plugin.
+        // This prevents stale sidebar/menu buttons after Safe Mode disables plugins.
+        cleanupPluginUI(item.id);
+
         setPluginStatus(item.id, 'disabled');
+
+        log('pm:safe-mode-disabled-plugin', {
+          id: item.id
+        });
       } catch (err) {
         setPluginStatus(item.id, 'failed', err.message || 'Could not disable plugin');
+
+        log('pm:safe-mode-disable-failed', {
+          id: item.id,
+          error: err.message || String(err)
+        });
       }
     }
 
@@ -2332,7 +2435,9 @@ export function setup(api) {
         ${externalItems.map(action => `
           <button
             class="pm-menu-item ${action.danger ? 'danger' : ''}"
-            data-menu-action="external:${escapeAttr(action.owner)}:${escapeAttr(action.id)}"
+            data-menu-action="external"
+            data-external-owner="${escapeAttr(action.owner)}"
+            data-external-id="${escapeAttr(action.id)}"
             data-id="${escapeAttr(id)}"
           >
             <span class="pm-menu-icon">${action.icon || menuIcon('sparkle')}</span>
@@ -2776,6 +2881,10 @@ export function setup(api) {
       logs.push({ time: Date.now(), event, data });
       localStorage.setItem(LOG_KEY, JSON.stringify(logs.slice(-100)));
     } catch {}
+
+    try {
+      api.bus.emit(event, data || {});
+    } catch {}
   }
 
   function getLogs() {
@@ -2822,7 +2931,13 @@ export function setup(api) {
       details: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>',
       sparkle: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.7 5.2L19 10l-5.3 1.8L12 17l-1.7-5.2L5 10l5.3-1.8L12 3z"></path></svg>',
       update: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6"></path><path d="M2.5 22v-6h6"></path><path d="M2 11.5a10 10 0 0 1 18.8-4.3"></path><path d="M22 12.5a10 10 0 0 1-18.8 4.2"></path></svg>',
-      reload: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 15.5-6.2"></path><path d="M18.5 3.8V9H13"></path><path d="M21 12a9 9 0 0 1-15.5 6.2"></path><path d="M5.5 20.2V15H11"></path></svg>',
+      reload: `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 5v7l4 2"></path>
+          <path d="M5.2 9.4A7.5 7.5 0 1 1 4.5 13"></path>
+          <path d="M5.2 9.4H2.8V7"></path>
+        </svg>
+      `,
       logs: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13"></path><path d="M8 12h13"></path><path d="M8 18h13"></path><path d="M3 6h.01"></path><path d="M3 12h.01"></path><path d="M3 18h.01"></path></svg>',
       reset: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"></path><path d="M3 4v6h6"></path></svg>',
       delete: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path></svg>'

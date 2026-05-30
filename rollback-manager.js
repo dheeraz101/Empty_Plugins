@@ -10,9 +10,9 @@
 export const meta = {
   id: 'rollback-manager',
   name: 'Rollback Manager',
-  version: '4.1.0',
+  version: '4.1.2',
   compat: '>=4.0.0',
-  coreVersion: '4.1.0',
+  coreVersion: '4.1.2',
   icon: '↩️',
   author: 'Dheeraz',
   description: 'Creates plugin snapshots and lets you roll back plugins safely.',
@@ -21,12 +21,12 @@ export const meta = {
   permissions: ['ui', 'storage', 'bus', 'network', 'registry', 'system'],
   whatsNew: [
     {
-      version: '4.1.0',
+      version: '4.1.2',
       title: 'Core v4.1 support',
       text: 'Updated for the latest Blank Board core and Plugin Manager extension slots.'
     },
     {
-      version: '4.1.0',
+      version: '4.1.2',
       title: 'Cleaner Plugin Manager integration',
       text: 'Manage Snapshots now appears as an icon-only sidebar button, and rollback actions move into each plugin’s three-dot menu.'
     }
@@ -44,6 +44,8 @@ if (!window.__rb) {
     clickHandlerBound: false,
     origReload: null,
     allPluginsLoaded: false,
+    beforeUpdateOff: null,
+    uiReadyOffs: [],
   };
 }
 const rb = window.__rb;
@@ -207,48 +209,44 @@ function buildCSS() {
 
 
 // ── Safely get the ORIGINAL (un-wrapped) reloadPlugin ──
-function getOrigReload(api) {
-  if (rb.origReload && typeof rb.origReload === 'function') return rb.origReload;
-  if (api._rb_origReload && typeof api._rb_origReload === 'function') return api._rb_origReload;
-  if (api.reloadPlugin && typeof api.reloadPlugin === 'function') return api.reloadPlugin;
+function getReload(api) {
+  if (api?.reloadPlugin && typeof api.reloadPlugin === 'function') {
+    return api.reloadPlugin;
+  }
+
   return null;
 }
-
 
 export async function setup(api) {
   rb.apiRef = api;
 
-  // Capture origReload safely.
-  // During bootstrap, api.reloadPlugin is undefined (core defines it after all plugins load).
-  if (!rb.origReload && api.reloadPlugin) {
-    rb.origReload = api.reloadPlugin;
-  }
-  if (!api._rb_origReload && rb.origReload) {
-    api._rb_origReload = rb.origReload;
-  }
-
-  // Listen for core's "all plugins loaded" event — fires AFTER api.reloadPlugin exists
   if (!rb.allPluginsLoaded) {
     api.bus.once('board:allPluginsLoaded', () => {
       rb.allPluginsLoaded = true;
-      if (!rb.origReload) {
-        rb.origReload = api.reloadPlugin;
-        api._rb_origReload = rb.origReload;
-      }
-      wrapReloadPlugin(api);
       cleanupRegistryUrls(api);
     });
   }
+
+  if (rb.beforeUpdateOff) {
+    try {
+      rb.beforeUpdateOff();
+    } catch {}
+    rb.beforeUpdateOff = null;
+  }
+
+  rb.beforeUpdateOff = api.bus.on('pm:before-update', async (payload = {}) => {
+    const pluginId = payload.id;
+    if (!pluginId) return;
+    if (!isTracked(pluginId)) return;
+    if (getSnapshot(pluginId)) return;
+
+    await captureSnapshot(api, pluginId);
+  }, meta.id);
 
   if (!rb.style) {
     rb.style = document.createElement('style');
     rb.style.textContent = buildCSS();
     document.head.appendChild(rb.style);
-  }
-
-  // If origReload is already available (re-enable, not first boot), wrap now
-  if (rb.origReload) {
-    wrapReloadPlugin(api);
   }
 
   function tryInjectSidebarButton() {
@@ -264,6 +262,15 @@ export async function setup(api) {
 
   registerRollbackMenuAction(api);
 
+  const uiReadyHandler = () => {
+    registerRollbackSidebarButton(api);
+  };
+
+  api.bus.on('pm:ui-slots-ready', uiReadyHandler, meta.id);
+
+  if (!rb.uiReadyOffs) rb.uiReadyOffs = [];
+  rb.uiReadyOffs.push(() => api.bus.off('pm:ui-slots-ready', uiReadyHandler));
+
   if (!rb.clickHandlerBound) {
     document.addEventListener('click', (e) => {
       const btn = e.target.closest('[data-rb-rollback]');
@@ -276,7 +283,7 @@ export async function setup(api) {
     rb.clickHandlerBound = true;
   }
 
-  console.log('\uD83D\uDD19 Rollback Manager v4.0.0 loaded');
+  console.log('🔙 Rollback Manager v4.1.1 loaded');
 }
 
 function registerRollbackMenuAction(api) {
@@ -315,6 +322,14 @@ function registerRollbackMenuAction(api) {
 function registerRollbackSidebarButton(api) {
   if (!api?.bus) return;
 
+  const existing = document.querySelector(
+    '[data-ui-id="rollback-sidebar-icon"][data-plugin-owner="rollback-manager"], [data-plugin-owner="rollback-manager"][aria-label="Manage Snapshots"]'
+  );
+
+  if (existing && existing.isConnected) {
+    return;
+  }
+
   const btn = document.createElement('button');
   btn.className = 'pm-plugin-mini-btn';
   btn.title = 'Manage Snapshots';
@@ -344,23 +359,6 @@ function registerRollbackSidebarButton(api) {
     owner: meta.id
   });
 }
-
-
-// ── Wrap api.reloadPlugin to auto-capture snapshots on first update ──
-function wrapReloadPlugin(api) {
-  const orig = rb.origReload;
-  if (!orig) return;
-  api.reloadPlugin = async function(id) {
-    const entry = api.registry?.getAll?.()?.find(p => p.id === id);
-    const isSnapshotUrl = entry?.url?.startsWith('data:');
-    // Auto-capture snapshot before first update (if tracked and no snapshot yet)
-    if (!isSnapshotUrl && isTracked(id) && !getSnapshot(id)) {
-      await captureSnapshot(api, id);
-    }
-    return orig.call(api, id);
-  };
-}
-
 
 // ── Cleanup: fix stale blob URLs in persisted registry (legacy cleanup) ──
 function cleanupRegistryUrls(api) {
@@ -551,8 +549,8 @@ async function performRollback(api, pluginId) {
   const entry = registry.find(p => p.id === pluginId);
   if (!entry) return api.notify('Plugin not found', 'error');
 
-  const orig = getOrigReload(api);
-  if (!orig) {
+  const reload = getReload(api);
+  if (!reload) {
     api.notify('Cannot reload plugin. Refresh the page and try again.', 'error');
     return;
   }
@@ -583,7 +581,7 @@ async function performRollback(api, pluginId) {
     api.registry.save(registry);
 
     // 3. Reload — core unloads old plugin + loads from the data: URL
-    await orig.call(api, pluginId);
+    await reload(pluginId);
 
     // 4. Re-assert version (origReload may overwrite from loaded meta)
     const reg2 = api.registry.getAll();
@@ -654,10 +652,24 @@ function injectCardButtons(api) {
 export function teardown() {
   if (rb.style) { rb.style.remove(); rb.style = null; }
   if (rb.pollInterval) { clearInterval(rb.pollInterval); rb.pollInterval = null; }
-  if (rb.apiRef && rb.origReload) { rb.apiRef.reloadPlugin = rb.origReload; }
   document.querySelectorAll('.rb-sidebar-btn').forEach(el => el.remove());
   document.querySelectorAll('[data-rb-rollback]').forEach(el => el.remove());
   document.querySelectorAll('[data-plugin-owner="rollback-manager"]').forEach(el => el.remove());
   document.querySelectorAll('.rb-overlay').forEach(el => el.remove());
+
+  if (rb.beforeUpdateOff) {
+    try {
+      rb.beforeUpdateOff();
+    } catch {}
+    rb.beforeUpdateOff = null;
+  }
+
+  if (Array.isArray(rb.uiReadyOffs)) {
+    rb.uiReadyOffs.forEach(off => {
+      try { off(); } catch {}
+    });
+    rb.uiReadyOffs = [];
+  }
+
   rb.apiRef = null;
 }

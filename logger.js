@@ -1,7 +1,7 @@
 export const meta = {
   id: 'logger',
   name: 'Logger',
-  version: '1.3.0',
+  version: '1.3.1',
   icon: '📋',
   description: 'Records plugin lifecycle events and shows activity logs from Plugin Manager.',
   compat: '>=4.0.0',
@@ -11,12 +11,12 @@ export const meta = {
   permissions: ['ui', 'storage', 'bus'],
   whatsNew: [
     {
-      version: '1.3.0',
+      version: '1.3.1',
       title: 'Core v4.1 support',
       text: 'Updated for the latest Blank Board plugin API and Plugin Manager sidebar icon slots.'
     },
     {
-      version: '1.3.0',
+      version: '1.3.1',
       title: 'Cleaner Plugin Manager integration',
       text: 'The Logs action now appears as an icon-only sidebar button instead of a full text button.'
     }
@@ -107,9 +107,42 @@ export function setup(api) {
   pushLog('logger:loaded', { version: meta.version });
 
   registerLoggerButton(api);
+
+  const uiReadyHandler = () => {
+    registerLoggerButton(api);
+  };
+
+  api.bus.on('pm:ui-slots-ready', uiReadyHandler, meta.id);
+  listeners.push({ evt: 'pm:ui-slots-ready', handler: uiReadyHandler });
+
+  api.bus.emit('pm:register-menu-action', {
+    id: 'view-logs',
+    owner: meta.id,
+    pluginId: 'plugin-manager',
+    label: 'View Activity Logs',
+    icon: `
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 6h11"></path>
+        <path d="M8 12h11"></path>
+        <path d="M8 18h11"></path>
+        <path d="M4 6h.01"></path>
+        <path d="M4 12h.01"></path>
+        <path d="M4 18h.01"></path>
+      </svg>
+    `,
+    handler: () => openLogViewer(api)
+  });
 }
 
 function registerLoggerButton(api) {
+  const existing = document.querySelector(
+    '[data-ui-id="logger-sidebar-icon"][data-plugin-owner="logger"], [data-plugin-owner="logger"][aria-label="View Logs"]'
+  );
+
+  if (existing && existing.isConnected) {
+    return;
+  }
+
   const btn = document.createElement('button');
   btn.className = 'pm-plugin-mini-btn';
   btn.title = 'View Logs';
