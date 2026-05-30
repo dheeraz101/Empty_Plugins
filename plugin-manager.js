@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '5.7.1-v4',
+  version: '5.7.2-v4',
   compat: '>=4.0.0',
   permissions: [
     'ui',
@@ -21,6 +21,7 @@ let keydownHandler = null;
 let pmRegisterUiHandler = null;
 let apiRef = null;
 let activeMenu = null;
+let documentClickHandler = null;
 
 export function setup(api) {
   apiRef = api;
@@ -173,6 +174,38 @@ export function setup(api) {
     background: rgba(255, 255, 255, 0.72);
     border-color: rgba(0, 113, 227, 0.42);
     box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.12), 0 6px 18px rgba(0, 0, 0, 0.06);
+  }
+
+  .pm-sidebar-action-btn,
+  #pm-actions .pm-btn {
+    width: 100%;
+    height: 32px;
+    justify-content: flex-start;
+    padding: 0 13px;
+    gap: 9px;
+    font-size: 13.2px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1;
+  }
+
+  #pm-actions .pm-btn svg {
+    width: 15px;
+    height: 15px;
+    flex: 0 0 15px;
+    stroke-width: 2.25;
+  }
+
+  #pm-actions .pm-btn span {
+    flex: 1;
+    text-align: center;
+    margin-right: 24px;
+  }
+
+  #close-pm:hover {
+    background: #ff3b30 !important;
+    color: #fff !important;
+    border-color: rgba(255, 59, 48, 0.5) !important;
   }
 
   .pm-search-icon {
@@ -334,6 +367,21 @@ export function setup(api) {
     white-space: nowrap;
   }
 
+  .pm-root.pm-safe-mode-active .pm-sidebar {
+    box-shadow: inset 3px 0 0 rgba(52,199,89,0.75);
+  }
+
+  .pm-root.pm-safe-mode-active .pm-sidebar-title::after {
+    content: "SAFE";
+    margin-left: 8px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: rgba(52,199,89,0.16);
+    color: #34c759;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+  }
+
   .pm-action-group { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
 
   .pm-btn {
@@ -397,39 +445,74 @@ export function setup(api) {
 
   .pm-action-menu {
     position: fixed;
-    min-width: 190px;
-    background: var(--pm-card-strong, rgba(255,255,255,0.94));
-    border: 1px solid var(--pm-border, rgba(0,0,0,0.1));
-    box-shadow: 0 18px 44px rgba(0,0,0,0.18);
+    min-width: 210px;
+    background: rgba(44, 44, 46, 0.96);
+    border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: 0 18px 46px rgba(0,0,0,0.42);
     border-radius: 14px;
     padding: 6px;
     z-index: 2147483647;
     backdrop-filter: blur(24px) saturate(180%);
     -webkit-backdrop-filter: blur(24px) saturate(180%);
+    color: #f5f5f7;
   }
 
   .pm-menu-item {
     width: 100%;
+    height: 36px;
     text-align: left;
     border: none;
     background: transparent;
-    color: var(--pm-text, #1d1d1f);
+    color: #f5f5f7;
     border-radius: 10px;
-    padding: 9px 10px;
-    font-size: 13.5px;
-    font-weight: 550;
+    padding: 0 10px;
+    font-size: 13.4px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
     cursor: pointer;
-    font-family: inherit;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    display: grid;
+    grid-template-columns: 20px 1fr;
+    align-items: center;
+    column-gap: 9px;
   }
-  .pm-menu-item:hover { background: rgba(0,0,0,0.055); }
-  .pm-menu-item { display:flex; align-items:center; gap:10px; }
-  .pm-menu-icon { width:18px; display:inline-flex; align-items:center; justify-content:center; opacity:0.82; flex-shrink:0; }
-  .pm-menu-label { flex:1; }
+  .pm-menu-item:hover {
+    background: rgba(255,255,255,0.09);
+  }
+
+  .pm-menu-icon {
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.82;
+  }
+
+  .pm-menu-icon svg {
+    width: 15.5px;
+    height: 15.5px;
+    stroke-width: 2.15;
+  }
+
+  .pm-menu-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pm-menu-item.danger {
+    color: #ff6961;
+  }
+
+  .pm-menu-separator {
+    height: 1px;
+    background: rgba(255,255,255,0.1);
+    margin: 6px 4px;
+  }
   .pm-btn-safe-active { background: rgba(52,199,89,0.16) !important; color: #1f8f3a !important; border-color: rgba(52,199,89,0.28) !important; }
   .pm-btn-safe-active::before { content: ""; width:7px; height:7px; border-radius:50%; background:#34c759; box-shadow:0 0 0 3px rgba(52,199,89,0.14); }
   .check-updates.spinning svg { animation: spin 0.8s linear infinite; }
-  .pm-menu-item.danger { color: var(--pm-red, #ff3b30); }
-  .pm-menu-separator { height:1px; background: rgba(128,128,128,0.18); margin:5px 4px; }
 
   .pm-divider {
     display: flex; align-items: center; text-align: center;
@@ -458,21 +541,26 @@ export function setup(api) {
     display: flex; align-items: center; justify-content: center;
   }
   .pm-modal-content {
-    background: rgba(255,255,255,0.97);
+    background: rgba(34,34,36,0.96);
     width: 390px;
     max-width: calc(100vw - 32px);
     max-height: calc(100vh - 32px);
     overflow: auto;
     padding: 24px;
     border-radius: 24px;
-    box-shadow: 0 20px 46px rgba(0,0,0,0.14);
-    border: 1px solid rgba(0,0,0,0.08);
+    box-shadow: 0 20px 46px rgba(0,0,0,0.28);
+    border: 1px solid rgba(255,255,255,0.12);
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    color: var(--pm-text);
+    color: #f5f5f7;
   }
   .pm-modal-content.wide { width: 560px; }
   .pm-modal-title {
-    margin: 0 0 18px 0; font-size: 20px; font-weight: 700; letter-spacing: -0.2px; color: var(--pm-text); line-height: 1.2;
+    margin: 0 0 18px 0;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #f5f5f7;
+    line-height: 1.2;
   }
   .pm-modal-title::after {
     content: ""; display:block; margin-top:12px; height:1px; width:100%; background: rgba(128,128,128,0.18);
@@ -480,20 +568,72 @@ export function setup(api) {
   .pm-modal-message {
     margin: -2px 0 16px 0;
     font-size: 14px;
-    line-height: 1.45;
-    color: var(--pm-muted);
+    line-height: 1.48;
+    color: #c7c7cc;
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .pm-modal-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 8px;
+  }
+
+  .pm-modal-actions .pm-btn {
+    flex: 1;
+    height: 32px;
+    font-size: 13.4px;
+    font-weight: 650;
   }
   .pm-modal-warning-box {
     padding: 12px 14px;
     border-radius: 14px;
-    background: rgba(255, 59, 48, 0.09);
-    border: 1px solid rgba(255, 59, 48, 0.18);
-    color: #b3261e;
+    background: rgba(255,69,58,0.12);
+    border: 1px solid rgba(255,69,58,0.22);
+    color: #ffb4ab;
     font-size: 13.5px;
-    font-weight: 500;
+    font-weight: 550;
     line-height: 1.45;
     margin-bottom: 16px;
+  }
+  .pm-check-box {
+    position: relative;
+    width: 16px;
+    height: 16px;
+    flex: 0 0 16px;
+    margin-top: 1px;
+  }
+
+  .pm-check-box input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .pm-check-visual {
+    position: absolute;
+    inset: 0;
+    border-radius: 5px;
+    border: 1px solid rgba(255,255,255,0.24);
+    background: rgba(255,255,255,0.08);
+    transition: background 0.16s ease, border-color 0.16s ease;
+  }
+
+  .pm-check-box input:checked + .pm-check-visual {
+    background: #0a84ff;
+    border-color: #0a84ff;
+  }
+
+  .pm-check-box input:checked + .pm-check-visual::after {
+    content: "";
+    position: absolute;
+    left: 4px;
+    top: 1.5px;
+    width: 5px;
+    height: 9px;
+    border: solid white;
+    border-width: 0 1.8px 1.8px 0;
+    transform: rotate(45deg);
   }
   .pm-input {
     width: 100%; padding: 12px; border-radius: 12px;
@@ -692,6 +832,7 @@ export function setup(api) {
   root = document.createElement('div');
   root.className = 'pm-root';
   root.style.display = 'none';
+  root.classList.toggle('pm-safe-mode-active', isSafeModeOn());
 
   root.innerHTML = `
     <div class="pm-sidebar">
@@ -853,11 +994,17 @@ export function setup(api) {
     renderCommunity();
   };
 
-  document.addEventListener('click', (e) => {
-    if (activeMenu && !e.target.closest('.pm-action-menu') && !e.target.closest('[data-act="menu"]')) {
+  documentClickHandler = (e) => {
+    if (
+      activeMenu &&
+      !e.target.closest('.pm-action-menu') &&
+      !e.target.closest('[data-act="menu"]')
+    ) {
       closeActionMenu();
     }
-  });
+  };
+
+  document.addEventListener('click', documentClickHandler);
 
   contextMenuHandler = (e) => {
     if (e.target.closest('.pm-root')) return;
@@ -881,16 +1028,14 @@ export function setup(api) {
 
     const checkUpdatesBtn = document.createElement('button');
     checkUpdatesBtn.className = 'pm-btn pm-btn-secondary check-updates';
-    checkUpdatesBtn.innerHTML = `${iconRefresh(14)} Check Updates`;
+    checkUpdatesBtn.classList.add('pm-sidebar-action-btn');
+    checkUpdatesBtn.innerHTML = `${iconRefresh(15)}<span>Check Updates</span>`;
     checkUpdatesBtn.onclick = async () => {
       const originalHTML = checkUpdatesBtn.innerHTML;
 
       checkUpdatesBtn.disabled = true;
       checkUpdatesBtn.classList.add('spinning');
-      checkUpdatesBtn.innerHTML = `
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
-        Checking…
-      `;
+      checkUpdatesBtn.innerHTML = `${iconRefresh(15)}<span>Checking…</span>`;
 
       const startedAt = Date.now();
 
@@ -903,15 +1048,9 @@ export function setup(api) {
         checkUpdatesBtn.classList.remove('spinning');
 
         if (updateCount > 0) {
-          checkUpdatesBtn.innerHTML = `
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
-            ${updateCount} Update${updateCount === 1 ? '' : 's'}
-          `;
+        checkUpdatesBtn.innerHTML = `${iconRefresh(15)}<span>${updateCount} Update${updateCount === 1 ? '' : 's'}</span>`;
         } else {
-          checkUpdatesBtn.innerHTML = `
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-            You're up to date
-          `;
+        checkUpdatesBtn.innerHTML = `${iconCheck(15)}<span>You're up to date</span>`;
 
           setTimeout(() => {
             checkUpdatesBtn.innerHTML = originalHTML;
@@ -928,16 +1067,24 @@ export function setup(api) {
 
     const installBtn = document.createElement('button');
     installBtn.className = 'pm-btn pm-btn-primary';
-    installBtn.textContent = 'Install via URL';
+    installBtn.classList.add('pm-sidebar-action-btn');
+    installBtn.innerHTML = `${iconPlus(15)}<span>Install via URL</span>`;
     installBtn.onclick = openInstallModal;
     actions.appendChild(installBtn);
 
     const safeBtn = document.createElement('button');
     safeBtn.className = `pm-btn pm-btn-secondary ${isSafeModeOn() ? 'pm-btn-safe-active' : ''}`;
-    safeBtn.textContent = isSafeModeOn() ? 'Safe Mode On' : 'Safe Mode';
+    safeBtn.classList.add('pm-sidebar-action-btn');
+    safeBtn.innerHTML = `${iconShield(15)}<span>${isSafeModeOn() ? 'Safe Mode On' : 'Safe Mode'}</span>`;
     safeBtn.title = isSafeModeOn() ? 'Safe Mode is active. Click to turn it off.' : 'Disable all non-system plugins.';
     safeBtn.onclick = isSafeModeOn() ? disableSafeMode : enableSafeMode;
     actions.appendChild(safeBtn);
+
+    const resetLayoutBtn = document.createElement('button');
+    resetLayoutBtn.className = 'pm-btn pm-btn-secondary pm-sidebar-action-btn';
+    resetLayoutBtn.innerHTML = `${iconReset(15)}<span>Reset Layout</span>`;
+    resetLayoutBtn.onclick = resetPluginManagerLayout;
+    actions.appendChild(resetLayoutBtn);
   }
 
   function registerPluginManagerUI(slot, el, id, owner = SELF_ID) {
@@ -1172,7 +1319,9 @@ export function setup(api) {
         <div class="pm-action-group">
           ${hasUpdate && !busy ? `<button class="pm-btn pm-btn-primary" data-update="${escapeAttr(p.id)}">Update</button>` : ''}
           ${p.id === SELF_ID ? '' : `<button class="pm-toggle ${p.enabled ? 'on' : ''}" data-act="toggle" data-id="${escapeAttr(p.id)}" title="${p.enabled ? 'Disable' : 'Enable'}" ${disabled ? 'disabled' : ''}></button>`}
-          ${p.id === SELF_ID ? '' : `<button class="pm-icon-btn" data-act="menu" data-id="${escapeAttr(p.id)}" title="More actions">•••</button>`}
+          ${p.id === SELF_ID ? '' : `<button class="pm-icon-btn" data-act="menu" data-id="${escapeAttr(p.id)}" title="More actions" aria-label="More actions">
+          ${iconEllipsis(17)}
+        </button>`}
         </div>
       </div>
     `;
@@ -1564,12 +1713,15 @@ export function setup(api) {
     const deletedEntry = { ...entry };
 
     try {
-      await api.deletePlugin(id);
-      cleanupPluginUI(id);
+    const deleted = await api.deletePlugin(id, {
+      purgeData: result.checked === true
+    });
 
-      if (result.checked) {
-        purgePluginData(id);
-      }
+    if (!deleted) {
+      throw new Error(readPluginError(id) || 'Core refused to delete plugin');
+    }
+
+    cleanupPluginUI(id);
 
       log('pm:delete-success', { id, purgeData: result.checked });
       showUndoToast(`${pluginName} deleted`, 'Undo', async () => {
@@ -1603,6 +1755,7 @@ export function setup(api) {
     if (!confirmed.confirmed) return;
 
     localStorage.setItem(SAFE_MODE_KEY, '1');
+    root?.classList.add('pm-safe-mode-active');
     const registry = api.registry.getAll();
     const targets = registry.filter(p => p.enabled && !isSystemPlugin(p));
 
@@ -1632,6 +1785,7 @@ export function setup(api) {
     });
     if (!result.confirmed) return;
     localStorage.removeItem(SAFE_MODE_KEY);
+    root?.classList.remove('pm-safe-mode-active');
     api.notify('Safe Mode turned off', 'success');
     log('pm:safe-mode-off', {});
     registerCoreUI();
@@ -1729,8 +1883,7 @@ export function setup(api) {
     confirmText = 'Confirm',
     cancelText = 'Cancel',
     danger = false,
-    checkbox = null,
-    returnDetails = false
+    checkbox = null
   } = {}) {
     return new Promise((resolve) => {
       const overlay = document.createElement('div');
@@ -1740,32 +1893,29 @@ export function setup(api) {
       overlay.innerHTML = `
         <div class="pm-modal-content">
           <h3 class="pm-modal-title">${escapeHTML(title)}</h3>
-          ${message ? `<p class="pm-modal-message">${escapeHTML(message)}</p>` : ''}
-          ${warning ? `<div class="pm-modal-warning-box">${escapeHTML(warning)}</div>` : ''}
+          ${message ? `<p class="pm-modal-message">${escapeHTML(message).replaceAll('\n', '<br>')}</p>` : ''}
+          ${warning ? `<div class="pm-modal-warning-box">${escapeHTML(warning).replaceAll('\n', '<br>')}</div>` : ''}
           ${checkbox ? `
             <label class="pm-modal-checkbox-row">
-              <input type="checkbox" data-confirm-checkbox>
+              <span class="pm-check-box">
+                <input type="checkbox" data-confirm-checkbox ${checkbox.checked ? 'checked' : ''}>
+                <span class="pm-check-visual"></span>
+              </span>
               <span>${escapeHTML(checkbox.label || '')}</span>
             </label>
           ` : ''}
-          <div style="display:flex; gap:10px; margin-top:8px;">
-            <button class="pm-btn pm-btn-secondary" data-confirm-action="cancel" style="flex:1">${escapeHTML(cancelText)}</button>
-            <button class="pm-btn ${danger ? 'pm-btn-danger' : 'pm-btn-primary'}" data-confirm-action="confirm" style="flex:1">${escapeHTML(confirmText)}</button>
+          <div class="pm-modal-actions">
+            <button class="pm-btn pm-btn-secondary" data-confirm-action="cancel">${escapeHTML(cancelText)}</button>
+            <button class="pm-btn ${danger ? 'pm-btn-danger' : 'pm-btn-primary'}" data-confirm-action="confirm">${escapeHTML(confirmText)}</button>
           </div>
         </div>
       `;
 
       function close(value) {
         const checked = Boolean(overlay.querySelector('[data-confirm-checkbox]')?.checked);
-
         overlay.remove();
         document.removeEventListener('keydown', onKeyDown);
-
-        if (returnDetails) {
-          resolve({ confirmed: value, checked });
-        } else {
-          resolve(value);
-        }
+        resolve({ confirmed: value, checked });
       }
 
       function onKeyDown(e) {
@@ -1787,6 +1937,10 @@ export function setup(api) {
 
       document.addEventListener('keydown', onKeyDown);
       document.documentElement.appendChild(overlay);
+
+      requestAnimationFrame(() => {
+        overlay.querySelector('[data-confirm-action="confirm"]')?.focus?.();
+      });
     });
   }
 
@@ -1966,7 +2120,6 @@ export function setup(api) {
     const systemMenu = isSelf ? `
       <div class="pm-menu-separator"></div>
       <button class="pm-menu-item" data-menu-action="logs" data-id="${escapeAttr(id)}">${menuIcon('logs')}<span class="pm-menu-label">View Logs</span></button>
-      <button class="pm-menu-item" data-menu-action="reset-layout" data-id="${escapeAttr(id)}">${menuIcon('reset')}<span class="pm-menu-label">Reset Manager Layout</span></button>
     ` : '';
 
     activeMenu.innerHTML = `
@@ -2200,21 +2353,38 @@ export function setup(api) {
 
   function normalizePermissions(perms = []) {
     if (!Array.isArray(perms)) return [];
-    return [...new Set(perms.map(p => String(p).trim()).filter(Boolean))];
+
+    const aliases = {
+      'global-css': 'globalCSS',
+      'global_css': 'globalCSS',
+      'globalcss': 'globalCSS',
+      'modify-others': 'modifyOthers',
+      'move-others': 'moveOthers',
+      'raw-board': 'rawBoard'
+    };
+
+    return [
+      ...new Set(
+        perms
+          .map(p => String(p).trim())
+          .filter(Boolean)
+          .map(p => aliases[p] || p)
+      )
+    ];
   }
 
   function inferPermissions(p = {}) {
     const category = normalizeCategory(p.category);
     const perms = ['ui'];
     if (/note|todo|kanban|planner|password|counter|quote|timer|clock/i.test(`${p.id} ${p.name} ${p.description}`)) perms.push('storage');
-    if (/theme|layout|manager|enhancer/i.test(`${p.id} ${p.name} ${p.description}`)) perms.push('global-css');
+    if (/theme|layout|manager|enhancer/i.test(`${p.id} ${p.name} ${p.description}`)) perms.push('globalCSS');
     if (category === 'system') perms.push('registry', 'system');
     if (/api|quote|community|network/i.test(`${p.id} ${p.name} ${p.description}`)) perms.push('network');
     return normalizePermissions(perms);
   }
 
   function permissionBadgeHTML(permission) {
-    const risky = ['network', 'global-css', 'registry', 'system'].includes(permission);
+    const risky = ['network', 'globalCSS', 'registry', 'system', 'rawBoard', 'modifyOthers', 'moveOthers'].includes(permission);
     return `<span class="perm-badge ${risky ? 'risky' : ''}">${escapeHTML(permissionLabel(permission))}</span>`;
   }
 
@@ -2224,11 +2394,17 @@ export function setup(api) {
       storage: 'Storage',
       network: 'Network',
       clipboard: 'Clipboard',
+      globalCSS: 'Global CSS',
       'global-css': 'Global CSS',
       registry: 'Registry',
       system: 'System',
+      bus: 'bus',
+      hooks: 'hooks',
+      theme: 'Theme',
       layout: 'Layout',
-      theme: 'Theme'
+      modifyOthers: 'Modify Others',
+      moveOthers: 'Move Others',
+      rawBoard: 'Raw Board'
     };
     return labels[permission] || permission;
   }
@@ -2452,6 +2628,26 @@ export function setup(api) {
   function iconRefresh(size = 16) {
     return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>`;
   }
+
+  function iconCheck(size = 16) {
+    return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`;
+  }
+
+  function iconPlus(size = 16) {
+    return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>`;
+  }
+
+  function iconShield(size = 16) {
+    return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 20 6v6c0 5-3.4 8.7-8 9-4.6-.3-8-4-8-9V6l8-3Z"/><path d="m9.5 12 1.7 1.7L15 10"/></svg>`;
+  }
+
+  function iconReset(size = 16) {
+    return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v6h6"/></svg>`;
+  }
+
+  function iconEllipsis(size = 16) {
+    return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>`;
+  }
 }
 
 export function teardown() {
@@ -2488,6 +2684,11 @@ export function teardown() {
   if (pmRegisterUiHandler && apiRef?.bus) {
     apiRef.bus.off('pm:register-ui', pmRegisterUiHandler);
     pmRegisterUiHandler = null;
+  }
+
+  if (documentClickHandler) {
+    document.removeEventListener('click', documentClickHandler);
+    documentClickHandler = null;
   }
 
   apiRef = null;
