@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '5.9.4-v4',
+  version: '5.9.5-v4',
   compat: '>=4.0.0',
   permissions: [
     'ui',
@@ -2190,9 +2190,9 @@ export function setup(api) {
     remoteMetaCache.set(id, remoteMeta);
 
     if (!hasPluginUpdate(entry, remoteMeta)) {
-      resetButton(btn, originalButtonHTML);
+      resetButton(btn, null);
       api.notify('Plugin is already up to date', 'success');
-      renderInstalled(false);
+      await refreshUpdatesAfterPluginChange();
       return;
     }
 
@@ -2269,21 +2269,30 @@ export function setup(api) {
           api.registry.save(reg);
         }
 
-        remoteMetaCache.set(id, remoteMeta);
-      }
-      incrementCrash(id, false);
-      api.notify(`${entry.name || id} updated`, 'success');
-      log('pm:update-success', { id, version: remoteMeta.version });
+        remoteMetaCache.set(id, {
+          ...remoteMeta,
+          version: remoteMeta.version || item?.version
+        });
+        }
+        incrementCrash(id, false);
+        api.notify(`${entry.name || id} updated`, 'success');
+        log('pm:update-success', { id, version: remoteMeta.version });
+
+        // Clear old cached update state before rechecking.
+        remoteMetaCache.delete(id);
+        lastCheckedTime = 0;
 
       if (id === SELF_ID) {
         setTimeout(() => window.location.reload(), 350);
         return;
       }
+
+      // Recheck after update so stale "1 Update" state disappears automatically.
+      await refreshUpdatesAfterPluginChange();
+      return;
     } catch (err) {
       handlePluginFailure(id, err, 'Update failed');
     }
-
-    renderInstalled(false);
   }
 
   async function deletePluginWithConfirmation(id) {
@@ -3299,18 +3308,41 @@ export function setup(api) {
         btn.innerHTML = `${iconCheck(14)}<span>You're up to date</span>`;
 
         window.setTimeout(() => {
-          btn.innerHTML = defaultHTML;
           btn.disabled = false;
+          syncCheckUpdatesButton(updateCount);
         }, 1800);
       }, wait);
     } catch (err) {
       btn.classList.remove('spinning');
-      btn.innerHTML = defaultHTML;
       btn.disabled = false;
+      syncCheckUpdatesButton(updateCount);
 
       api.notify('Could not check updates', 'error');
 
       log('pm:check-updates-failed', {
+        error: err.message || String(err)
+      });
+    }
+  }
+
+  async function refreshUpdatesAfterPluginChange() {
+    try {
+      await renderInstalled(true);
+
+      // renderInstalled(true) updates updateCount through updateBadge().
+      syncCheckUpdatesButton(updateCount);
+
+      log('pm:update-state-refreshed', {
+        updateCount
+      });
+    } catch (err) {
+      console.warn('[Plugin Manager] update-state refresh failed:', err);
+
+      // Fallback: still refresh from current local registry/cache.
+      await renderInstalled(false);
+      syncCheckUpdatesButton(updateCount);
+
+      log('pm:update-state-refresh-failed', {
         error: err.message || String(err)
       });
     }
@@ -3598,13 +3630,32 @@ export function setup(api) {
 
   function updateBadge(count) {
     updateCount = count;
+
     const badge = root.querySelector('#update-badge-count');
-    if (!badge) return;
+
+    if (badge) {
+      if (count > 0) {
+        badge.textContent = count;
+        badge.style.display = 'inline-flex';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+
+    syncCheckUpdatesButton(count);
+  }
+
+  function syncCheckUpdatesButton(count = updateCount) {
+    const btn = root?.querySelector('.check-updates');
+    if (!btn) return;
+
+    // Do not overwrite active loading states.
+    if (btn.disabled || btn.classList.contains('spinning')) return;
+
     if (count > 0) {
-      badge.textContent = count;
-      badge.style.display = 'inline-flex';
+      btn.innerHTML = `${iconRefresh(14)}<span>${count} Update${count === 1 ? '' : 's'}</span>`;
     } else {
-      badge.style.display = 'none';
+      btn.innerHTML = `${iconRefresh(14)}<span>Check Updates</span>`;
     }
   }
 
