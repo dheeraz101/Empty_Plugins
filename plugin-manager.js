@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '5.9.2-v4',
+  version: '5.9.3-v4',
   compat: '>=4.0.0',
   permissions: [
     'ui',
@@ -18,6 +18,7 @@ let style = null;
 let escHandler = null;
 let contextMenuHandler = null;
 let keydownHandler = null;
+let pendingPMOpenHandler = null;
 let pmRegisterUiHandler = null;
 let apiRef = null;
 let activeMenu = null;
@@ -40,6 +41,7 @@ export function setup(api) {
   const COMMUNITY_CACHE_KEY = 'pm:community-cache:v2';
   const LOG_KEY = 'pm:logs:v1';
   const SAFE_MODE_KEY = 'pm:safe-mode:v1';
+  const WELCOME_KEY = 'pm:welcome-seen:v1';
 
   let lastCheckedTime = 0;
   let updateCount = 0;
@@ -229,6 +231,12 @@ export function setup(api) {
     border-color: rgba(255, 59, 48, 0.5) !important;
   }
 
+  .pm-options-close-btn:hover {
+    background: #ff3b30 !important;
+    color: #fff !important;
+    border-color: rgba(255, 59, 48, 0.5) !important;
+  }
+
   .pm-search-icon {
     position: absolute;
     left: 14px;
@@ -303,14 +311,14 @@ export function setup(api) {
   }
 
   .pm-store-refresh-btn {
-  height: 31px;
-  padding: 0 12px;
-  font-size: 12.4px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
+    height: 31px;
+    padding: 0 12px;
+    font-size: 12.4px;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
 
   .pm-store-refresh-btn svg {
     width: 13.5px;
@@ -1129,7 +1137,7 @@ export function setup(api) {
       scrollbar-color: rgba(255,255,255,0.3) transparent;
     }
   }
-`;
+    `;
   document.head.appendChild(style);
 
   // ─────────────────────────────────────────────
@@ -1392,9 +1400,26 @@ export function setup(api) {
   };
   api.boardEl.addEventListener('contextmenu', contextMenuHandler);
 
+  window.__blankBoardPMReady = true;
+
+  if (window.__blankBoardPendingPMOpen) {
+    window.__blankBoardPendingPMOpen = false;
+    root.style.display = 'flex';
+    switchTab('installed');
+  }
+
+  pendingPMOpenHandler = () => {
+    if (!root) return;
+    root.style.display = 'flex';
+    switchTab('installed');
+  };
+
+  window.addEventListener('blank-board:open-plugin-manager-requested', pendingPMOpenHandler);
+
   loadCommunityFromCache();
   log('pm:loaded', { version: meta.version });
   api.bus.emit('pm:loaded', { version: meta.version });
+  maybeShowWelcomePopup();
 
   // ─────────────────────────────────────────────
   // UI REGISTRATION
@@ -1497,6 +1522,34 @@ export function setup(api) {
         slotRegistry.delete(owner);
       }
     }
+  }
+
+  function maybeShowWelcomePopup() {
+    if (localStorage.getItem(WELCOME_KEY) === '1') return;
+
+    window.setTimeout(() => {
+      if (localStorage.getItem(WELCOME_KEY) === '1') return;
+
+      showInfoModal({
+        title: 'Welcome to Blank Board',
+        subtitle: 'Your board supports plugins, tools, and extensions. Right-click anywhere on the board to open Plugin Manager.',
+        rows: [
+          ['Open Plugin Manager', 'Right-click on the board'],
+          ['Install Plugins', 'Open Options → Install via URL, or use the Community tab'],
+          ['Recovery', 'Use Options → Safe Mode if a plugin causes problems'],
+          ['Privacy', 'Plugins run locally unless their permissions require network access']
+        ],
+        actions: `
+          <button class="pm-btn pm-btn-secondary" data-confirm-action="cancel">Later</button>
+          <button class="pm-btn pm-btn-primary" data-confirm-action="got-it">Got it</button>
+        `,
+        onAction: (action) => {
+          if (action === 'got-it' || action === 'cancel') {
+            localStorage.setItem(WELCOME_KEY, '1');
+          }
+        }
+      });
+    }, 700);
   }
 
   // ─────────────────────────────────────────────
@@ -1636,7 +1689,7 @@ export function setup(api) {
     const listEl = root.querySelector('#community .pm-list');
     if (!listEl) return;
 
-    if (!communityCache.length) {
+    if (forceRefresh || !communityCache.length) {
       listEl.innerHTML = skeletonHTML(4);
     }
 
@@ -1765,7 +1818,7 @@ export function setup(api) {
       isSystem ? '<span class="plugin-badge badge-system">System</span>' : '',
       isNew ? '<span class="plugin-badge badge-new">New</span>' : '',
       incompatible ? '<span class="plugin-badge badge-incompatible">Not Compatible</span>' : '',
-      `<span class="trust-badge">${escapeHTML(categoryLabel(category))}</span>`
+      !isSystem ? `<span class="trust-badge">${escapeHTML(categoryLabel(category))}</span>` : ''
     ].filter(Boolean).join('');
 
     const visiblePermissions = permissions.filter(permission => permission !== 'system');
@@ -2487,7 +2540,7 @@ export function setup(api) {
         }
 
         <div class="pm-modal-actions">
-          <button class="pm-btn pm-btn-secondary" data-option-act="close">Close</button>
+          <button class="pm-btn pm-btn-secondary pm-options-close-btn" data-option-act="close">Close</button>
         </div>
       </div>
     `;
@@ -3757,9 +3810,13 @@ export function setup(api) {
 
   function iconOptions(size = 16) {
     return `
-      <svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <circle cx="12" cy="12" r="3"></circle>
-        <path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.04.04a2.1 2.1 0 0 1-2.97 2.97l-.04-.04A1.8 1.8 0 0 0 14.8 19.6a1.8 1.8 0 0 0-1 .52V20.2a2.1 2.1 0 0 1-4.2 0v-.08a1.8 1.8 0 0 0-1-.52 1.8 1.8 0 0 0-1.98.36l-.04.04a2.1 2.1 0 1 1-2.97-2.97l.04-.04A1.8 1.8 0 0 0 4 15.2a1.8 1.8 0 0 0-.52-1H3.4a2.1 2.1 0 0 1 0-4.2h.08a1.8 1.8 0 0 0 .52-1 1.8 1.8 0 0 0-.36-1.98l-.04-.04A2.1 2.1 0 1 1 6.57 4l.04.04A1.8 1.8 0 0 0 8.6 4.4a1.8 1.8 0 0 0 1-.52V3.8a2.1 2.1 0 0 1 4.2 0v.08a1.8 1.8 0 0 0 1 .52 1.8 1.8 0 0 0 1.98-.36l.04-.04a2.1 2.1 0 1 1 2.97 2.97l-.04.04A1.8 1.8 0 0 0 19.6 9c.16.34.34.67.52 1h.08a2.1 2.1 0 0 1 0 4.2h-.08a1.8 1.8 0 0 0-.72.8Z"></path>
+      <svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="2.25" stroke-linecap="round"
+        stroke-linejoin="round" aria-hidden="true">
+        <rect x="4" y="5" width="16" height="14" rx="4"></rect>
+        <path d="M8 9h8"></path>
+        <path d="M8 13h5"></path>
+        <circle cx="17" cy="16" r="1.4" fill="currentColor" stroke="none"></circle>
       </svg>
     `;
   }
@@ -3804,6 +3861,14 @@ export function teardown() {
   if (documentClickHandler) {
     document.removeEventListener('click', documentClickHandler);
     documentClickHandler = null;
+  }
+
+  window.__blankBoardPMReady = false;
+  window.__blankBoardPendingPMOpen = false;
+
+  if (pendingPMOpenHandler) {
+    window.removeEventListener('blank-board:open-plugin-manager-requested', pendingPMOpenHandler);
+    pendingPMOpenHandler = null;
   }
 
   if (pmRegisterMenuActionHandler && apiRef?.bus) {
