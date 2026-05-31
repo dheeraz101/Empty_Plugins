@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '5.9.3-v4',
+  version: '5.9.4-v4',
   compat: '>=4.0.0',
   permissions: [
     'ui',
@@ -1641,7 +1641,7 @@ export function setup(api) {
 
     rows = rows.filter(({ p, remoteMeta }) => {
       if (installedFilter === 'system' && !isSystemPlugin(p)) return false;
-      if (installedFilter === 'updates' && !hasPluginUpdate(p, remoteMeta)) return false;
+      if (installedFilter === 'updates' && !hasPluginUpdate(p, remoteMeta) && !isBusy(p)) return false;
       if (installedFilter === 'failed' && !['failed', 'blocked'].includes(getPluginStatus(p))) return false;
 
       if (globalSearch.trim()) {
@@ -2175,20 +2175,29 @@ export function setup(api) {
     const entry = api.registry.getAll().find(p => p.id === id);
     if (!entry || isBusy(entry)) return;
 
+    const originalButtonHTML = btn?.innerHTML || null;
+    setButtonBusy(btn, `${iconRefresh(14)}<span>Checking…</span>`);
+
     const updateUrl = getRemoteUrl(entry);
     const remoteMeta = await fetchRemoteMeta(updateUrl);
 
     if (!remoteMeta || remoteMeta.__error) {
+      resetButton(btn, originalButtonHTML);
       api.notify('Could not read update metadata', 'error');
       return;
     }
 
+    remoteMetaCache.set(id, remoteMeta);
+
     if (!hasPluginUpdate(entry, remoteMeta)) {
+      resetButton(btn, originalButtonHTML);
       api.notify('Plugin is already up to date', 'success');
+      renderInstalled(false);
       return;
     }
 
     if (!isCompatible(remoteMeta.compat || entry.compat)) {
+      resetButton(btn, originalButtonHTML);
       api.notify('This update is not compatible with your Blank Board version', 'error');
       return;
     }
@@ -2205,12 +2214,14 @@ export function setup(api) {
     });
 
     if (!confirmed.confirmed) {
+      resetButton(btn, originalButtonHTML);
       log('pm:update-cancelled', { id });
       return;
     }
 
-    setButtonBusy(btn, 'Updating…');
+    setButtonBusy(btn, `${iconRefresh(14)}<span>Updating…</span>`);
     setPluginStatus(id, 'updating');
+    renderInstalled(false);
 
     log('pm:update-start', {
       id,
@@ -2272,7 +2283,7 @@ export function setup(api) {
       handlePluginFailure(id, err, 'Update failed');
     }
 
-    renderInstalled(true);
+    renderInstalled(false);
   }
 
   async function deletePluginWithConfirmation(id) {
@@ -3262,7 +3273,7 @@ export function setup(api) {
   }
 
   async function checkForUpdatesFromButton(btn) {
-    const originalHTML = btn.innerHTML;
+    const defaultHTML = `${iconRefresh(14)}<span>Check Updates</span>`;
 
     btn.disabled = true;
     btn.classList.add('spinning');
@@ -3281,22 +3292,20 @@ export function setup(api) {
 
         if (updateCount > 0) {
           btn.innerHTML = `${iconRefresh(14)}<span>${updateCount} Update${updateCount === 1 ? '' : 's'}</span>`;
-        } else {
-          btn.innerHTML = `${iconCheck(14)}<span>You're up to date</span>`;
-
-          window.setTimeout(() => {
-            btn.innerHTML = originalHTML;
-            btn.disabled = false;
-          }, 1800);
-
+          btn.disabled = false;
           return;
         }
 
-        btn.disabled = false;
+        btn.innerHTML = `${iconCheck(14)}<span>You're up to date</span>`;
+
+        window.setTimeout(() => {
+          btn.innerHTML = defaultHTML;
+          btn.disabled = false;
+        }, 1800);
       }, wait);
     } catch (err) {
       btn.classList.remove('spinning');
-      btn.innerHTML = originalHTML;
+      btn.innerHTML = defaultHTML;
       btn.disabled = false;
 
       api.notify('Could not check updates', 'error');
