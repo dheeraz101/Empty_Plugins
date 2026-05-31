@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '5.9.1-v4',
+  version: '5.9.2-v4',
   compat: '>=4.0.0',
   permissions: [
     'ui',
@@ -136,6 +136,18 @@ export function setup(api) {
 
   .pm-tab-container { display: flex; align-items: center; justify-content: space-between; width: 100%; }
 
+  .pm-tab.pm-tab-action {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .pm-tab.pm-tab-action svg {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 16px;
+    stroke-width: 2.25;
+  }
+
   .pm-badge {
     background: var(--pm-red);
     color: white;
@@ -155,7 +167,7 @@ export function setup(api) {
   }
 
   .pm-search-sidebar {
-    margin: 10px 0 12px 0;
+    margin: 12px 0 12px 0;
     position: relative;
   }
 
@@ -585,13 +597,37 @@ export function setup(api) {
   .pm-empty-subtitle { font-size: 14px; color: var(--pm-soft-muted); line-height: 1.4; margin-bottom: 16px; }
 
   .pm-options-modal {
-    width: 460px;
+    width: 500px;
   }
 
   .pm-options-grid {
     display: grid;
     gap: 10px;
     margin: 14px 0 18px 0;
+  }
+
+  .pm-options-section {
+    margin: 0 0 18px 0;
+  }
+
+  .pm-options-section-title {
+    margin: 0 0 9px 2px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #86868b;
+  }
+
+  .pm-option-card[disabled] {
+    opacity: 0.42;
+    cursor: not-allowed;
+    pointer-events: none;
+    transform: none !important;
+  }
+
+  .pm-option-card[disabled] .pm-option-icon {
+    color: #86868b;
   }
 
   .pm-option-card {
@@ -932,66 +968,53 @@ export function setup(api) {
   .pm-combined-badge-row {
     display: flex;
     align-items: center;
-    gap: 0;
+    gap: 6px;
     flex-wrap: wrap;
     overflow: visible;
     margin-top: 8px;
   }
 
-  .pm-combined-badge-row > span {
-    flex: 0 0 auto;
+  .pm-badge-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    min-width: 0;
   }
 
-  .pm-combined-badge-row > span + span::before {
-    content: "•";
-    display: inline-block;
-    margin: 0 7px 0 6px;
+  .pm-badge-divider {
     color: var(--pm-soft-muted);
-    opacity: 0.65;
-    font-weight: 700;
+    opacity: 0.7;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1;
+    margin: 0 1px;
+    user-select: none;
   }
 
   .pm-combined-badge-row .plugin-badge,
   .pm-combined-badge-row .perm-badge,
   .pm-combined-badge-row .trust-badge {
-    background: transparent !important;
-    padding: 0 !important;
-    min-height: auto !important;
-    height: auto !important;
-    line-height: 1.2 !important;
-    border-radius: 0 !important;
-    font-size: 11.5px !important;
-    font-weight: 650 !important;
-    letter-spacing: -0.005em !important;
-    text-transform: none !important;
+    padding: 2px 8px;
+    border-radius: 999px;
+    min-height: 18px;
+    line-height: 18px;
+    font-size: 11px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
   }
 
-  .pm-combined-badge-row .badge-new,
+  .pm-combined-badge-row .plugin-badge {
+    text-transform: uppercase;
+    letter-spacing: 0.45px;
+  }
+
+  .pm-combined-badge-row .perm-badge,
   .pm-combined-badge-row .trust-badge {
-    color: var(--pm-muted) !important;
-  }
-
-  .pm-combined-badge-row .perm-badge.risky,
-  .pm-combined-badge-row .badge-risk {
-    color: #ffb340 !important;
-  }
-
-  .pm-combined-badge-row .badge-system {
-    color: #a9a7ff !important;
-  }
-
-  .pm-combined-badge-row .badge-enabled {
-    color: #34c759 !important;
-  }
-
-  .pm-combined-badge-row .badge-disabled {
-    color: #a1a1a6 !important;
-  }
-
-  .pm-combined-badge-row .badge-failed,
-  .pm-combined-badge-row .badge-blocked,
-  .pm-combined-badge-row .badge-incompatible {
-    color: #ff6961 !important;
+    text-transform: none;
+    letter-spacing: 0;
   }
 
   @keyframes pm-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
@@ -1135,6 +1158,11 @@ export function setup(api) {
       <div class="pm-tab" data-tab="community">
         ${iconGlobe()}
         <span>Community</span>
+      </div>
+
+      <div class="pm-tab pm-tab-action" data-act="open-options" title="Open Plugin Manager options">
+        ${iconOptions()}
+        <span>Options</span>
       </div>
 
       <div class="pm-search-sidebar">
@@ -1376,19 +1404,16 @@ export function setup(api) {
     const actions = root.querySelector('#pm-actions');
     actions.innerHTML = '';
 
-    const optionsBtn = document.createElement('button');
-    optionsBtn.className = 'pm-btn pm-btn-secondary pm-sidebar-action-btn';
-    optionsBtn.innerHTML = `${iconOptions(15)}<span>Options</span>`;
-    optionsBtn.title = 'Open Plugin Manager options';
-    optionsBtn.onclick = openOptionsModal;
-    actions.appendChild(optionsBtn);
-
     const pluginIconRow = document.createElement('div');
     pluginIconRow.id = 'pm-plugin-icon-actions';
     pluginIconRow.className = 'pm-plugin-icon-actions';
-    actions.appendChild(pluginIconRow);
 
     slots['sidebar-icons'] = pluginIconRow;
+
+    // Keep this slot mounted but hidden.
+    // External plugins can still register UI here, and Options popup will render them as option cards.
+    actions.style.display = 'none';
+    actions.appendChild(pluginIconRow);
 
     restoreRegisteredUI('sidebar-icons');
 
@@ -1697,13 +1722,21 @@ export function setup(api) {
           <div class="plugin-meta">${escapeHTML(p.id)}</div>
           ${p.description ? `<div class="plugin-desc">${escapeHTML(p.description)}</div>` : ''}
           <div class="pm-badge-row pm-combined-badge-row">
-            ${statusBadge}
-            ${systemBadge}
-            ${updateBadge}
-            ${incompatible ? '<span class="plugin-badge badge-incompatible">Not Compatible</span>' : ''}
-            ${crashHtml}
-            ${sourceBadge}
-            ${permBadges}
+            <span class="pm-badge-group pm-badge-group-main">
+              ${statusBadge}
+              ${systemBadge}
+              ${updateBadge}
+              ${incompatible ? '<span class="plugin-badge badge-incompatible">Not Compatible</span>' : ''}
+              ${crashHtml}
+              ${sourceBadge}
+            </span>
+
+            ${permBadges ? `
+              <span class="pm-badge-divider">•</span>
+              <span class="pm-badge-group pm-badge-group-permissions">
+                ${permBadges}
+              </span>
+            ` : ''}
           </div>
           ${errorHtml}
         </div>
@@ -1748,7 +1781,21 @@ export function setup(api) {
           </div>
           <div class="plugin-meta">${escapeHTML(p.author || 'Unknown')} • ${escapeHTML(p.id)}</div>
           <div class="plugin-desc">${escapeHTML(p.description || '')}</div>
-          <div class="pm-badge-row pm-combined-badge-row">${badges}${permBadges}</div>
+          <div class="pm-badge-row pm-combined-badge-row">
+            ${badges ? `
+              <span class="pm-badge-group pm-badge-group-main">
+                ${badges}
+              </span>
+            ` : ''}
+
+            ${badges && permBadges ? `<span class="pm-badge-divider">•</span>` : ''}
+
+            ${permBadges ? `
+              <span class="pm-badge-group pm-badge-group-permissions">
+                ${permBadges}
+              </span>
+            ` : ''}
+          </div>
         </div>
         <div class="pm-action-group" style="min-width:112px;">
           ${
@@ -1766,21 +1813,15 @@ export function setup(api) {
   // ─────────────────────────────────────────────
 
   async function onRootClick(e) {
-    const tab = e.target.closest('.pm-tab');
-    if (tab && root.contains(tab)) {
-      e.preventDefault();
-      switchTab(tab.dataset.tab);
-      return;
-    }
-
-    const pluginCard = e.target.closest('[data-plugin-id]');
-    const communityCard = e.target.closest('[data-community-id]');
-    const btn = e.target.closest('button');
+    const btn = e.target.closest('button, .pm-tab');
 
     if (btn && root.contains(btn)) {
       await handleButtonClick(btn, e);
       return;
     }
+
+    const pluginCard = e.target.closest('[data-plugin-id]');
+    const communityCard = e.target.closest('[data-community-id]');
 
     if (pluginCard && root.contains(pluginCard)) {
       showPluginDetails(pluginCard.dataset.pluginId);
@@ -1794,6 +1835,20 @@ export function setup(api) {
 
   async function handleButtonClick(btn, e) {
     const id = btn.dataset.id;
+
+    if (btn.dataset.act === 'open-options') {
+      e.preventDefault();
+      e.stopPropagation();
+      openOptionsModal();
+      return;
+    }
+
+    if (btn.dataset.tab) {
+      e.preventDefault();
+      e.stopPropagation();
+      switchTab(btn.dataset.tab);
+      return;
+    }
 
     if (btn.dataset.act === 'check-updates') {
       e.preventDefault();
@@ -2367,36 +2422,69 @@ export function setup(api) {
     overlay.className = 'pm-modal-overlay';
     overlay.style.zIndex = '2147483647';
 
+    const externalActions = getRegisteredOptionActions();
+
     overlay.innerHTML = `
       <div class="pm-modal-content pm-options-modal">
         <h3 class="pm-modal-title">Plugin Manager Options</h3>
         <p class="pm-modal-message">Quick tools for installing, recovering, and managing your plugin workspace.</p>
 
-        <div class="pm-options-grid">
-          <button class="pm-option-card" data-option-act="install-url">
-            <span class="pm-option-icon">${iconPlus(18)}</span>
-            <span class="pm-option-text">
-              <strong>Install via URL</strong>
-              <small>Add a plugin from a direct JavaScript file URL.</small>
-            </span>
-          </button>
+        <div class="pm-options-section">
+          <div class="pm-options-section-title">Core Tools</div>
 
-          <button class="pm-option-card ${isSafeModeOn() ? 'active' : ''}" data-option-act="safe-mode">
-            <span class="pm-option-icon">${iconShield(18)}</span>
-            <span class="pm-option-text">
-              <strong>${isSafeModeOn() ? 'Turn Off Safe Mode' : 'Safe Mode'}</strong>
-              <small>${isSafeModeOn() ? 'Allow normal plugins to run again.' : 'Disable non-system plugins for recovery.'}</small>
-            </span>
-          </button>
+          <div class="pm-options-grid">
+            <button class="pm-option-card" data-option-act="install-url">
+              <span class="pm-option-icon">${iconPlus(18)}</span>
+              <span class="pm-option-text">
+                <strong>Install via URL</strong>
+                <small>Add a plugin from a direct JavaScript file URL.</small>
+              </span>
+            </button>
 
-          <button class="pm-option-card" data-option-act="reset-layout">
-            <span class="pm-option-icon">${iconReset(18)}</span>
-            <span class="pm-option-text">
-              <strong>Reset Layout</strong>
-              <small>Restore Plugin Manager position and size.</small>
-            </span>
-          </button>
+            <button class="pm-option-card ${isSafeModeOn() ? 'active' : ''}" data-option-act="safe-mode">
+              <span class="pm-option-icon">${iconShield(18)}</span>
+              <span class="pm-option-text">
+                <strong>${isSafeModeOn() ? 'Turn Off Safe Mode' : 'Safe Mode'}</strong>
+                <small>${isSafeModeOn() ? 'Allow normal plugins to run again.' : 'Disable non-system plugins for recovery.'}</small>
+              </span>
+            </button>
+
+            <button class="pm-option-card" data-option-act="reset-layout">
+              <span class="pm-option-icon">${iconReset(18)}</span>
+              <span class="pm-option-text">
+                <strong>Reset Layout</strong>
+                <small>Restore Plugin Manager position and size.</small>
+              </span>
+            </button>
+          </div>
         </div>
+
+        ${
+          externalActions.length
+            ? `
+              <div class="pm-options-section">
+                <div class="pm-options-section-title">Extension Tools</div>
+
+                <div class="pm-options-grid">
+                  ${externalActions.map(action => `
+                    <button
+                      class="pm-option-card"
+                      data-option-ui-owner="${escapeAttr(action.owner)}"
+                      data-option-ui-id="${escapeAttr(action.uiId)}"
+                      ${action.disabled ? 'disabled' : ''}
+                    >
+                      <span class="pm-option-icon">${action.icon}</span>
+                      <span class="pm-option-text">
+                        <strong>${escapeHTML(action.label)}</strong>
+                        <small>${escapeHTML(action.ownerLabel)}</small>
+                      </span>
+                    </button>
+                  `).join('')}
+                </div>
+              </div>
+            `
+            : ''
+        }
 
         <div class="pm-modal-actions">
           <button class="pm-btn pm-btn-secondary" data-option-act="close">Close</button>
@@ -2410,10 +2498,19 @@ export function setup(api) {
     }
 
     async function onClick(e) {
-      const btn = e.target.closest('[data-option-act]');
+      const btn = e.target.closest('[data-option-act], [data-option-ui-owner]');
       if (!btn) return;
 
       const action = btn.dataset.optionAct;
+
+      if (btn.dataset.optionUiOwner) {
+        const owner = btn.dataset.optionUiOwner;
+        const uiId = btn.dataset.optionUiId;
+
+        close();
+        runRegisteredOptionAction(owner, uiId);
+        return;
+      }
 
       if (action === 'close') {
         close();
@@ -2428,11 +2525,13 @@ export function setup(api) {
 
       if (action === 'safe-mode') {
         close();
+
         if (isSafeModeOn()) {
           await disableSafeMode();
         } else {
           await enableSafeMode();
         }
+
         return;
       }
 
@@ -2453,6 +2552,87 @@ export function setup(api) {
     overlay.addEventListener('click', onClick);
     document.addEventListener('keydown', onKeyDown);
     document.documentElement.appendChild(overlay);
+  }
+
+  function getRegisteredOptionActions() {
+    const actions = [];
+    const seen = new Set();
+
+    for (const [owner, items] of slotRegistry.entries()) {
+      for (const el of items) {
+        if (!(el instanceof HTMLElement)) continue;
+        if (el.dataset.pmSlot !== 'sidebar-icons') continue;
+
+        const uiId = el.dataset.uiId || '';
+        const key = `${owner}:${uiId}`;
+
+        if (seen.has(key)) continue;
+        seen.add(key);
+
+        const label =
+          el.getAttribute('aria-label') ||
+          el.title ||
+          el.dataset.label ||
+          ownerToLabel(owner);
+
+        actions.push({
+          owner,
+          uiId,
+          label,
+          ownerLabel: ownerToLabel(owner),
+          icon: extractOptionIcon(el),
+          disabled: el.disabled === true
+        });
+      }
+    }
+
+    return actions;
+  }
+
+  function runRegisteredOptionAction(owner, uiId) {
+    const items = slotRegistry.get(owner) || [];
+    const el = items.find(item => item instanceof HTMLElement && (item.dataset.uiId || '') === uiId);
+
+    if (!el) {
+      api.notify('Option is no longer available', 'error');
+      return;
+    }
+
+    if (el.disabled) {
+      api.notify('Option is currently disabled', 'error');
+      return;
+    }
+
+    try {
+      el.click();
+    } catch (err) {
+      console.error('[Plugin Manager] registered option failed:', err);
+      api.notify('Option failed', 'error');
+    }
+  }
+
+  function extractOptionIcon(el) {
+    const svg = el.querySelector('svg');
+
+    if (svg) {
+      return svg.outerHTML;
+    }
+
+    const text = String(el.textContent || '').trim();
+
+    if (text && [...text].length <= 3) {
+      return `<span style="font-size:17px;line-height:1;">${escapeHTML(text)}</span>`;
+    }
+
+    return iconOptions(18);
+  }
+
+  function ownerToLabel(owner = '') {
+    return String(owner || 'Plugin')
+      .split(/[-_\s]+/)
+      .filter(Boolean)
+      .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
   }
 
   async function showInstallConfirm(pluginDef) {
