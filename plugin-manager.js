@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '5.7.8-v4',
+  version: '5.7.9-v4',
   compat: '>=4.0.0',
   permissions: [
     'ui',
@@ -30,6 +30,10 @@ export function setup(api) {
 
   const SELF_ID = meta.id;
   const COMMUNITY_URL = 'https://raw.githubusercontent.com/dheeraz101/Empty_Plugins/refs/heads/main/plugins.json';
+  const COMMUNITY_FALLBACK_URLS = [
+    COMMUNITY_URL,
+    'https://cdn.jsdelivr.net/gh/dheeraz101/Empty_Plugins@main/plugins.json'
+  ];
   const DOCS_URL = 'https://empty-ad9a3406.mintlify.app/introduction';
   const CORE_VERSION = String(api.version || '4.0.0');
   const CACHE_TIMEOUT = 10 * 60 * 1000;
@@ -2617,38 +2621,50 @@ export function setup(api) {
   }
 
   async function refreshCommunityCache({ hard = false } = {}) {
-    const bustUrl = COMMUNITY_URL + (COMMUNITY_URL.includes('?') ? '&' : '?') + 'v=' + Date.now();
+    let lastError = null;
 
-    const res = await fetch(hard ? bustUrl : COMMUNITY_URL, {
-      cache: hard ? 'no-store' : 'no-cache',
-      headers: hard
-        ? {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          }
-        : {}
-    });
+    for (const baseUrl of COMMUNITY_FALLBACK_URLS) {
+      try {
+        const url = hard
+          ? baseUrl + (baseUrl.includes('?') ? '&' : '?') + 'v=' + Date.now()
+          : baseUrl;
 
-    if (!res.ok) {
-      throw new Error(`Community HTTP ${res.status}`);
+        const res = await fetch(url, {
+          method: 'GET',
+          cache: hard ? 'reload' : 'default',
+          mode: 'cors'
+        });
+
+        if (!res.ok) {
+          throw new Error(`Community HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        const items = normalizeCommunityPayload(data);
+
+        communityCache = items;
+        lastCommunityCacheTime = Date.now();
+
+        localStorage.setItem(COMMUNITY_CACHE_KEY, JSON.stringify({
+          time: lastCommunityCacheTime,
+          items: communityCache,
+          source: baseUrl
+        }));
+
+        return communityCache;
+      } catch (err) {
+        lastError = err;
+        console.warn('[Plugin Manager] Community source failed:', baseUrl, err);
+      }
     }
 
-    const data = await res.json();
-    const items = normalizeCommunityPayload(data);
-
-    communityCache = items;
-    lastCommunityCacheTime = Date.now();
-
-    localStorage.setItem(COMMUNITY_CACHE_KEY, JSON.stringify({
-      time: lastCommunityCacheTime,
-      items: communityCache
-    }));
-
-    return communityCache;
+    throw lastError || new Error('Community Store failed');
   }
 
   async function hardRefreshCommunity(btn = null) {
     const oldHTML = btn?.innerHTML;
+    const previousCache = [...communityCache];
+    const previousCacheTime = lastCommunityCacheTime;
 
     if (btn) {
       btn.disabled = true;
@@ -2657,25 +2673,26 @@ export function setup(api) {
     }
 
     try {
-      localStorage.removeItem(COMMUNITY_CACHE_KEY);
-      communityCache = [];
-      lastCommunityCacheTime = 0;
-
       await refreshCommunityCache({ hard: true });
       await renderCommunity(false);
 
       api.notify('Community Store refreshed', 'success');
+
       log('pm:community-hard-refresh', {
         count: communityCache.length
       });
     } catch (err) {
-      api.notify('Community refresh failed', 'error');
-      log('pm:community-hard-refresh-failed', {
-        error: err.message || String(err)
-      });
+      communityCache = previousCache;
+      lastCommunityCacheTime = previousCacheTime;
 
-      if (!communityCache.length) {
+      if (previousCache.length) {
+        await renderCommunity(false);
+        api.notify('Could not refresh. Showing cached store.', 'error');
+      } else {
+        api.notify('Community refresh failed', 'error');
+
         const listEl = root?.querySelector('#community .pm-list');
+
         if (listEl) {
           listEl.innerHTML = emptyStateHTML(
             'Couldn’t refresh Community Store',
@@ -2684,6 +2701,10 @@ export function setup(api) {
           );
         }
       }
+
+      log('pm:community-hard-refresh-failed', {
+        error: err.message || String(err)
+      });
     } finally {
       if (btn) {
         window.setTimeout(() => {
