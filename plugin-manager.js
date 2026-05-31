@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '5.7.9-v4',
+  version: '5.8.0-v4',
   compat: '>=4.0.0',
   permissions: [
     'ui',
@@ -9,7 +9,7 @@ export const meta = {
     'network',
     'registry',
     'system',
-    'global-css'
+    'globalCSS'
   ]
 };
 
@@ -46,7 +46,6 @@ export function setup(api) {
   let installedFilter = 'all';
   let communityFilter = 'all';
   let globalSearch = '';
-  let activeTab = 'installed';
   let communityCache = [];
   let lastCommunityCacheTime = 0;
   let remoteMetaCache = new Map();
@@ -261,6 +260,25 @@ export function setup(api) {
   }
 
   .pm-view-title { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; margin: 0 0 4px 0; }
+  .pm-view-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+    margin: 0 0 22px 0;
+  }
+
+  .pm-view-header .pm-view-title {
+    margin-bottom: 4px;
+  }
+
+  .pm-view-header .pm-view-subtitle {
+    margin-bottom: 0;
+  }
+
+  .pm-community-header .pm-store-refresh-btn {
+    margin-top: 4px;
+  }
   .pm-view-subtitle { font-size: 15px; color: var(--pm-muted); margin: 0 0 24px 0; font-weight: 400; }
   .pm-list { display: flex; flex-direction: column; gap: 12px; position: relative; }
 
@@ -273,14 +291,14 @@ export function setup(api) {
   }
 
   .pm-store-refresh-btn {
-    height: 29px;
-    padding: 0 11px;
-    font-size: 12px;
-    font-weight: 650;
-    letter-spacing: -0.01em;
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
+  height: 31px;
+  padding: 0 12px;
+  font-size: 12.4px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
 
   .pm-store-refresh-btn svg {
     width: 13.5px;
@@ -516,13 +534,13 @@ export function setup(api) {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    opacity: 0.82;
+      opacity: 0.9;
   }
 
   .pm-menu-icon svg {
-    width: 15.5px;
-    height: 15.5px;
-    stroke-width: 2.15;
+    width: 15.75px;
+    height: 15.75px;
+    stroke-width: 2.25;
   }
 
   .pm-menu-label {
@@ -803,18 +821,33 @@ export function setup(api) {
     accent-color: #0071e3;
   }
 
-  .pm-content::-webkit-scrollbar { width: 12px; }
-  .pm-content::-webkit-scrollbar-track { background: transparent; }
+  .pm-content::-webkit-scrollbar {
+    width: 12px;
+  }
+
+  .pm-content::-webkit-scrollbar-track {
+    background: transparent;
+    margin-top: 18px;
+    margin-bottom: 18px;
+  }
+
   .pm-content::-webkit-scrollbar-thumb {
     background-color: rgba(0, 0, 0, 0.08);
-    border-radius: 20px;
+    border-radius: 999px;
     border: 3px solid transparent;
     background-clip: padding-box;
-    min-height: 40px;
+    min-height: 44px;
     transition: background-color 0.2s;
   }
-  .pm-content:hover::-webkit-scrollbar-thumb { background-color: rgba(0, 0, 0, 0.2); }
-  .pm-content { scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.1) transparent; }
+
+  .pm-content:hover::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.2);
+  }
+
+  .pm-content {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0,0,0,0.1) transparent;
+  }
 
   @keyframes pm-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
   @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
@@ -910,9 +943,23 @@ export function setup(api) {
     .pm-modal-warning-box { background: rgba(255,69,58,0.12); border-color: rgba(255,69,58,0.22); color: #ffb4ab; }
     .pm-input { background: rgba(0,0,0,0.2); border-color: rgba(255,255,255,0.1); color: white; }
     .pm-skeleton-card { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.08); }
-    .pm-content::-webkit-scrollbar-thumb { background-color: rgba(255,255,255,0.2); }
-    .pm-content::-webkit-scrollbar-thumb:hover { background-color: rgba(255,255,255,0.35); }
-    .pm-content { scrollbar-color: rgba(255,255,255,0.3) transparent; }
+    .pm-content::-webkit-scrollbar-track {
+      background: transparent;
+      margin-top: 18px;
+      margin-bottom: 18px;
+    }
+
+    .pm-content::-webkit-scrollbar-thumb {
+      background-color: rgba(255,255,255,0.2);
+    }
+
+    .pm-content::-webkit-scrollbar-thumb:hover {
+      background-color: rgba(255,255,255,0.35);
+    }
+
+    .pm-content {
+      scrollbar-color: rgba(255,255,255,0.3) transparent;
+    }
   }
 `;
   document.head.appendChild(style);
@@ -981,8 +1028,18 @@ export function setup(api) {
       </div>
 
       <div id="community" style="display:none;">
-        <h1 class="pm-view-title">Discovery</h1>
-        <p class="pm-view-subtitle">Explore new extensions built by the community.</p>
+        <div class="pm-view-header pm-community-header">
+          <div>
+            <h1 class="pm-view-title">Discovery</h1>
+            <p class="pm-view-subtitle">Explore new extensions built by the community.</p>
+          </div>
+
+          <button class="pm-btn pm-btn-secondary pm-store-refresh-btn" data-act="refresh-community-hard" title="Refresh Community Store">
+            ${iconRefresh(14)}
+            <span>Refresh</span>
+          </button>
+        </div>
+
         <div class="pm-toolbar-row">
           <div class="pm-filter-bar" id="community-filter-bar">
             <button class="pm-filter-btn active" data-filter-community="all">All</button>
@@ -993,12 +1050,8 @@ export function setup(api) {
             <button class="pm-filter-btn" data-filter-community="system">System</button>
             <button class="pm-filter-btn" data-filter-community="new">New</button>
           </div>
-
-          <button class="pm-btn pm-btn-secondary pm-store-refresh-btn" data-act="refresh-community-hard" title="Refresh Community Store">
-            ${iconRefresh(14)}
-            <span>Refresh</span>
-          </button>
         </div>
+
         <div class="pm-list"></div>
       </div>
     </div>
@@ -1337,13 +1390,14 @@ export function setup(api) {
     installedView.style.display = tabName === 'installed' ? 'block' : 'none';
     communityView.style.display = tabName === 'community' ? 'block' : 'none';
 
-    activeTab = tabName;
+    if (tabName === 'installed') {
+      renderInstalled();
+      return;
+    }
 
-    if (tabName === 'installed') renderInstalled();
-    if (tabName === 'community') renderCommunity();if (tabName === 'community') {
+    if (tabName === 'community') {
       renderCommunity();
 
-      // Quiet background check. Keeps cache useful but still updates eventually.
       if (isCommunityCacheStale()) {
         renderCommunity(true);
       }
@@ -1512,7 +1566,6 @@ export function setup(api) {
     const status = p.id === SELF_ID ? 'active' : getPluginStatus(p);
     const displayName = escapeHTML(remoteMeta?.name || p.name || p.id);
     const installedVer = p.version || remoteMeta?.version || p.remoteVersion || null;
-    const remoteVer = remoteMeta?.version || p.remoteVersion || null;
     const hasUpdate = hasPluginUpdate(p, remoteMeta);
     const iconContent = p.icon || remoteMeta?.icon || getCommunityIcon(p.id) || '📦';
     const iconBg = pickColor(p.id);
@@ -3118,9 +3171,32 @@ export function setup(api) {
 
   function menuIcon(type) {
     const icons = {
-      details: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>',
-      sparkle: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.7 5.2L19 10l-5.3 1.8L12 17l-1.7-5.2L5 10l5.3-1.8L12 3z"></path></svg>',
-      update: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6"></path><path d="M2.5 22v-6h6"></path><path d="M2 11.5a10 10 0 0 1 18.8-4.3"></path><path d="M22 12.5a10 10 0 0 1-18.8 4.2"></path></svg>',
+      details: `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="8.5"></circle>
+          <path d="M12 11.5v5"></path>
+          <path d="M12 7.5h.01"></path>
+        </svg>
+      `,
+      'whats-new': `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3.5 14.2 8l4.8.7-3.5 3.4.8 4.8L12 14.6l-4.3 2.3.8-4.8L5 8.7 9.8 8 12 3.5Z"></path>
+          <path d="M19 18.5h.01"></path>
+        </svg>
+      `,
+      sparkle: `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3.5 13.4 8.6 18.5 10 13.4 11.4 12 16.5 10.6 11.4 5.5 10 10.6 8.6 12 3.5Z"></path>
+          <path d="M19 15.5l.7 2.3 2.3.7-2.3.7-.7 2.3-.7-2.3-2.3-.7 2.3-.7.7-2.3Z"></path>
+        </svg>
+      `,
+      update: `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 4v12"></path>
+          <path d="m7 11 5 5 5-5"></path>
+          <path d="M5 20h14"></path>
+        </svg>
+      `,
       reload: `
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 5v7l4 2"></path>
@@ -3128,9 +3204,26 @@ export function setup(api) {
           <path d="M5.2 9.4H2.8V7"></path>
         </svg>
       `,
-      logs: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13"></path><path d="M8 12h13"></path><path d="M8 18h13"></path><path d="M3 6h.01"></path><path d="M3 12h.01"></path><path d="M3 18h.01"></path></svg>',
+      logs: `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M8 6h11"></path>
+          <path d="M8 12h11"></path>
+          <path d="M8 18h11"></path>
+          <path d="M4 6h.01"></path>
+          <path d="M4 12h.01"></path>
+          <path d="M4 18h.01"></path>
+        </svg>
+      `,
       reset: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"></path><path d="M3 4v6h6"></path></svg>',
-      delete: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path></svg>'
+      delete: `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 7h16"></path>
+          <path d="M10 11v6"></path>
+          <path d="M14 11v6"></path>
+          <path d="M6.5 7l.8 13h9.4l.8-13"></path>
+          <path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7"></path>
+        </svg>
+      `,
     };
     return `<span class="pm-menu-icon">${icons[type] || ''}</span>`;
   }
@@ -3173,7 +3266,7 @@ export function setup(api) {
 
   function iconReset(size = 16) {
     return `
-      <svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
+      <svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <rect x="4" y="5" width="16" height="14" rx="3"></rect>
         <path d="M8 9h8"></path>
         <path d="M8 13h4"></path>
@@ -3184,7 +3277,13 @@ export function setup(api) {
   }
 
   function iconEllipsis(size = 16) {
-    return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>`;
+    return `
+      <svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="5.5" cy="12" r="1.65" fill="currentColor"></circle>
+        <circle cx="12" cy="12" r="1.65" fill="currentColor"></circle>
+        <circle cx="18.5" cy="12" r="1.65" fill="currentColor"></circle>
+      </svg>
+    `;
   }
 }
 
