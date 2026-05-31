@@ -14,7 +14,7 @@
     "compat": ">=4.0.0",
     "trust": "community",
     "changelog": "https://github.com/dheeraz101/Empty_Plugins/releases",
-    "version": "0.1.0"
+    "version": "0.4.6"
   },
   {
     "id": "layout-engine",
