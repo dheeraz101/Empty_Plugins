@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '5.8.0-v4',
+  version: '5.9.0-v4',
   compat: '>=4.0.0',
   permissions: [
     'ui',
@@ -584,6 +584,86 @@ export function setup(api) {
   .pm-empty-title { font-size: 17px; color: var(--pm-text); font-weight: 700; margin-bottom: 6px; }
   .pm-empty-subtitle { font-size: 14px; color: var(--pm-soft-muted); line-height: 1.4; margin-bottom: 16px; }
 
+  .pm-options-modal {
+    width: 460px;
+  }
+
+  .pm-options-grid {
+    display: grid;
+    gap: 10px;
+    margin: 14px 0 18px 0;
+  }
+
+  .pm-option-card {
+    width: 100%;
+    border: 1px solid rgba(255,255,255,0.10);
+    background: rgba(255,255,255,0.07);
+    color: #f5f5f7;
+    border-radius: 16px;
+    padding: 13px 14px;
+    display: grid;
+    grid-template-columns: 34px 1fr;
+    gap: 12px;
+    align-items: center;
+    text-align: left;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.18s ease, border-color 0.18s ease, transform 0.15s ease;
+  }
+
+  .pm-option-card:hover {
+    background: rgba(255,255,255,0.11);
+    border-color: rgba(255,255,255,0.16);
+    transform: translateY(-0.5px);
+  }
+
+  .pm-option-card.active {
+    border-color: rgba(52,199,89,0.30);
+    background: rgba(52,199,89,0.12);
+  }
+
+  .pm-option-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255,255,255,0.10);
+    color: #0a84ff;
+  }
+
+  .pm-option-card.active .pm-option-icon {
+    color: #34c759;
+    background: rgba(52,199,89,0.16);
+  }
+
+  .pm-option-icon svg {
+    width: 18px;
+    height: 18px;
+    stroke-width: 2.3;
+  }
+
+  .pm-option-text {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+  }
+
+  .pm-option-text strong {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: #f5f5f7;
+  }
+
+  .pm-option-text small {
+    font-size: 12.4px;
+    line-height: 1.35;
+    color: #a1a1a6;
+  }
+
   .pm-modal-overlay {
     position: fixed; inset:0;
     background: rgba(0,0,0,0.22);
@@ -849,6 +929,71 @@ export function setup(api) {
     scrollbar-color: rgba(0,0,0,0.1) transparent;
   }
 
+  .pm-combined-badge-row {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex-wrap: wrap;
+    overflow: visible;
+    margin-top: 8px;
+  }
+
+  .pm-combined-badge-row > span {
+    flex: 0 0 auto;
+  }
+
+  .pm-combined-badge-row > span + span::before {
+    content: "•";
+    display: inline-block;
+    margin: 0 7px 0 6px;
+    color: var(--pm-soft-muted);
+    opacity: 0.65;
+    font-weight: 700;
+  }
+
+  .pm-combined-badge-row .plugin-badge,
+  .pm-combined-badge-row .perm-badge,
+  .pm-combined-badge-row .trust-badge {
+    background: transparent !important;
+    padding: 0 !important;
+    min-height: auto !important;
+    height: auto !important;
+    line-height: 1.2 !important;
+    border-radius: 0 !important;
+    font-size: 11.5px !important;
+    font-weight: 650 !important;
+    letter-spacing: -0.005em !important;
+    text-transform: none !important;
+  }
+
+  .pm-combined-badge-row .badge-new,
+  .pm-combined-badge-row .trust-badge {
+    color: var(--pm-muted) !important;
+  }
+
+  .pm-combined-badge-row .perm-badge.risky,
+  .pm-combined-badge-row .badge-risk {
+    color: #ffb340 !important;
+  }
+
+  .pm-combined-badge-row .badge-system {
+    color: #a9a7ff !important;
+  }
+
+  .pm-combined-badge-row .badge-enabled {
+    color: #34c759 !important;
+  }
+
+  .pm-combined-badge-row .badge-disabled {
+    color: #a1a1a6 !important;
+  }
+
+  .pm-combined-badge-row .badge-failed,
+  .pm-combined-badge-row .badge-blocked,
+  .pm-combined-badge-row .badge-incompatible {
+    color: #ff6961 !important;
+  }
+
   @keyframes pm-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
   @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
   @keyframes pm-shimmer { 100% { transform:translateX(100%); } }
@@ -1014,8 +1159,18 @@ export function setup(api) {
 
     <div class="pm-content">
       <div id="installed">
-        <h1 class="pm-view-title">Installed Plugins</h1>
-        <p class="pm-view-subtitle">Manage and configure your active workspace tools.</p>
+        <div class="pm-view-header pm-installed-header">
+          <div>
+            <h1 class="pm-view-title">Installed Plugins</h1>
+            <p class="pm-view-subtitle">Manage and configure your active workspace tools.</p>
+          </div>
+
+          <button class="pm-btn pm-btn-secondary pm-header-action-btn check-updates" data-act="check-updates" title="Check for plugin updates">
+            ${iconRefresh(14)}
+            <span>Check Updates</span>
+          </button>
+        </div>
+
         <div class="pm-toolbar-row">
           <div class="pm-filter-bar">
             <button class="pm-filter-btn active" data-filter-installed="all">All</button>
@@ -1221,65 +1376,25 @@ export function setup(api) {
     const actions = root.querySelector('#pm-actions');
     actions.innerHTML = '';
 
-    const checkUpdatesBtn = document.createElement('button');
-    checkUpdatesBtn.className = 'pm-btn pm-btn-secondary check-updates';
-    checkUpdatesBtn.classList.add('pm-sidebar-action-btn');
-    checkUpdatesBtn.innerHTML = `${iconRefresh(15)}<span>Check Updates</span>`;
-    checkUpdatesBtn.onclick = async () => {
-      const originalHTML = checkUpdatesBtn.innerHTML;
+    const optionsBtn = document.createElement('button');
+    optionsBtn.className = 'pm-btn pm-btn-secondary pm-sidebar-action-btn';
+    optionsBtn.innerHTML = `${iconOptions(15)}<span>Options</span>`;
+    optionsBtn.title = 'Open Plugin Manager options';
+    optionsBtn.onclick = openOptionsModal;
+    actions.appendChild(optionsBtn);
 
-      checkUpdatesBtn.disabled = true;
-      checkUpdatesBtn.classList.add('spinning');
-      checkUpdatesBtn.innerHTML = `${iconRefresh(15)}<span>Checking…</span>`;
+    const pluginIconRow = document.createElement('div');
+    pluginIconRow.id = 'pm-plugin-icon-actions';
+    pluginIconRow.className = 'pm-plugin-icon-actions';
+    actions.appendChild(pluginIconRow);
 
-      const startedAt = Date.now();
+    slots['sidebar-icons'] = pluginIconRow;
 
-      await renderInstalled(true);
+    restoreRegisteredUI('sidebar-icons');
 
-      const elapsed = Date.now() - startedAt;
-      const wait = Math.max(0, 2000 - elapsed);
-
-      setTimeout(() => {
-        checkUpdatesBtn.classList.remove('spinning');
-
-        if (updateCount > 0) {
-        checkUpdatesBtn.innerHTML = `${iconRefresh(15)}<span>${updateCount} Update${updateCount === 1 ? '' : 's'}</span>`;
-        } else {
-        checkUpdatesBtn.innerHTML = `${iconCheck(15)}<span>You're up to date</span>`;
-
-          setTimeout(() => {
-            checkUpdatesBtn.innerHTML = originalHTML;
-            checkUpdatesBtn.disabled = false;
-          }, 1800);
-
-          return;
-        }
-
-        checkUpdatesBtn.disabled = false;
-      }, wait);
-    };
-    actions.appendChild(checkUpdatesBtn);
-
-    const installBtn = document.createElement('button');
-    installBtn.className = 'pm-btn pm-btn-primary';
-    installBtn.classList.add('pm-sidebar-action-btn');
-    installBtn.innerHTML = `${iconPlus(15)}<span>Install via URL</span>`;
-    installBtn.onclick = openInstallModal;
-    actions.appendChild(installBtn);
-
-    const safeBtn = document.createElement('button');
-    safeBtn.className = `pm-btn pm-btn-secondary ${isSafeModeOn() ? 'pm-btn-safe-active' : ''}`;
-    safeBtn.classList.add('pm-sidebar-action-btn');
-    safeBtn.innerHTML = `${iconShield(15)}<span>${isSafeModeOn() ? 'Safe Mode On' : 'Safe Mode'}</span>`;
-    safeBtn.title = isSafeModeOn() ? 'Safe Mode is active. Click to turn it off.' : 'Disable all non-system plugins.';
-    safeBtn.onclick = isSafeModeOn() ? disableSafeMode : enableSafeMode;
-    actions.appendChild(safeBtn);
-
-    const resetLayoutBtn = document.createElement('button');
-    resetLayoutBtn.className = 'pm-btn pm-btn-secondary pm-sidebar-action-btn';
-    resetLayoutBtn.innerHTML = `${iconReset(15)}<span>Reset Layout</span>`;
-    resetLayoutBtn.onclick = resetPluginManagerLayout;
-    actions.appendChild(resetLayoutBtn);
+    api.bus.emit('pm:ui-slots-ready', {
+      slots: Object.keys(slots)
+    });
 
     const pluginIconRow = document.createElement('div');
     pluginIconRow.id = 'pm-plugin-icon-actions';
@@ -1593,15 +1708,16 @@ export function setup(api) {
             <span class="plugin-badge badge-disabled">${versionText}</span>
           </div>
           <div class="plugin-meta">${escapeHTML(p.id)}</div>
-          <div class="pm-badge-row">
+          ${p.description ? `<div class="plugin-desc">${escapeHTML(p.description)}</div>` : ''}
+          <div class="pm-badge-row pm-combined-badge-row">
             ${statusBadge}
             ${systemBadge}
             ${updateBadge}
             ${incompatible ? '<span class="plugin-badge badge-incompatible">Not Compatible</span>' : ''}
             ${crashHtml}
             ${sourceBadge}
+            ${permBadges}
           </div>
-          <div class="pm-badge-row">${permBadges}</div>
           ${errorHtml}
         </div>
         <div class="pm-action-group">
@@ -1632,7 +1748,8 @@ export function setup(api) {
       `<span class="trust-badge">${escapeHTML(categoryLabel(category))}</span>`
     ].filter(Boolean).join('');
 
-    const permBadges = permissions.slice(0, 4).map(permissionBadgeHTML).join('');
+    const visiblePermissions = permissions.filter(permission => permission !== 'system');
+    const permBadges = visiblePermissions.slice(0, 4).map(permissionBadgeHTML).join('');
 
     return `
       <div class="plugin-item clickable" data-community-id="${escapeAttr(p.id)}">
@@ -1643,14 +1760,13 @@ export function setup(api) {
             ${displayVersion ? `<span class="plugin-badge badge-disabled">v${escapeHTML(displayVersion)}</span>` : ''}
           </div>
           <div class="plugin-meta">${escapeHTML(p.author || 'Unknown')} • ${escapeHTML(p.id)}</div>
-          <div class="pm-badge-row">${badges}</div>
-          <div class="pm-badge-row">${permBadges}</div>
           <div class="plugin-desc">${escapeHTML(p.description || '')}</div>
+          <div class="pm-badge-row pm-combined-badge-row">${badges}${permBadges}</div>
         </div>
         <div class="pm-action-group" style="min-width:112px;">
           ${
             isInstalled
-              ? `<button class="pm-btn pm-btn-secondary" disabled style="width:100%;">Installed</button>`
+              ? `<button class="pm-btn pm-btn-danger" style="width:100%;" data-community-remove="${escapeAttr(p.id)}">Remove</button>`
               : `<button class="pm-btn pm-btn-primary" style="width:100%;" data-install="${escapeAttr(p.id)}" data-url="${escapeAttr(p.url)}" ${incompatible ? 'disabled title="Not compatible with this Blank Board version"' : ''}>Install</button>`
           }
         </div>
@@ -1691,6 +1807,13 @@ export function setup(api) {
 
   async function handleButtonClick(btn, e) {
     const id = btn.dataset.id;
+
+    if (btn.dataset.act === 'check-updates') {
+      e.preventDefault();
+      e.stopPropagation();
+      await checkForUpdatesFromButton(btn);
+      return;
+    }
 
     if (btn.dataset.act === 'clear-search') {
       clearSearch();
@@ -1752,6 +1875,15 @@ export function setup(api) {
       e.preventDefault();
       e.stopPropagation();
       await updatePlugin(btn.dataset.update, btn);
+      return;
+    }
+
+    if (btn.dataset.communityRemove) {
+      e.preventDefault();
+      e.stopPropagation();
+      await deletePluginWithConfirmation(btn.dataset.communityRemove);
+      await renderCommunity(false);
+      await renderInstalled(false);
       return;
     }
   }
@@ -2243,6 +2375,99 @@ export function setup(api) {
     };
   }
 
+  function openOptionsModal() {
+    const overlay = document.createElement('div');
+    overlay.className = 'pm-modal-overlay';
+    overlay.style.zIndex = '2147483647';
+
+    overlay.innerHTML = `
+      <div class="pm-modal-content pm-options-modal">
+        <h3 class="pm-modal-title">Plugin Manager Options</h3>
+        <p class="pm-modal-message">Quick tools for installing, recovering, and managing your plugin workspace.</p>
+
+        <div class="pm-options-grid">
+          <button class="pm-option-card" data-option-act="install-url">
+            <span class="pm-option-icon">${iconPlus(18)}</span>
+            <span class="pm-option-text">
+              <strong>Install via URL</strong>
+              <small>Add a plugin from a direct JavaScript file URL.</small>
+            </span>
+          </button>
+
+          <button class="pm-option-card ${isSafeModeOn() ? 'active' : ''}" data-option-act="safe-mode">
+            <span class="pm-option-icon">${iconShield(18)}</span>
+            <span class="pm-option-text">
+              <strong>${isSafeModeOn() ? 'Turn Off Safe Mode' : 'Safe Mode'}</strong>
+              <small>${isSafeModeOn() ? 'Allow normal plugins to run again.' : 'Disable non-system plugins for recovery.'}</small>
+            </span>
+          </button>
+
+          <button class="pm-option-card" data-option-act="reset-layout">
+            <span class="pm-option-icon">${iconReset(18)}</span>
+            <span class="pm-option-text">
+              <strong>Reset Layout</strong>
+              <small>Restore Plugin Manager position and size.</small>
+            </span>
+          </button>
+        </div>
+
+        <div class="pm-modal-actions">
+          <button class="pm-btn pm-btn-secondary" data-option-act="close">Close</button>
+        </div>
+      </div>
+    `;
+
+    function close() {
+      overlay.remove();
+      document.removeEventListener('keydown', onKeyDown);
+    }
+
+    async function onClick(e) {
+      const btn = e.target.closest('[data-option-act]');
+      if (!btn) return;
+
+      const action = btn.dataset.optionAct;
+
+      if (action === 'close') {
+        close();
+        return;
+      }
+
+      if (action === 'install-url') {
+        close();
+        openInstallModal();
+        return;
+      }
+
+      if (action === 'safe-mode') {
+        close();
+        if (isSafeModeOn()) {
+          await disableSafeMode();
+        } else {
+          await enableSafeMode();
+        }
+        return;
+      }
+
+      if (action === 'reset-layout') {
+        close();
+        resetPluginManagerLayout();
+      }
+    }
+
+    function onKeyDown(e) {
+      if (e.key === 'Escape') close();
+    }
+
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) close();
+    });
+
+    overlay.addEventListener('click', onClick);
+    document.addEventListener('keydown', onKeyDown);
+    document.documentElement.appendChild(overlay);
+  }
+
   async function showInstallConfirm(pluginDef) {
     const permissions = normalizePermissions(pluginDef.permissions || inferPermissions(pluginDef));
     const permissionList = permissions.length
@@ -2414,6 +2639,8 @@ export function setup(api) {
       ['URL', p.url || 'Unknown']
     ];
 
+    const isInstalled = api.registry.getAll().some(item => item.id === p.id);
+
     showInfoModal({
       title: p.name || p.id,
       subtitle: p.description || 'Community plugin.',
@@ -2421,9 +2648,19 @@ export function setup(api) {
       actions: `
         <button class="pm-btn pm-btn-secondary" data-confirm-action="whats-new-community">What’s New</button>
         <button class="pm-btn pm-btn-secondary" data-confirm-action="cancel">Close</button>
-        <button class="pm-btn pm-btn-primary" data-confirm-action="install">Install</button>
+        ${isInstalled
+          ? `<button class="pm-btn pm-btn-danger" data-modal-action="remove">Remove</button>`
+          : `<button class="pm-btn pm-btn-primary" data-modal-action="install">Install</button>`
+        }
       `,
       onAction: async (action) => {
+        if (action === 'remove') {
+          close();
+          await deletePluginWithConfirmation(plugin.id);
+          await renderCommunity(false);
+          await renderInstalled(false);
+          return;
+        }
         if (action === 'whats-new-community') showWhatsNewModal(p.id);
         if (action === 'install') await installCommunityPlugin(p.id, p.url, null);
       }
@@ -2782,6 +3019,52 @@ export function setup(api) {
     } catch (e) {
       console.error('Fetch failed for:', url, e);
       return { __error: true, message: e.message };
+    }
+  }
+
+  async function checkForUpdatesFromButton(btn) {
+    const originalHTML = btn.innerHTML;
+
+    btn.disabled = true;
+    btn.classList.add('spinning');
+    btn.innerHTML = `${iconRefresh(14)}<span>Checking…</span>`;
+
+    const startedAt = Date.now();
+
+    try {
+      await renderInstalled(true);
+
+      const elapsed = Date.now() - startedAt;
+      const wait = Math.max(0, 2000 - elapsed);
+
+      window.setTimeout(() => {
+        btn.classList.remove('spinning');
+
+        if (updateCount > 0) {
+          btn.innerHTML = `${iconRefresh(14)}<span>${updateCount} Update${updateCount === 1 ? '' : 's'}</span>`;
+        } else {
+          btn.innerHTML = `${iconCheck(14)}<span>You're up to date</span>`;
+
+          window.setTimeout(() => {
+            btn.innerHTML = originalHTML;
+            btn.disabled = false;
+          }, 1800);
+
+          return;
+        }
+
+        btn.disabled = false;
+      }, wait);
+    } catch (err) {
+      btn.classList.remove('spinning');
+      btn.innerHTML = originalHTML;
+      btn.disabled = false;
+
+      api.notify('Could not check updates', 'error');
+
+      log('pm:check-updates-failed', {
+        error: err.message || String(err)
+      });
     }
   }
 
@@ -3282,6 +3565,15 @@ export function setup(api) {
         <circle cx="5.5" cy="12" r="1.65" fill="currentColor"></circle>
         <circle cx="12" cy="12" r="1.65" fill="currentColor"></circle>
         <circle cx="18.5" cy="12" r="1.65" fill="currentColor"></circle>
+      </svg>
+    `;
+  }
+
+  function iconOptions(size = 16) {
+    return `
+      <svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.04.04a2.1 2.1 0 0 1-2.97 2.97l-.04-.04A1.8 1.8 0 0 0 14.8 19.6a1.8 1.8 0 0 0-1 .52V20.2a2.1 2.1 0 0 1-4.2 0v-.08a1.8 1.8 0 0 0-1-.52 1.8 1.8 0 0 0-1.98.36l-.04.04a2.1 2.1 0 1 1-2.97-2.97l.04-.04A1.8 1.8 0 0 0 4 15.2a1.8 1.8 0 0 0-.52-1H3.4a2.1 2.1 0 0 1 0-4.2h.08a1.8 1.8 0 0 0 .52-1 1.8 1.8 0 0 0-.36-1.98l-.04-.04A2.1 2.1 0 1 1 6.57 4l.04.04A1.8 1.8 0 0 0 8.6 4.4a1.8 1.8 0 0 0 1-.52V3.8a2.1 2.1 0 0 1 4.2 0v.08a1.8 1.8 0 0 0 1 .52 1.8 1.8 0 0 0 1.98-.36l.04-.04a2.1 2.1 0 1 1 2.97 2.97l-.04.04A1.8 1.8 0 0 0 19.6 9c.16.34.34.67.52 1h.08a2.1 2.1 0 0 1 0 4.2h-.08a1.8 1.8 0 0 0-.72.8Z"></path>
       </svg>
     `;
   }
