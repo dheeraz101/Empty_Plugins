@@ -1,7 +1,7 @@
 export const meta = {
   id: 'plugin-manager',
   name: 'Plugin Manager',
-  version: '5.9.0-v4',
+  version: '5.9.1-v4',
   compat: '>=4.0.0',
   permissions: [
     'ui',
@@ -1395,19 +1395,6 @@ export function setup(api) {
     api.bus.emit('pm:ui-slots-ready', {
       slots: Object.keys(slots)
     });
-
-    const pluginIconRow = document.createElement('div');
-    pluginIconRow.id = 'pm-plugin-icon-actions';
-    pluginIconRow.className = 'pm-plugin-icon-actions';
-    actions.appendChild(pluginIconRow);
-
-    slots['sidebar-icons'] = pluginIconRow;
-
-    restoreRegisteredUI('sidebar-icons');
-
-    api.bus.emit('pm:ui-slots-ready', {
-      slots: Object.keys(slots)
-    });
   }
 
   function registerPluginManagerUI(slot, el, id, owner = SELF_ID) {
@@ -1628,9 +1615,9 @@ export function setup(api) {
       listEl.innerHTML = skeletonHTML(4);
     }
 
-  if (forceRefresh || !communityCache.length || isCommunityCacheStale()) {
-    try {
-      await refreshCommunityCache({ hard: forceRefresh === true });
+    if (forceRefresh || !communityCache.length || isCommunityCacheStale()) {
+      try {
+        await refreshCommunityCache({ hard: forceRefresh === true });
       } catch (err) {
         if (!communityCache.length) {
           listEl.innerHTML = emptyStateHTML(
@@ -2648,21 +2635,30 @@ export function setup(api) {
       actions: `
         <button class="pm-btn pm-btn-secondary" data-confirm-action="whats-new-community">What’s New</button>
         <button class="pm-btn pm-btn-secondary" data-confirm-action="cancel">Close</button>
-        ${isInstalled
-          ? `<button class="pm-btn pm-btn-danger" data-modal-action="remove">Remove</button>`
-          : `<button class="pm-btn pm-btn-primary" data-modal-action="install">Install</button>`
+        ${
+          isInstalled
+            ? `<button class="pm-btn pm-btn-danger" data-confirm-action="remove">Remove</button>`
+            : `<button class="pm-btn pm-btn-primary" data-confirm-action="install">Install</button>`
         }
       `,
       onAction: async (action) => {
         if (action === 'remove') {
-          close();
-          await deletePluginWithConfirmation(plugin.id);
+          await deletePluginWithConfirmation(p.id);
           await renderCommunity(false);
           await renderInstalled(false);
           return;
         }
-        if (action === 'whats-new-community') showWhatsNewModal(p.id);
-        if (action === 'install') await installCommunityPlugin(p.id, p.url, null);
+
+        if (action === 'whats-new-community') {
+          showWhatsNewModal(p.id);
+          return;
+        }
+
+        if (action === 'install') {
+          await installCommunityPlugin(p.id, p.url, null);
+          await renderCommunity(false);
+          await renderInstalled(false);
+        }
       }
     });
   }
@@ -2844,9 +2840,19 @@ export function setup(api) {
     activeMenu.addEventListener('click', async (e) => {
       const btn = e.target.closest('[data-menu-action]');
       if (!btn) return;
+
       const action = btn.dataset.menuAction;
       const targetId = btn.dataset.id;
+      const externalOwner = btn.dataset.externalOwner;
+      const externalId = btn.dataset.externalId;
+
       closeActionMenu();
+
+      if (action === 'external') {
+        await runExternalMenuAction(externalOwner, externalId, targetId);
+        return;
+      }
+
       await handleMenuAction(action, targetId);
     });
   }
