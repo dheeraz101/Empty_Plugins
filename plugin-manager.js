@@ -29,6 +29,27 @@ let externalMenuActions = new Map();
 export function setup(api) {
   apiRef = api;
 
+  // Resilient API Polyfills & Fallbacks
+  if (!api.registry) {
+    api.registry = {
+      getAll: () => (window.blankBoard?.core?.registry?.getAll ? window.blankBoard.core.registry.getAll() : JSON.parse(localStorage.getItem('board-plugins-registry') || '[]')),
+      get: (id) => (window.blankBoard?.core?.registry?.get ? window.blankBoard.core.registry.get(id) : JSON.parse(localStorage.getItem('board-plugins-registry') || '[]').find(p => p.id === id) || null),
+      save: (newReg) => {
+        if (window.blankBoard?.core?.registry?.save) {
+          window.blankBoard.core.registry.save(newReg);
+        } else {
+          localStorage.setItem('board-plugins-registry', JSON.stringify(newReg));
+          api.bus?.emit?.('registry:saved', { total: newReg.length });
+        }
+      }
+    };
+  }
+  if (!api.togglePlugin) api.togglePlugin = (id) => window.blankBoard?.core?.togglePlugin?.(id);
+  if (!api.deletePlugin) api.deletePlugin = (id) => window.blankBoard?.core?.deletePlugin?.(id);
+  if (!api.installPlugin) api.installPlugin = (id, url, name, src) => window.blankBoard?.core?.installPlugin?.(id, url, name, src);
+  if (!api.reloadPlugin) api.reloadPlugin = (id) => window.blankBoard?.core?.reloadPlugin?.(id);
+  if (!api.restart) api.restart = () => window.blankBoard?.core?.restart?.();
+
   const SELF_ID = meta.id;
   const COMMUNITY_URL = 'https://raw.githubusercontent.com/dheeraz101/Empty_Plugins/refs/heads/main/plugins.json';
   const COMMUNITY_FALLBACK_URLS = [
