@@ -1297,8 +1297,6 @@ export function setup(api) {
       api.bus.emit('pm:register-ui-failed', { reason: err.message || 'Unknown error' });
     }
   };
-  api.bus.on('pm:register-ui', pmRegisterUiHandler);
-
   pmRegisterMenuActionHandler = (payload = {}) => {
     try {
       const owner = String(payload.owner || payload.pluginId || payload.__source || 'external');
@@ -2529,6 +2527,26 @@ export function setup(api) {
                 <small>Restore Plugin Manager position and size.</small>
               </span>
             </button>
+
+            <button class="pm-option-card" data-option-act="export-workspace">
+              <span class="pm-option-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              </span>
+              <span class="pm-option-text">
+                <strong>Export Workspace</strong>
+                <small>Download active plugins & settings (.blankboard).</small>
+              </span>
+            </button>
+
+            <button class="pm-option-card" data-option-act="import-workspace">
+              <span class="pm-option-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              </span>
+              <span class="pm-option-text">
+                <strong>Import Workspace</strong>
+                <small>Restore a saved .blankboard workspace bundle.</small>
+              </span>
+            </button>
           </div>
         </div>
 
@@ -2611,6 +2629,36 @@ export function setup(api) {
       if (action === 'reset-layout') {
         close();
         resetPluginManagerLayout();
+        return;
+      }
+
+      if (action === 'export-workspace') {
+        close();
+        if (window.blankBoard?.core?.exportWorkspace) {
+          window.blankBoard.core.exportWorkspace();
+        } else {
+          api.notify('Workspace export triggered', 'info');
+        }
+        return;
+      }
+
+      if (action === 'import-workspace') {
+        close();
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = '.blankboard,.json';
+        fileInput.onchange = async (event) => {
+          const file = event.target.files[0];
+          if (file) {
+            const text = await file.text();
+            if (window.blankBoard?.core?.importWorkspace) {
+              await window.blankBoard.core.importWorkspace(text);
+              renderInstalled(true);
+            }
+          }
+        };
+        fileInput.click();
+        return;
       }
     }
 

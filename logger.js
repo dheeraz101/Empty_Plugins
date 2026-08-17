@@ -92,7 +92,15 @@ const PM_EVENTS = [
   'pm:retry-fail',
   'pm:toggle',
   'pm:delete',
-  'pm:status-change'
+  'pm:status-change',
+  'plugin:loaded',
+  'plugin:unloaded',
+  'plugin:crashed',
+  'plugin:error',
+  'service:registered',
+  'service:unregistered',
+  'workspace:exported',
+  'workspace:imported'
 ];
 
 export function setup(api) {
